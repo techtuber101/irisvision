@@ -26,9 +26,8 @@ class SandboxImageSearchTool(SandboxToolsBase):
         # Use API keys from config
         self.serper_api_key = config.SERPER_API_KEY
         
-        # Do not fail tool registration if key is missing; handle at call time
         if not self.serper_api_key:
-            logging.warning("SERPER_API_KEY not found in configuration; Image Search tool will return a helpful error when called")
+            raise ValueError("SERPER_API_KEY not found in configuration")
 
     @openapi_schema({
         "type": "function",

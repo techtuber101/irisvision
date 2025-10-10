@@ -50,8 +50,8 @@ def setup_api_keys() -> None:
     for provider in providers:
         key = getattr(config, f"{provider}_API_KEY")
         if key:
-            # Export to env so underlying SDKs/LiteLLM pick them up consistently
-            os.environ[f"{provider}_API_KEY"] = key
+            # logger.debug(f"API key set for provider: {provider}")
+            pass
         else:
             logger.warning(f"No API key found for provider: {provider}")
 
@@ -60,12 +60,6 @@ def setup_api_keys() -> None:
         os.environ["OPENROUTER_API_BASE"] = config.OPENROUTER_API_BASE
         # logger.debug(f"Set OPENROUTER_API_BASE to {config.OPENROUTER_API_BASE}")
 
-
-    # Map Gemini to Google's env var for litellm/google SDK compatibility
-    if config.GEMINI_API_KEY:
-        os.environ["GOOGLE_API_KEY"] = config.GEMINI_API_KEY
-        # Also set GEMINI_API_KEY explicitly
-        os.environ["GEMINI_API_KEY"] = config.GEMINI_API_KEY
 
     # Set up AWS Bedrock bearer token authentication
     bedrock_token = config.AWS_BEARER_TOKEN_BEDROCK

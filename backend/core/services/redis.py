@@ -28,11 +28,8 @@ def initialize():
     redis_port = int(os.getenv("REDIS_PORT", 6379))
     redis_password = os.getenv("REDIS_PASSWORD", "")
     
-    # Connection pool configuration - allow overriding via env
-    try:
-        max_connections = int(os.getenv("REDIS_MAX_CONNECTIONS", "8192"))
-    except ValueError:
-        max_connections = 8192
+    # Connection pool configuration - optimized for production
+    max_connections = 128            # Reasonable limit for production
     socket_timeout = 15.0            # 15 seconds socket timeout
     connect_timeout = 10.0           # 10 seconds connection timeout
     retry_on_timeout = not (os.getenv("REDIS_RETRY_ON_TIMEOUT", "True").lower() != "true")
@@ -54,7 +51,7 @@ def initialize():
     )
 
     # Create Redis client from connection pool
-    client = redis.Redis(connection_pool=pool, client_name=f"app-{os.getpid()}")
+    client = redis.Redis(connection_pool=pool)
 
     return client
 

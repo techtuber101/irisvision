@@ -399,10 +399,10 @@ class Configuration:
         
         # Environment-based defaults
         if self.ENV_MODE == EnvMode.PRODUCTION:
-            return int(os.getenv("MAX_PARALLEL_AGENT_RUNS", "5000"))
+            return 3
         else:
-            # Local and staging: effectively infinite (bounded by env override)
-            return int(os.getenv("MAX_PARALLEL_AGENT_RUNS", "999999"))
+            # Local and staging: effectively infinite
+            return 999999
     
     @property
     def STRIPE_PRODUCT_ID(self) -> str:
