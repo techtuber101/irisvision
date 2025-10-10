@@ -112,7 +112,7 @@ async def start_agent(
         try:
             agent_data = await loader.load_agent(effective_agent_id, user_id, load_config=True)
             logger.debug(f"Using agent {agent_data.name} ({effective_agent_id}) version {agent_data.version_name}")
-        except HTTPException as e:
+        except (HTTPException, ValueError) as e:
             if body.agent_id:
                 raise  # Explicit agent not found - fail
             logger.warning(f"Stored agent_id {effective_agent_id} not found, falling back to default")
@@ -603,14 +603,19 @@ async def initiate_agent_with_files(
     
     # Try to load specified agent
     if agent_id:
-        agent_data = await loader.load_agent(agent_id, user_id, load_config=True)
-        logger.debug(f"Using agent {agent_data.name} ({agent_id}) version {agent_data.version_name}")
-    else:
-        # Load default agent
+        try:
+            agent_data = await loader.load_agent(agent_id, user_id, load_config=True)
+            logger.debug(f"Using agent {agent_data.name} ({agent_id}) version {agent_data.version_name}")
+        except ValueError as e:
+            logger.warning(f"Specified agent {agent_id} not found: {e}")
+            agent_data = None
+    
+    # Fall back to default agent if specified agent not found or not provided
+    if not agent_data:
         logger.debug(f"[AGENT INITIATE] Loading default agent")
         default_agent = await client.table('agents').select('agent_id').eq('account_id', account_id).eq('is_default', True).maybe_single().execute()
         
-        if default_agent.data:
+        if default_agent and default_agent.data:
             agent_data = await loader.load_agent(default_agent.data['agent_id'], user_id, load_config=True)
             logger.debug(f"Using default agent: {agent_data.name} ({agent_data.agent_id}) version {agent_data.version_name}")
         else:

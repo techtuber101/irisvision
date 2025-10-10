@@ -197,14 +197,14 @@ class TaskListTool(SandboxToolsBase):
                                     "type": "string",
                                     "description": "Section title (creates if doesn't exist)"
                                 },
-                                "tasks": {
+                                "task_contents": {
                                     "type": "array",
                                     "description": "Task contents for this section",
                                     "items": {"type": "string"},
                                     "minItems": 1
                                 }
                             },
-                            "required": ["title", "tasks"]
+                            "required": ["title", "task_contents"]
                         }
                     },
                     "section_title": {
@@ -250,7 +250,7 @@ class TaskListTool(SandboxToolsBase):
                 # Batch creation across multiple sections
                 for section_data in sections:
                     section_title_input = section_data["title"]
-                    task_list = section_data["tasks"]
+                    task_list = section_data["task_contents"]
                     
                     # Find or create section
                     title_lower = section_title_input.lower()

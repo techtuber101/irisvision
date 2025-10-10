@@ -137,7 +137,7 @@ def calculate_optimal_cache_threshold(
     
     # Context window scaling
     if context_window >= 2_000_000:
-        # Massive context (Gemini 2.5 Pro): Very large chunks
+        # Massive context (Gemini 2.5 Flash): Very large chunks
         context_multiplier = 2.0
     elif context_window >= 1_000_000:
         # Very large context: Can afford larger chunks

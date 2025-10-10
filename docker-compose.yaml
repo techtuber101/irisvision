@@ -65,6 +65,8 @@ services:
       - "3000:3000"
     volumes:
       - ./frontend/.env.local:/app/.env.local:ro
+    environment:
+      - NEXT_PUBLIC_BACKEND_URL=http://backend:8000/api
     depends_on:
       - backend
 

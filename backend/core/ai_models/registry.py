@@ -180,11 +180,12 @@ class ModelRegistry:
         ))
         
         self.register(Model(
-            id="gemini/gemini-2.5-pro",
-            name="Gemini 2.5 Pro",
+            id="gemini/gemini-2.5-flash",
+            name="Gemini 2.5 Flash",
             provider=ModelProvider.GOOGLE,
-            aliases=["gemini-2.5-pro", "Gemini 2.5 Pro"],
-            context_window=2_000_000,
+            aliases=["gemini-2.5-flash", "Gemini 2.5 Flash", "gemini-2.5-pro", "Gemini 2.5 Pro"],
+            context_window=1_000_000,
+            max_output_tokens=65_536,
             capabilities=[
                 ModelCapability.CHAT,
                 ModelCapability.FUNCTION_CALLING,
@@ -192,12 +193,20 @@ class ModelRegistry:
                 ModelCapability.STRUCTURED_OUTPUT,
             ],
             pricing=ModelPricing(
-                input_cost_per_million_tokens=1.25,
-                output_cost_per_million_tokens=10.00
+                input_cost_per_million_tokens=0.075,
+                output_cost_per_million_tokens=0.30
             ),
-            tier_availability=["paid"],
+            tier_availability=["free", "paid"],
             priority=95,
-            enabled=True
+            enabled=True,
+            recommended=True,
+            config=ModelConfig(
+                timeout=60.0,  # 60 second timeout for Flash model
+                num_retries=3,
+                extra_headers={
+                    "User-Agent": "Suna-AI-Agent/1.0"
+                }
+            )
         ))
         
         

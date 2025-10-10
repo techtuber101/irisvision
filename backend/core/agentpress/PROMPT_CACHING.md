@@ -8,7 +8,7 @@ AgentPress implements mathematically optimized prompt caching for Anthropic Clau
 
 ### 1. **Dynamic Context Detection**
 - Auto-detects context window from model registry (200k-2M+ tokens)
-- Supports all models: Claude 3.7 (200k), Claude Sonnet 4 (1M), Gemini 2.5 Pro (2M)
+- Supports all models: Claude 3.7 (200k), Claude Sonnet 4 (1M), Gemini 2.5 Flash (1M)
 - Falls back to 200k default if model not found
 
 ### 2. **Mathematical Threshold Calculation**
@@ -39,7 +39,7 @@ Where:
 | 200k tokens | 1.0x | Claude 3.7 Sonnet |
 | 500k tokens | 1.2x | GPT-4 variants |
 | 1M tokens | 1.5x | Claude Sonnet 4 |
-| 2M+ tokens | 2.0x | Gemini 2.5 Pro |
+| 1M+ tokens | 2.0x | Gemini 2.5 Flash |
 
 ## Cache Threshold Examples
 
@@ -50,7 +50,7 @@ Where:
 | **Claude 3.7** | 200k | 1.5k tokens | 3k tokens | 5k tokens | 9k tokens |
 | **GPT-5** | 400k | 3k tokens | 6k tokens | 10k tokens | 18k tokens |
 | **Claude Sonnet 4** | 1M | 7.5k tokens | 15k tokens | 25k tokens | 45k tokens |
-| **Gemini 2.5 Pro** | 2M | 15k tokens | 30k tokens | 50k tokens | 90k tokens |
+| **Gemini 2.5 Flash** | 1M | 15k tokens | 30k tokens | 50k tokens | 90k tokens |
 
 ## Cache Block Strategy
 
