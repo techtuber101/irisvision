@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Suna",
+    "name": "Iris",
     "slug": "suna-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,7 +9,7 @@
     "scheme": "sunamobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "description": "Suna is a fully open source AI assistant that helps you accomplish real-world tasks with ease. Through natural conversation, Suna becomes your digital companion for research, data analysis, and everyday challenges.",
+    "description": "Iris is a fully open source AI assistant that helps you accomplish real-world tasks with ease. Through natural conversation, Iris becomes your digital companion for research, data analysis, and everyday challenges.",
     "primaryColor": "#121215",
     "privacy": "public",
     "platforms": [
@@ -34,7 +34,7 @@
       "bundleIdentifier": "com.kortix.suna",
       "buildNumber": "1.0.0",
       "infoPlist": {
-        "CFBundleDisplayName": "Suna",
+        "CFBundleDisplayName": "Iris",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         }
@@ -58,9 +58,9 @@
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png",
-      "name": "Suna - Open Source Generalist AI Agent",
-      "shortName": "Suna",
-      "description": "Suna is a fully open source AI assistant that helps you accomplish real-world tasks with ease through natural conversation.",
+      "name": "Iris - Open Source Generalist AI Agent",
+      "shortName": "Iris",
+      "description": "Iris is a fully open source AI assistant that helps you accomplish real-world tasks with ease through natural conversation.",
       "startUrl": "/",
       "display": "standalone",
       "orientation": "portrait",
@@ -89,7 +89,7 @@
     },
     "extra": {
       "metadata": {
-        "applicationName": "Suna",
+        "applicationName": "Iris",
         "authors": "Kortix Team",
         "creator": "Kortix Team",
         "publisher": "Kortix Team",
