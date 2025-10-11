@@ -266,7 +266,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
           startOnLoad: false,
           securityLevel: 'loose',
           theme: 'base',
-          fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+          fontFamily: 'var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif',
           // Enable experimental features including gitgraph
           gitGraph: {
             showBranches: true,
@@ -394,7 +394,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = React.memo(({
             startOnLoad: false,
             securityLevel: 'loose',
             theme: 'base',
-            fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+            fontFamily: 'var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif',
             // Enable experimental features including gitgraph
             gitGraph: {
               showBranches: true,

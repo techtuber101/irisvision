@@ -66,18 +66,22 @@ export function createMutationHook<
       errorContext?: ErrorContext;
     },
   ) => {
-    const { errorContext: baseErrorContext, ...baseOptions } = options || {};
-    const { errorContext: customErrorContext, ...customMutationOptions } = customOptions || {};
+    const { errorContext: baseErrorContext, onError: baseOnError, ...baseOptions } = options || {};
+    const { errorContext: customErrorContext, onError: customOnError, ...customMutationOptions } = customOptions || {};
     
     return useMutation<TData, TError, TVariables, TContext>({
       mutationFn,
       onError: (error, variables, context) => {
         const errorContext = customErrorContext || baseErrorContext;
-        if (!customMutationOptions?.onError && !baseOptions?.onError) {
+        if (!customOnError && !baseOnError) {
           handleApiError(error, errorContext);
         }
-        baseOptions?.onError?.(error, variables, context);
-        customMutationOptions?.onError?.(error, variables, context);
+        if (baseOnError) {
+          (baseOnError as any)(error, variables, context);
+        }
+        if (customOnError) {
+          (customOnError as any)(error, variables, context);
+        }
       },
       ...baseOptions,
       ...customMutationOptions,

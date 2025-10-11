@@ -2,12 +2,11 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Bot, Menu, Plus, Zap, ChevronRight, BookOpen } from 'lucide-react';
+import { Bot, Menu, Plus, ChevronRight } from 'lucide-react';
 
 import { NavAgents } from '@/components/sidebar/nav-agents';
 import { NavUserWithTeams } from '@/components/sidebar/nav-user-with-teams';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
-import { CTACard } from '@/components/sidebar/cta';
 import {
   Sidebar,
   SidebarContent,
@@ -194,36 +193,6 @@ export function SidebarLeft({
               </span>
             </SidebarMenuButton>
           </Link>
-          <Link href="/triggers">
-            <SidebarMenuButton
-              className={cn('touch-manipulation mt-1', {
-                'bg-accent text-accent-foreground font-medium': pathname === '/triggers',
-              })}
-              onClick={() => {
-                if (isMobile) setOpenMobile(false);
-              }}
-            >
-              <Zap className="h-4 w-4 mr-1" />
-              <span className="flex items-center justify-between w-full">
-                Triggers
-              </span>
-            </SidebarMenuButton>
-          </Link>
-          <Link href="/knowledge">
-            <SidebarMenuButton
-              className={cn('touch-manipulation mt-1', {
-                'bg-accent text-accent-foreground font-medium': pathname === '/knowledge',
-              })}
-              onClick={() => {
-                if (isMobile) setOpenMobile(false);
-              }}
-            >
-              <BookOpen className="h-4 w-4 mr-1" />
-              <span className="flex items-center justify-between w-full">
-                Knowledge Base
-              </span>
-            </SidebarMenuButton>
-          </Link>
           {(
             <SidebarMenu>
               <Collapsible
@@ -285,11 +254,6 @@ export function SidebarLeft({
         </SidebarGroup>
         <NavAgents />
       </SidebarContent>
-      {state !== 'collapsed' && (
-        <div className="px-3 py-2">
-          <CTACard />
-        </div>
-      )}
       <SidebarFooter>
         {state === 'collapsed' && (
           <div className="mt-2 flex justify-center">

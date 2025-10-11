@@ -202,7 +202,7 @@ export function FileRenderer({
           <meta charset="UTF-8">
           <style>
             body { 
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+              font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
               padding: 2rem; 
               max-width: 900px; 
               margin: 0 auto;

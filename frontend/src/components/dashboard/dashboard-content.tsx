@@ -351,62 +351,34 @@ export function DashboardContent() {
         showUsageLimitAlert={true}
       />
 
-      <div className="flex flex-col h-screen w-full overflow-hidden">
+      <div className="flex flex-col h-screen w-full overflow-hidden relative">
+        {/* White checkered pattern background */}
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{
+          backgroundImage: `
+            linear-gradient(to right, rgba(255, 255, 255, 0.5) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.5) 1px, transparent 1px)
+          `,
+          backgroundSize: '40px 40px'
+        }}></div>
 
-
-
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto relative z-10">
           <div className="min-h-full flex flex-col">
-            {/* Tabs at the top */}
-            {(isStagingMode() || isLocalMode()) && (
-              <div className="px-4 pt-4 pb-4">
-                <div className="flex items-center justify-center gap-2 p-1 bg-muted/50 rounded-xl w-fit mx-auto">
-                  <button
-                    onClick={() => {
-                      setViewMode('super-worker');
-                      setSelectedMode(null);
-                    }}
-                    className={cn(
-                      "px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200",
-                      viewMode === 'super-worker'
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    Kortix Super Worker
-                  </button>
-                  <button
-                    onClick={() => {
-                      setViewMode('worker-templates');
-                      setSelectedMode(null);
-                    }}
-                    className={cn(
-                      "px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200",
-                      viewMode === 'worker-templates'
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    Worker Templates
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Centered content area */}
-            <div className="flex-1 flex items-start justify-center pt-[20vh]">
+            <div className="flex-1 flex items-center justify-center">
               {/* Super Worker View - Suna only */}
               {viewMode === 'super-worker' && (
                 <div className="w-full animate-in fade-in-0 duration-300">
                   {/* Title and chat input - Fixed position */}
                   <div className="px-4 py-8">
-                    <div className="w-full max-w-3xl mx-auto flex flex-col items-center space-y-4 md:space-y-6">
+                    <div className="w-full max-w-3xl mx-auto flex flex-col items-center justify-center space-y-4 md:space-y-6 relative">
                       <div className="flex flex-col items-center text-center w-full">
                         <p
-                          className="tracking-tight text-2xl md:text-3xl font-normal text-foreground/90"
+                          className="tracking-tight text-2xl md:text-3xl font-normal text-foreground/90 text-center relative z-10"
                           data-tour="dashboard-title"
+                          style={{ fontFamily: 'Geist, -apple-system, BlinkMacSystemFont, sans-serif', fontWeight: 400 }}
                         >
-                          What should Kortix Super Worker do for you today?
+                          Iris is ready, are you?
                         </p>
                       </div>
 

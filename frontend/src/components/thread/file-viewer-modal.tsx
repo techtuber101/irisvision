@@ -881,7 +881,7 @@ export function FileViewerModal({
               }
             }
             body {
-              font-family: 'Helvetica', 'Arial', sans-serif;
+              font-family: 'Geist', 'Helvetica', 'Arial', sans-serif;
               font-size: 12pt;
               color: #333;
               line-height: 1.5;
@@ -896,7 +896,7 @@ export function FileViewerModal({
             h4, h5, h6 { font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
             p { margin: 8pt 0; }
             pre, code {
-              font-family: 'Courier New', monospace;
+              font-family: 'Geist Mono', 'Courier New', monospace;
               background-color: #f5f5f5;
               border-radius: 3pt;
               padding: 2pt 4pt;

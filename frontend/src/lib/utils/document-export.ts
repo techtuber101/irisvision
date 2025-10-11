@@ -25,7 +25,7 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
         element.innerHTML = `
           <style>
             body { 
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
               line-height: 1.6;
               color: #000;
             }
@@ -51,14 +51,14 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
               border-radius: 4px; 
               overflow-x: auto; 
               margin: 1em 0;
-              font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+              font-family: 'Geist Mono', 'SF Mono', Monaco, 'Courier New', monospace;
               font-size: 0.9em;
             }
             code { 
               background: #f4f4f4; 
               padding: 0.2em 0.4em; 
               border-radius: 3px; 
-              font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+              font-family: 'Geist Mono', 'SF Mono', Monaco, 'Courier New', monospace;
               font-size: 0.9em;
             }
             pre code {
@@ -154,7 +154,7 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
       box-sizing: border-box;
     }
     body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       line-height: 1.6;
       color: #333;
       max-width: 800px;
@@ -227,14 +227,14 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
       padding: 1em; 
       overflow-x: auto; 
       margin: 1em 0;
-      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-family: 'Geist Mono', 'SF Mono', Monaco, 'Courier New', monospace;
       font-size: 0.9em;
     }
     code { 
       background: #f5f5f5; 
       padding: 0.2em 0.4em; 
       border-radius: 3px; 
-      font-family: 'SF Mono', Monaco, 'Courier New', monospace; 
+      font-family: 'Geist Mono', 'SF Mono', Monaco, 'Courier New', monospace; 
       font-size: 0.9em;
     }
     pre code {

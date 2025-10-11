@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -110,7 +110,7 @@
     "file-saver": "^2.0.5",
     "flags": "^3.2.0",
     "framer-motion": "^12.6.5",
-    "geist": "^1.2.1",
+    "geist": "^1.5.1",
     "gsap": "^3.13.0",
     "hjson": "^3.2.2",
     "html-to-docx": "^1.8.0",

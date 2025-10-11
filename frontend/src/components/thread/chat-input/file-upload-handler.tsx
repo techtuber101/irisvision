@@ -258,7 +258,7 @@ export const FileUploadHandler = forwardRef<
                   onClick={handleFileUpload}
                   variant="outline"
                   size="sm"
-                  className="h-8 w-8 p-0 bg-transparent border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/50 flex items-center justify-center cursor-pointer"
+                  className="h-8 px-3 bg-transparent border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/50 flex items-center justify-center gap-2 cursor-pointer"
                   disabled={
                     !isLoggedIn || loading || (disabled && !isAgentRunning) || isUploading
                   }
@@ -266,7 +266,10 @@ export const FileUploadHandler = forwardRef<
                   {isUploading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Paperclip className="h-4 w-4" />
+                    <>
+                      <Paperclip className="h-4 w-4" />
+                      <span className="text-sm">Attach</span>
+                    </>
                   )}
                 </Button>
               </span>

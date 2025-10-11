@@ -256,28 +256,10 @@ async def list_html_files():
         from fastapi import HTTPException
         raise HTTPException(status_code=500, detail=str(e))
 
-# Serve HTML files directly at root level
-@app.get("/{file_name}")
-async def serve_html_file(file_name: str):
-    """Serve HTML files directly for viewing"""
-    from fastapi import HTTPException
-    from fastapi.responses import HTMLResponse
-    
-    if not file_name.endswith('.html'):
-        raise HTTPException(status_code=404, detail="File must be .html")
-    
-    file_path = os.path.join(workspace_dir, file_name)
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    with open(file_path, 'r', encoding='utf-8') as f:
-        content = f.read()
-    
-    return HTMLResponse(content=content)
-
-# Mount static files but exclude them from the specific HTML route above
-# This ensures only the HTML route handles .html files, while StaticFiles handles everything else
-app.mount('/', StaticFiles(directory=workspace_dir), name='site')
+# Mount static files to serve all workspace files including presentations
+# This handles HTML files, JSON files, images, and all other static content
+# The StaticFiles mount properly handles subdirectories like presentations/name/slide_01.html
+app.mount('/', StaticFiles(directory=workspace_dir, html=True), name='site')
 
 # This is needed for the import string approach with uvicorn
 if __name__ == '__main__':

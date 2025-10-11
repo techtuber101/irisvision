@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
         <meta charset="utf-8">
         <style>
           body { 
-            font-family: Calibri, Arial, sans-serif;
+            font-family: 'Geist', Calibri, Arial, sans-serif;
             font-size: 11pt;
             line-height: 1.6;
           }
@@ -34,14 +34,14 @@ export async function POST(request: NextRequest) {
             font-style: italic; 
           }
           pre { 
-            font-family: 'Courier New', monospace;
+            font-family: 'Geist Mono', 'Courier New', monospace;
             font-size: 10pt;
             background-color: #f5f5f5;
             padding: 6pt;
             margin: 6pt 0;
           }
           code { 
-            font-family: 'Courier New', monospace;
+            font-family: 'Geist Mono', 'Courier New', monospace;
             font-size: 10pt;
             background-color: #f5f5f5;
           }
