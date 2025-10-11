@@ -17,7 +17,7 @@ import {
   getToolTitle,
   extractToolData,
 } from '../utils';
-import { downloadPresentation, DownloadFormat, handleGoogleSlidesUpload } from '../utils/presentation-utils';
+import { downloadPresentation, DownloadFormat, handleGoogleSlidesUpload, sanitizePresentationSlug } from '../utils/presentation-utils';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -63,7 +63,8 @@ export function PresentPresentationToolView({
     slideCount,
     summary,
     attachments,
-    presentationUrl
+    presentationUrl,
+    sandboxUrl: sandboxUrlFromArgs
   } = {
     presentationName: args.presentation_name || args.presentationName || undefined,
     presentationPath: args.presentation_path || args.presentationPath || undefined,
@@ -80,6 +81,7 @@ export function PresentPresentationToolView({
       return undefined;
     })(),
     presentationUrl: args.presentation_url || args.presentationUrl || undefined,
+    sandboxUrl: args.sandbox_url || args.sandboxUrl || undefined,
   };
 
   // Download state
@@ -87,24 +89,26 @@ export function PresentPresentationToolView({
 
   // Download handlers
   const handleDownload = async (format: DownloadFormat) => {
-    if (!project?.sandbox?.sandbox_url || !presentationName) return;
+    const resolvedSandboxUrl = project?.sandbox?.sandbox_url || sandboxUrlFromArgs;
+    if (!resolvedSandboxUrl || !presentationName || !presentationPath) return;
 
+    const sanitizedName = sanitizePresentationSlug(presentationName);
     setIsDownloading(true);
     try {
       if (format === DownloadFormat.GOOGLE_SLIDES) {
         const result = await handleGoogleSlidesUpload(
-          project.sandbox.sandbox_url, 
+          resolvedSandboxUrl, 
           `/workspace/${presentationPath}`
         );
-        // If redirected to auth, don't show error
         if (result?.redirected_to_auth) {
-          return; // Don't set loading false, user is being redirected
+          return;
         }
       } else {
-        await downloadPresentation(format,
-          project.sandbox.sandbox_url, 
-          `/workspace/${presentationPath}`, 
-          presentationName
+        await downloadPresentation(
+          format,
+          resolvedSandboxUrl,
+          `/workspace/${presentationPath}`,
+          sanitizedName
         );
       }
     } catch (error) {

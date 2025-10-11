@@ -7,6 +7,8 @@ import { Bot, Menu, Plus, ChevronRight } from 'lucide-react';
 import { NavAgents } from '@/components/sidebar/nav-agents';
 import { NavUserWithTeams } from '@/components/sidebar/nav-user-with-teams';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
+import Image from 'next/image';
+import { useTheme } from 'next-themes';
 import {
   Sidebar,
   SidebarContent,
@@ -75,6 +77,8 @@ export function SidebarLeft({
 }: React.ComponentProps<typeof Sidebar>) {
   const { state, setOpen, setOpenMobile } = useSidebar();
   const isMobile = useIsMobile();
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
   const [user, setUser] = useState<{
     name: string;
     email: string;
@@ -127,6 +131,10 @@ export function SidebarLeft({
   }, []);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isDocumentModalOpen) return;
 
@@ -154,10 +162,26 @@ export function SidebarLeft({
       className="border-r-0 bg-background/95 backdrop-blur-sm [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
       {...props}
     >
-      <SidebarHeader className="px-2 py-2">
-        <div className="flex h-[40px] items-center px-1 relative">
+      <SidebarHeader className="px-2 py-1">
+        <div className="flex h-[48px] items-center px-1 relative">
           <Link href="/dashboard" className="flex-shrink-0" onClick={() => isMobile && setOpenMobile(false)}>
-            <KortixLogo size={24} />
+            {state === 'collapsed' ? (
+              <KortixLogo size={24} />
+            ) : (
+              <Image
+                src={!mounted 
+                  ? '/irislogoblack.png'
+                  : resolvedTheme === 'dark'
+                    ? '/irislogowhitebig.png'
+                    : '/irislogoblack.png'
+                }
+                alt="Iris Logo"
+                width={100}
+                height={18}
+                className="h-5 w-auto"
+                priority
+              />
+            )}
           </Link>
           {state !== 'collapsed' && (
             <div className="ml-2 transition-all duration-200 ease-in-out whitespace-nowrap">

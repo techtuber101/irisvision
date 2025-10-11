@@ -9,9 +9,9 @@ export function SecondBentoAnimation() {
 
       <div className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 size-16 bg-black p-2 rounded-full z-30 md:bottom-0 md:top-auto">
         <img 
-          src="/kortix-symbol.svg" 
-          alt="Kortix Symbol" 
-          className="size-10 filter brightness-0 invert"
+          src="/irissymbolwhite.png" 
+          alt="Iris Symbol" 
+          className="size-10"
         />
       </div>
       <div className="relative flex h-full w-full items-center justify-center overflow-hidden">

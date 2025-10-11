@@ -313,6 +313,13 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
               );
             }
           }
+          
+          // If this is an assistant message, remove any optimistic "Hmm..." messages
+          if (message.type === 'assistant') {
+            const filteredPrev = prev.filter((m) => !m.message_id?.startsWith('hmm-'));
+            return [...filteredPrev, message];
+          }
+          
           return [...prev, message];
         }
       });
@@ -374,6 +381,15 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
 
   const handleStreamClose = useCallback(() => {}, []);
 
+  const handleAssistantStart = useCallback(() => {
+    // Remove the optimistic "Hmm..." message when assistant starts streaming
+    setMessages((prev) => 
+      prev.filter((m) => !m.message_id?.startsWith('hmm-'))
+    );
+    // Note: We can't clear the timeout here since it's scoped to the handleSubmitMessage function
+    // But the message removal is the important part
+  }, [setMessages]);
+
   const {
     status: streamHookStatus,
     textContent: streamingTextContent,
@@ -388,6 +404,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
       onStatusChange: handleStreamStatusChange,
       onError: handleStreamError,
       onClose: handleStreamClose,
+      onAssistantStart: handleAssistantStart,
     },
     threadId,
     setMessages,
@@ -413,7 +430,22 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         updated_at: new Date().toISOString(),
       };
 
-      setMessages((prev) => [...prev, optimisticUserMessage]);
+      // Add optimistic "Hmm..." message to show immediate responsiveness
+      const optimisticHmmMessage: UnifiedMessage = {
+        message_id: `hmm-${Date.now()}`,
+        thread_id: threadId,
+        type: 'assistant',
+        is_llm_message: true,
+        content: JSON.stringify({
+          content: 'HMM_THINKING_MESSAGE',
+          metadata: { is_optimistic: true, is_thinking: true }
+        }),
+        metadata: JSON.stringify({ is_optimistic: true, is_thinking: true }),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, optimisticUserMessage, optimisticHmmMessage]);
       setNewMessage('');
 
       // Auto-scroll to bottom when user sends a message
@@ -422,6 +454,13 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
           scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
         }
       }, 100);
+
+      // Fallback: Remove Hmm message after 10 seconds if no response comes
+      const hmmTimeout = setTimeout(() => {
+        setMessages((prev) => 
+          prev.filter((m) => m.message_id !== optimisticHmmMessage.message_id)
+        );
+      }, 10000);
 
       try {
         const messagePromise = addUserMessageMutation.mutateAsync({
@@ -467,9 +506,10 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
 
             setMessages((prev) =>
               prev.filter(
-                (m) => m.message_id !== optimisticUserMessage.message_id,
+                (m) => m.message_id !== optimisticUserMessage.message_id && m.message_id !== optimisticHmmMessage.message_id,
               ),
             );
+            clearTimeout(hmmTimeout);
             return;
           }
 
@@ -484,9 +524,10 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
 
             setMessages((prev) =>
               prev.filter(
-                (m) => m.message_id !== optimisticUserMessage.message_id,
+                (m) => m.message_id !== optimisticUserMessage.message_id && m.message_id !== optimisticHmmMessage.message_id,
               ),
             );
+            clearTimeout(hmmTimeout);
             return;
           }
 
@@ -503,9 +544,10 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
 
             setMessages((prev) =>
               prev.filter(
-                (m) => m.message_id !== optimisticUserMessage.message_id,
+                (m) => m.message_id !== optimisticUserMessage.message_id && m.message_id !== optimisticHmmMessage.message_id,
               ),
             );
+            clearTimeout(hmmTimeout);
             return;
           }
 
@@ -515,6 +557,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         const agentResult = results[1].value;
         setUserInitiatedRun(true);
         setAgentRunId(agentResult.agent_run_id);
+        
+        // Clear the Hmm timeout since we got a successful response
+        clearTimeout(hmmTimeout);
       } catch (err) {
         console.error('Error sending message or starting agent:', err);
         if (
@@ -524,8 +569,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
           toast.error(err instanceof Error ? err.message : 'Operation failed');
         }
         setMessages((prev) =>
-          prev.filter((m) => m.message_id !== optimisticUserMessage.message_id),
+          prev.filter((m) => m.message_id !== optimisticUserMessage.message_id && m.message_id !== optimisticHmmMessage.message_id),
         );
+        clearTimeout(hmmTimeout);
       } finally {
         setIsSending(false);
       }

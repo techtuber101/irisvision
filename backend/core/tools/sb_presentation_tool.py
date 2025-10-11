@@ -1,690 +1,1086 @@
+"""Modern presentation tool with reliable live previews and metadata.
+
+This module rewrites the sandbox presentation workflow to provide:
+- Consistent metadata management with explicit presentation + slide models
+- Stable sanitisation between backend and frontend (slug-based identifiers)
+- Rich tool responses that include sandbox URLs for immediate previews
+- Helper utilities for regenerating slides (finalise, validate, delete)
+"""
+
+from __future__ import annotations
+
+import html
+import json
+import re
+import unicodedata
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+from core.agentpress.thread_manager import ThreadManager
 from core.agentpress.tool import ToolResult, openapi_schema, tool_metadata
 from core.sandbox.tool_base import SandboxToolsBase
-from core.agentpress.thread_manager import ThreadManager
-from typing import List, Dict, Optional, Union
-import json
-import os
-from datetime import datetime
-import re
-import asyncio
+from core.utils.logger import logger
 
-@tool_metadata(
-    display_name="Presentations",
-    description="Create and manage stunning presentation slides",
-    icon="Presentation",
-    color="bg-orange-100 dark:bg-orange-800/50",
-    weight=70,
-    visible=True
-)
-class SandboxPresentationTool(SandboxToolsBase):
-    """
-    Per-slide HTML presentation tool for creating presentation slides.
-    Each slide is created as a basic HTML document without predefined CSS styling.
-    Users can include their own CSS styling inline or in style tags as needed.
-    """
-    
-    def __init__(self, project_id: str, thread_manager: ThreadManager):
-        super().__init__(project_id, thread_manager)
-        self.presentations_dir = "presentations"
+ISO_SUFFIX = "Z"
+METADATA_VERSION = 1
+DEFAULT_THEME = "modern"
 
 
-    async def _ensure_presentations_dir(self):
-        """Ensure the presentations directory exists"""
-        full_path = f"{self.workspace_path}/{self.presentations_dir}"
+# ---------------------------------------------------------------------------
+# Utility helpers
+# ---------------------------------------------------------------------------
+
+def utc_now() -> str:
+    """Return a UTC timestamp with a trailing Z suffix."""
+    return datetime.utcnow().replace(microsecond=0).isoformat() + ISO_SUFFIX
+
+
+def sanitize_presentation_id(raw: str) -> str:
+    """Create a filesystem-safe identifier shared across backend and frontend."""
+    if not raw:
+        return f"presentation_{uuid.uuid4().hex[:8]}"
+
+    normalized = unicodedata.normalize("NFKD", raw)
+    ascii_str = normalized.encode("ascii", "ignore").decode("ascii")
+    ascii_str = ascii_str.lower()
+    ascii_str = re.sub(r"[^\w\s-]", "", ascii_str)
+    ascii_str = re.sub(r"[\s-]+", "_", ascii_str)
+    ascii_str = ascii_str.strip("_")
+    ascii_str = ascii_str[:64]
+
+    return ascii_str or f"presentation_{uuid.uuid4().hex[:8]}"
+
+
+THEME_CATALOG: Dict[str, Dict[str, str]] = {
+    "modern": {
+        "background": "linear-gradient(135deg, #2b5876 0%, #4e4376 100%)",
+        "title_color": "#ffffff",
+        "text_color": "#f5f5f5",
+        "accent_color": "#ffd166",
+        "font_family": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        "panel_color": "rgba(255, 255, 255, 0.1)",
+        "border_color": "rgba(255, 255, 255, 0.25)",
+    },
+    "minimal": {
+        "background": "#ffffff",
+        "title_color": "#0f172a",
+        "text_color": "#1f2937",
+        "accent_color": "#6366f1",
+        "font_family": "'Helvetica Neue', Arial, sans-serif",
+        "panel_color": "#f8fafc",
+        "border_color": "#e2e8f0",
+    },
+    "dark": {
+        "background": "linear-gradient(135deg, #101828 0%, #1d2939 50%, #111827 100%)",
+        "title_color": "#f8fafc",
+        "text_color": "#e2e8f0",
+        "accent_color": "#38bdf8",
+        "font_family": "'IBM Plex Sans', 'Segoe UI', sans-serif",
+        "panel_color": "rgba(255, 255, 255, 0.08)",
+        "border_color": "rgba(148, 163, 184, 0.45)",
+    },
+    "corporate": {
+        "background": "#0f172a",
+        "title_color": "#f8fafc",
+        "text_color": "#e2e8f0",
+        "accent_color": "#f97316",
+        "font_family": "'Open Sans', 'Segoe UI', sans-serif",
+        "panel_color": "rgba(15, 23, 42, 0.65)",
+        "border_color": "rgba(100, 116, 139, 0.4)",
+    },
+    "vibrant": {
+        "background": "linear-gradient(135deg, #ff6cab 0%, #7366ff 100%)",
+        "title_color": "#ffffff",
+        "text_color": "#f8fafc",
+        "accent_color": "#ffe066",
+        "font_family": "'Poppins', 'Segoe UI', sans-serif",
+        "panel_color": "rgba(255, 255, 255, 0.12)",
+        "border_color": "rgba(255, 255, 255, 0.25)",
+    },
+    "slate": {
+        "background": "linear-gradient(135deg, #334155 0%, #1e293b 100%)",
+        "title_color": "#f8fafc",
+        "text_color": "#e2e8f0",
+        "accent_color": "#22d3ee",
+        "font_family": "'Nunito Sans', 'Segoe UI', sans-serif",
+        "panel_color": "rgba(15, 23, 42, 0.55)",
+        "border_color": "rgba(148, 163, 184, 0.35)",
+    },
+}
+
+
+# ---------------------------------------------------------------------------
+# Metadata data classes
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class SlideEntry:
+    number: int
+    title: str
+    filename: str
+    file_path: str
+    content: str
+    created_at: str
+    updated_at: str
+
+    def to_metadata(self) -> Dict[str, Any]:
+        return {
+            "number": self.number,
+            "title": self.title,
+            "filename": self.filename,
+            "file_path": self.file_path,
+            "content": self.content,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+    def to_public_dict(self, sandbox_url: Optional[str] = None, include_content: bool = False) -> Dict[str, Any]:
+        data = {
+            "slide_number": self.number,
+            "title": self.title,
+            "file_path": self.file_path,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+        if include_content:
+            data["content"] = self.content
+        if sandbox_url:
+            data["preview_url"] = PresentationStorage.build_external_url(self.file_path, sandbox_url)
+        return data
+
+    @classmethod
+    def from_metadata(cls, number: int, data: Dict[str, Any], presentation_name: str) -> "SlideEntry":
+        filename = data.get("filename") or f"slide_{number:03d}.html"
+        file_path = data.get("file_path") or f"presentations/{presentation_name}/{filename}"
+        content = data.get("content", "")
+        created_at = data.get("created_at") or utc_now()
+        updated_at = data.get("updated_at") or created_at
+        title = data.get("title") or f"Slide {number}"
+        return cls(
+            number=number,
+            title=title,
+            filename=filename,
+            file_path=file_path,
+            content=content,
+            created_at=created_at,
+            updated_at=updated_at,
+        )
+
+
+@dataclass
+class PresentationState:
+    presentation_id: str
+    presentation_name: str
+    title: str
+    theme: str = DEFAULT_THEME
+    description: str = ""
+    created_at: str = field(default_factory=utc_now)
+    updated_at: str = field(default_factory=utc_now)
+    slides: Dict[int, SlideEntry] = field(default_factory=dict)
+
+    @property
+    def directory_path(self) -> str:
+        return f"presentations/{self.presentation_name}"
+
+    @property
+    def metadata_path(self) -> str:
+        return f"{self.directory_path}/metadata.json"
+
+    def slide_count(self) -> int:
+        return len(self.slides)
+
+    def ordered_slides(self) -> List[SlideEntry]:
+        return [self.slides[idx] for idx in sorted(self.slides.keys())]
+
+    def to_metadata(self) -> Dict[str, Any]:
+        return {
+            "version": METADATA_VERSION,
+            "presentation_id": self.presentation_id,
+            "presentation_name": self.presentation_name,
+            "title": self.title,
+            "description": self.description,
+            "theme": self.theme,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "slide_count": self.slide_count(),
+            "slides": {
+                str(number): slide.to_metadata()
+                for number, slide in sorted(self.slides.items())
+            },
+        }
+
+    @classmethod
+    def from_metadata(cls, metadata: Dict[str, Any]) -> "PresentationState":
+        presentation_name = metadata.get("presentation_name") or sanitize_presentation_id(metadata.get("presentation_id") or "presentation")
+        presentation_id = metadata.get("presentation_id") or presentation_name
+        state = cls(
+            presentation_id=presentation_id,
+            presentation_name=presentation_name,
+            title=metadata.get("title") or presentation_id,
+            theme=metadata.get("theme") or DEFAULT_THEME,
+            description=metadata.get("description", ""),
+            created_at=metadata.get("created_at") or utc_now(),
+            updated_at=metadata.get("updated_at") or utc_now(),
+        )
+
+        slides = metadata.get("slides", {})
+        for key, value in slides.items():
+            try:
+                number = int(key)
+            except ValueError:
+                continue
+            state.slides[number] = SlideEntry.from_metadata(number, value, presentation_name)
+        return state
+
+
+# ---------------------------------------------------------------------------
+# Storage helper around the sandbox filesystem
+# ---------------------------------------------------------------------------
+
+
+class PresentationStorage:
+    def __init__(self, tool: "ProfessionalPresentationTool"):
+        self.tool = tool
+        self.root_dir = f"{tool.workspace_path}/presentations"
+        self.index_path = f"{self.root_dir}/.metadata.json"
+
+    async def ensure_root(self) -> None:
+        await self.tool._ensure_sandbox()
         try:
-            await self.sandbox.fs.create_folder(full_path, "755")
-        except:
+            await self.tool.sandbox.fs.make_dir(self.root_dir)
+        except Exception:
             pass
 
-    async def _ensure_presentation_dir(self, presentation_name: str):
-        """Ensure a specific presentation directory exists"""
-        safe_name = self._sanitize_filename(presentation_name)
-        presentation_path = f"{self.workspace_path}/{self.presentations_dir}/{safe_name}"
+    async def ensure_presentation_dir(self, presentation_name: str) -> str:
+        await self.ensure_root()
+        presentation_dir = f"{self.root_dir}/{presentation_name}"
         try:
-            await self.sandbox.fs.create_folder(presentation_path, "755")
-        except:
+            await self.tool.sandbox.fs.make_dir(presentation_dir)
+        except Exception:
             pass
-        return safe_name, presentation_path
+        return presentation_dir
 
-    def _sanitize_filename(self, name: str) -> str:
-        """Convert presentation name to safe filename"""
-        return "".join(c for c in name if c.isalnum() or c in "-_").lower()
+    async def load(self, presentation_reference: str, *, create_if_missing: bool = False, default_title: Optional[str] = None, default_theme: str = DEFAULT_THEME) -> PresentationState:
+        name_candidate = sanitize_presentation_id(presentation_reference)
+        metadata_path = f"{self.root_dir}/{name_candidate}/metadata.json"
+
+        try:
+            raw = await self.tool.sandbox.fs.download_file(metadata_path)
+            metadata = json.loads(raw.decode())
+            state = PresentationState.from_metadata(metadata)
+            return state
+        except Exception:
+            if not create_if_missing:
+                raise FileNotFoundError(f"Presentation '{presentation_reference}' does not exist")
+
+            await self.ensure_presentation_dir(name_candidate)
+            now = utc_now()
+            state = PresentationState(
+                presentation_id=presentation_reference,
+                presentation_name=name_candidate,
+                title=default_title or presentation_reference,
+                theme=default_theme or DEFAULT_THEME,
+                created_at=now,
+                updated_at=now,
+            )
+            await self.save(state)
+            return state
+
+    async def save(self, state: PresentationState) -> None:
+        await self.ensure_presentation_dir(state.presentation_name)
+        state.updated_at = utc_now()
+        metadata_path = f"{self.root_dir}/{state.presentation_name}/metadata.json"
+        payload = json.dumps(state.to_metadata(), indent=2, ensure_ascii=False)
+        await self.tool.sandbox.fs.upload_file(payload.encode("utf-8"), metadata_path)
+
+    async def update_index(self, state: PresentationState) -> None:
+        await self.ensure_root()
+        try:
+            raw = await self.tool.sandbox.fs.download_file(self.index_path)
+            index = json.loads(raw.decode())
+        except Exception:
+            index = {"presentations": {}, "updated_at": utc_now()}
+
+        index.setdefault("presentations", {})[state.presentation_name] = {
+            "presentation_id": state.presentation_id,
+            "title": state.title,
+            "description": state.description,
+            "theme": state.theme,
+            "slide_count": state.slide_count(),
+            "created_at": state.created_at,
+            "updated_at": state.updated_at,
+            "presentation_name": state.presentation_name,
+            "metadata_path": state.metadata_path,
+        }
+        index["updated_at"] = utc_now()
+        await self.tool.sandbox.fs.upload_file(json.dumps(index, indent=2).encode("utf-8"), self.index_path)
+
+    async def remove_from_index(self, presentation_name: str) -> None:
+        await self.ensure_root()
+        try:
+            raw = await self.tool.sandbox.fs.download_file(self.index_path)
+            index = json.loads(raw.decode())
+        except Exception:
+            return
+
+        presentations = index.get("presentations", {})
+        if presentation_name in presentations:
+            presentations.pop(presentation_name, None)
+            index["presentations"] = presentations
+            index["updated_at"] = utc_now()
+            await self.tool.sandbox.fs.upload_file(json.dumps(index, indent=2).encode("utf-8"), self.index_path)
+
+    async def list_presentations(self) -> List[PresentationState]:
+        await self.ensure_root()
+        try:
+            entries = await self.tool.sandbox.fs.list_files(self.root_dir)
+        except Exception as exc:
+            logger.warning("Failed to list presentations directory: %s", exc)
+            return []
+
+        states: List[PresentationState] = []
+        for entry in entries:
+            is_dir = getattr(entry, "is_directory", None)
+            if is_dir is None:
+                is_dir = getattr(entry, "is_dir", False)
+            if not is_dir:
+                continue
+            try:
+                state = await self.load(entry.name, create_if_missing=False)
+                states.append(state)
+            except FileNotFoundError:
+                continue
+            except Exception as exc:
+                logger.error("Failed to load presentation %s: %s", entry.name, exc)
+        return states
+
+    @staticmethod
+    def build_external_url(relative_path: str, sandbox_url: Optional[str]) -> Optional[str]:
+        if not sandbox_url or not relative_path:
+            return None
+        relative = relative_path.lstrip("/")
+        base = sandbox_url.rstrip("/")
+        return f"{base}/{relative}"
 
 
-    def _create_slide_html(self, slide_content: str, slide_number: int, total_slides: int, presentation_title: str) -> str:
-        """Create a basic HTML document without predefined CSS"""
-        
-        html_template = f"""<!DOCTYPE html>
-<html lang="en">
+# ---------------------------------------------------------------------------
+# HTML rendering helpers
+# ---------------------------------------------------------------------------
+
+
+def resolve_theme(theme: Optional[str]) -> Dict[str, str]:
+    if not theme:
+        return THEME_CATALOG[DEFAULT_THEME]
+    return THEME_CATALOG.get(theme, THEME_CATALOG[DEFAULT_THEME])
+
+
+def render_slide_html(
+    *,
+    presentation: PresentationState,
+    slide: SlideEntry,
+    slide_index: int,
+    total_slides: int,
+) -> str:
+    theme = resolve_theme(presentation.theme)
+    title = html.escape(slide.title or presentation.title)
+    presentation_title = html.escape(presentation.title)
+
+    return f"""<!DOCTYPE html>
+<html lang=\"en\">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{presentation_title} - Slide {slide_number}</title>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1"></script>
-    <style>
-        body {{
-            height: 1080px;
-            width: 1920px;
-            margin: 0;
-            padding: 0;
-        }}
-    </style>
+  <meta charset=\"UTF-8\" />
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />
+  <meta name=\"generator\" content=\"ProfessionalPresentationTool\" />
+  <meta name=\"presentation\" content=\"{presentation.presentation_name}\" />
+  <meta name=\"slide-number\" content=\"{slide_index}\" />
+  <meta name=\"slide-count\" content=\"{total_slides}\" />
+  <meta http-equiv=\"X-Daytona-Skip-Preview-Warning\" content=\"true\" />
+  <title>{title} − {presentation_title}</title>
+  <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\" />
+  <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin />
+  <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Poppins:wght@400;600&display=swap\" rel=\"stylesheet\" />
+  <style>
+    :root {{
+      color-scheme: light dark;
+    }}
+    * {{
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }}
+    body {{
+      width: 1920px;
+      height: 1080px;
+      margin: 0;
+      background: {theme['background']};
+      color: {theme['text_color']};
+      font-family: {theme['font_family']};
+      display: flex;
+      align-items: stretch;
+      justify-content: stretch;
+    }}
+    .slide-wrapper {{
+      flex: 1;
+      padding: 72px 96px;
+      display: flex;
+      flex-direction: column;
+      gap: 48px;
+    }}
+    .slide-header {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid {theme['border_color']};
+      padding-bottom: 32px;
+    }}
+    .slide-header h1 {{
+      font-size: 64px;
+      font-weight: 700;
+      color: {theme['title_color']};
+      letter-spacing: -0.01em;
+    }}
+    .badge {{
+      font-size: 20px;
+      font-weight: 600;
+      color: {theme['accent_color']};
+      border: 1px solid {theme['border_color']};
+      padding: 8px 18px;
+      border-radius: 999px;
+      background: {theme['panel_color']};
+      backdrop-filter: blur(6px);
+    }}
+    .slide-body {{
+      flex: 1;
+      overflow: auto;
+      font-size: 34px;
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }}
+    .slide-body p {{
+      margin-bottom: 18px;
+    }}
+    .slide-body ul,
+    .slide-body ol {{
+      margin-left: 40px;
+      display: grid;
+      gap: 12px;
+    }}
+    .slide-body li {{
+      margin-left: 8px;
+    }}
+    .slide-body .card {{
+      background: {theme['panel_color']};
+      border: 1px solid {theme['border_color']};
+      border-radius: 18px;
+      padding: 32px;
+      backdrop-filter: blur(10px);
+    }}
+    .slide-body pre {{
+      background: rgba(15, 23, 42, 0.65);
+      padding: 24px;
+      border-radius: 16px;
+      overflow-x: auto;
+      font-size: 26px;
+    }}
+    .slide-footer {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid {theme['border_color']};
+      padding-top: 24px;
+      font-size: 24px;
+      letter-spacing: 0.02em;
+    }}
+    .footer-title {{
+      font-weight: 600;
+      opacity: 0.8;
+    }}
+  </style>
 </head>
 <body>
-    {slide_content}
+  <div class=\"slide-wrapper\">
+    <header class=\"slide-header\">
+      <h1>{title}</h1>
+      <div class=\"badge\">Slide {slide_index} of {total_slides}</div>
+    </header>
+    <section class=\"slide-body\">
+      {slide.content}
+    </section>
+    <footer class=\"slide-footer\">
+      <div class=\"footer-title\">{presentation_title}</div>
+      <div>Slide {slide_index}/{total_slides}</div>
+    </footer>
+  </div>
 </body>
 </html>"""
-        return html_template
 
-    async def _load_presentation_metadata(self, presentation_path: str):
-        """Load presentation metadata, create if doesn't exist"""
-        metadata_path = f"{presentation_path}/metadata.json"
+
+# ---------------------------------------------------------------------------
+# Primary Presentation Tool implementation
+# ---------------------------------------------------------------------------
+
+
+@tool_metadata(
+    display_name="Professional Presentations",
+    description="Create, preview, and deliver stunning presentations",
+    icon="Presentation",
+    color="bg-purple-100 dark:bg-purple-800/50",
+    weight=70,
+    visible=True,
+)
+class ProfessionalPresentationTool(SandboxToolsBase):
+    def __init__(self, project_id: str, thread_manager: ThreadManager):
+        super().__init__(project_id, thread_manager)
+        self._storage = PresentationStorage(self)
+
+    async def _get_sandbox_links(self) -> Dict[str, Optional[str]]:
         try:
-            metadata_content = await self.sandbox.fs.download_file(metadata_path)
-            return json.loads(metadata_content.decode())
-        except:
-            # Create default metadata
+            client = await self.thread_manager.db.client
+            result = await client.table("projects").select("sandbox").eq("project_id", self.project_id).execute()
+            data = (result.data or [None])[0] if hasattr(result, "data") else None
+            sandbox_info = (data or {}).get("sandbox") or {}
             return {
-                "presentation_name": "",
-                "title": "Presentation", 
-                "description": "",
-                "slides": {},
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
+                "sandbox_url": sandbox_info.get("sandbox_url"),
+                "vnc_url": sandbox_info.get("vnc_preview"),
+                "token": sandbox_info.get("token"),
             }
+        except Exception as exc:
+            logger.debug("Unable to load sandbox links: %s", exc)
+            return {"sandbox_url": None, "vnc_url": None, "token": None}
 
-    async def _save_presentation_metadata(self, presentation_path: str, metadata: Dict):
-        """Save presentation metadata"""
-        metadata["updated_at"] = datetime.now().isoformat()
-        metadata_path = f"{presentation_path}/metadata.json"
-        await self.sandbox.fs.upload_file(json.dumps(metadata, indent=2).encode(), metadata_path)
-
-
-
+    # ------------------------------------------------------------------
+    # create_slide
+    # ------------------------------------------------------------------
 
     @openapi_schema({
         "type": "function",
         "function": {
             "name": "create_slide",
-            "description": "Create or update a single slide in a presentation. Each slide is saved as a standalone HTML file with 1920x1080 dimensions (16:9 aspect ratio). Perfect for iterative slide creation and editing.",
+            "description": "Create or update a presentation slide with rich HTML content.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "presentation_name": {
+                    "presentation_id": {
                         "type": "string",
-                        "description": "Name of the presentation (creates folder if doesn't exist)"
+                        "description": "Unique identifier for the presentation (name or slug).",
                     },
                     "slide_number": {
                         "type": "integer",
-                        "description": "Slide number (1-based). If slide exists, it will be updated."
+                        "description": "Slide number (starting from 1).",
                     },
-                    "slide_title": {
+                    "title": {
                         "type": "string",
-                        "description": "Title of this specific slide (for reference and navigation)"
+                        "description": "Slide title displayed in headers and metadata.",
                     },
                     "content": {
                         "type": "string",
-                        "description": "HTML body content only (DO NOT include <!DOCTYPE>, <html>, <head>, or <body> tags - these are added automatically). Include your content with inline CSS or <style> blocks. Design for 1920x1080 resolution. D3.js, Font Awesome, and Chart.js are pre-loaded and available to use."
+                        "description": "HTML body content for the slide (no <html>/<body> wrapper).",
                     },
-                    "presentation_title": {
-                                    "type": "string",
-                        "description": "Main title of the presentation (used in HTML title and navigation)",
-                        "default": "Presentation"
-                    }
+                    "theme": {
+                        "type": "string",
+                        "description": "Optional theme key (modern, minimal, dark, corporate, vibrant, slate).",
+                        "default": DEFAULT_THEME,
+                    },
                 },
-                "required": ["presentation_name", "slide_number", "slide_title", "content"]
-            }
-        }
+                "required": ["presentation_id", "slide_number", "title", "content"],
+            },
+        },
     })
     async def create_slide(
         self,
-        presentation_name: str,
+        presentation_id: str,
         slide_number: int,
-        slide_title: str,
+        title: str,
         content: str,
-        presentation_title: str = "Presentation"
+        theme: str = DEFAULT_THEME,
     ) -> ToolResult:
-        """Create or update a single slide in a presentation"""
         try:
-            await self._ensure_sandbox()
-            await self._ensure_presentations_dir()
-            
-            # Validation
-            if not presentation_name:
-                return self.fail_response("Presentation name is required.")
-            
+            await self._storage.ensure_root()
+
             if slide_number < 1:
-                return self.fail_response("Slide number must be 1 or greater.")
-            
-            if not slide_title:
-                return self.fail_response("Slide title is required.")
-            
-            if not content:
-                return self.fail_response("Slide content is required.")
-            
-            # Ensure presentation directory exists
-            safe_name, presentation_path = await self._ensure_presentation_dir(presentation_name)
-            
-            # Load or create metadata
-            metadata = await self._load_presentation_metadata(presentation_path)
-            metadata["presentation_name"] = presentation_name
-            if presentation_title != "Presentation":  # Only update if explicitly provided
-                metadata["title"] = presentation_title
-            
-            # Create slide HTML
-            slide_html = self._create_slide_html(
-                slide_content=content,
-                slide_number=slide_number,
-                total_slides=0,  # Will be updated when regenerating navigation
-                presentation_title=presentation_title
+                return self.fail_response("slide_number must be >= 1")
+            if not presentation_id.strip():
+                return self.fail_response("presentation_id is required")
+            if not title.strip():
+                return self.fail_response("title is required")
+            if not content.strip():
+                return self.fail_response("content is required")
+
+            state = await self._storage.load(
+                presentation_id,
+                create_if_missing=True,
+                default_title=title,
+                default_theme=theme,
             )
-            
-            # Save slide file
-            slide_filename = f"slide_{slide_number:02d}.html"
-            slide_path = f"{presentation_path}/{slide_filename}"
-            await self.sandbox.fs.upload_file(slide_html.encode(), slide_path)
-            
-            # Update metadata
-            if "slides" not in metadata:
-                metadata["slides"] = {}
-            
-            metadata["slides"][str(slide_number)] = {
-                "title": slide_title,
-                "filename": slide_filename,
-                "file_path": f"{self.presentations_dir}/{safe_name}/{slide_filename}",
-                "preview_url": f"/workspace/{self.presentations_dir}/{safe_name}/{slide_filename}",
-                "created_at": datetime.now().isoformat()
-            }
-            
-            # Save updated metadata
-            await self._save_presentation_metadata(presentation_path, metadata)
-            
-            return self.success_response({
-                "message": f"Slide {slide_number} '{slide_title}' created/updated successfully",
-                "presentation_name": presentation_name,
-                "presentation_path": f"{self.presentations_dir}/{safe_name}",
+
+            state.theme = theme or state.theme
+            slide_filename = f"slide_{slide_number:03d}.html"
+            file_path = f"presentations/{state.presentation_name}/{slide_filename}"
+            now = utc_now()
+
+            existing = state.slides.get(slide_number)
+            created_at = existing.created_at if existing else now
+            slide_entry = SlideEntry(
+                number=slide_number,
+                title=title,
+                filename=slide_filename,
+                file_path=file_path,
+                content=content,
+                created_at=created_at,
+                updated_at=now,
+            )
+            state.slides[slide_number] = slide_entry
+
+            total_slides = state.slide_count()
+            rendered = render_slide_html(
+                presentation=state,
+                slide=slide_entry,
+                slide_index=slide_number,
+                total_slides=total_slides,
+            )
+            slide_full_path = f"{self._storage.root_dir}/{state.presentation_name}/{slide_filename}"
+            await self.sandbox.fs.upload_file(rendered.encode("utf-8"), slide_full_path)
+
+            await self._storage.save(state)
+            await self._storage.update_index(state)
+
+            sandbox_links = await self._get_sandbox_links()
+            sandbox_url = sandbox_links.get("sandbox_url")
+
+            response = {
+                "status": "slide_created",
+                "message": f"✓ Slide {slide_number} created successfully",
+                "presentation_id": state.presentation_id,
+                "presentation_name": state.presentation_name,
+                "presentation_title": state.title,
+                "presentation_path": state.directory_path,
+                "metadata_path": state.metadata_path,
+                "metadata_url": PresentationStorage.build_external_url(state.metadata_path, sandbox_url),
+                "sandbox_url": sandbox_url,
                 "slide_number": slide_number,
-                "slide_title": slide_title,
-                "slide_file": f"{self.presentations_dir}/{safe_name}/{slide_filename}",
-                "preview_url": f"/workspace/{self.presentations_dir}/{safe_name}/{slide_filename}",
-                "total_slides": len(metadata["slides"]),
-                "note": "Professional slide created with custom styling - designed for 1920x1080 resolution"
-            })
-            
-        except Exception as e:
-            return self.fail_response(f"Failed to create slide: {str(e)}")
+                "slide_title": title,
+                "slide_file": slide_entry.file_path,
+                "slide": slide_entry.to_public_dict(sandbox_url=sandbox_url, include_content=False),
+                "total_slides": total_slides,
+                "theme": state.theme,
+            }
+            return self.success_response(response)
+        except Exception as exc:
+            logger.exception("Failed to create slide: %s", exc)
+            return self.fail_response(f"Failed to create slide: {exc}")
+
+    # ------------------------------------------------------------------
+    # list_slides
+    # ------------------------------------------------------------------
 
     @openapi_schema({
         "type": "function",
         "function": {
             "name": "list_slides",
-            "description": "List all slides in a presentation, showing their titles and order",
+            "description": "List all slides for a presentation.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "presentation_name": {
-                        "type": "string",
-                        "description": "Name of the presentation to list slides for"
-                    }
+                    "presentation_id": {"type": "string", "description": "Presentation identifier or slug."}
                 },
-                "required": ["presentation_name"]
-            }
-        }
+                "required": ["presentation_id"],
+            },
+        },
     })
-    async def list_slides(self, presentation_name: str) -> ToolResult:
-        """List all slides in a presentation"""
+    async def list_slides(self, presentation_id: str) -> ToolResult:
         try:
-            await self._ensure_sandbox()
-            
-            if not presentation_name:
-                return self.fail_response("Presentation name is required.")
-            
-            safe_name = self._sanitize_filename(presentation_name)
-            presentation_path = f"{self.workspace_path}/{self.presentations_dir}/{safe_name}"
-            
-            # Load metadata
-            metadata = await self._load_presentation_metadata(presentation_path)
-            
-            if not metadata.get("slides"):
-                return self.success_response({
-                    "message": f"No slides found in presentation '{presentation_name}'",
-                    "presentation_name": presentation_name,
-                    "slides": [],
-                    "total_slides": 0
-                })
-            
-            # Sort slides by number
-            slides_info = []
-            for slide_num_str, slide_data in metadata["slides"].items():
-                slides_info.append({
-                    "slide_number": int(slide_num_str),
-                    "title": slide_data["title"],
-                    "filename": slide_data["filename"],
-                    "preview_url": slide_data["preview_url"],
-                    "created_at": slide_data.get("created_at", "Unknown")
-                })
-            
-            slides_info.sort(key=lambda x: x["slide_number"])
-            
-            return self.success_response({
-                "message": f"Found {len(slides_info)} slides in presentation '{presentation_name}'",
-                "presentation_name": presentation_name,
-                "presentation_title": metadata.get("title", "Presentation"),
-                "slides": slides_info,
-                "total_slides": len(slides_info),
-                "presentation_path": f"{self.presentations_dir}/{safe_name}"
-            })
-            
-        except Exception as e:
-            return self.fail_response(f"Failed to list slides: {str(e)}")
+            state = await self._storage.load(presentation_id, create_if_missing=False)
+            sandbox_links = await self._get_sandbox_links()
+            sandbox_url = sandbox_links.get("sandbox_url")
+
+            slides = [
+                slide.to_public_dict(sandbox_url=sandbox_url, include_content=False)
+                for slide in state.ordered_slides()
+            ]
+
+            response = {
+                "message": f"Found {len(slides)} slides",
+                "presentation_id": state.presentation_id,
+                "presentation_name": state.presentation_name,
+                "presentation_title": state.title,
+                "presentation_path": state.directory_path,
+                "metadata_path": state.metadata_path,
+                "metadata_url": PresentationStorage.build_external_url(state.metadata_path, sandbox_url),
+                "theme": state.theme,
+                "description": state.description,
+                "slides": slides,
+                "slide_count": state.slide_count(),
+                "sandbox_url": sandbox_url,
+            }
+            return self.success_response(response)
+        except FileNotFoundError:
+            return self.fail_response(f"Presentation '{presentation_id}' not found")
+        except Exception as exc:
+            logger.exception("Failed to list slides: %s", exc)
+            return self.fail_response(f"Failed to list slides: {exc}")
+
+    # ------------------------------------------------------------------
+    # delete_slide
+    # ------------------------------------------------------------------
 
     @openapi_schema({
         "type": "function",
         "function": {
             "name": "delete_slide",
-            "description": "Delete a specific slide from a presentation",
+            "description": "Delete a specific slide from a presentation.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "presentation_name": {
-                        "type": "string",
-                        "description": "Name of the presentation"
-                    },
-                    "slide_number": {
-                        "type": "integer",
-                        "description": "Slide number to delete (1-based)"
-                    }
+                    "presentation_id": {"type": "string"},
+                    "slide_number": {"type": "integer"},
                 },
-                "required": ["presentation_name", "slide_number"]
-            }
-        }
+                "required": ["presentation_id", "slide_number"],
+            },
+        },
     })
-    async def delete_slide(self, presentation_name: str, slide_number: int) -> ToolResult:
-        """Delete a specific slide from a presentation"""
+    async def delete_slide(self, presentation_id: str, slide_number: int) -> ToolResult:
         try:
-            await self._ensure_sandbox()
-            
-            if not presentation_name:
-                return self.fail_response("Presentation name is required.")
-            
-            if slide_number < 1:
-                return self.fail_response("Slide number must be 1 or greater.")
-            
-            safe_name = self._sanitize_filename(presentation_name)
-            presentation_path = f"{self.workspace_path}/{self.presentations_dir}/{safe_name}"
-            
-            # Load metadata
-            metadata = await self._load_presentation_metadata(presentation_path)
-            
-            if not metadata.get("slides") or str(slide_number) not in metadata["slides"]:
-                return self.fail_response(f"Slide {slide_number} not found in presentation '{presentation_name}'")
-            
-            # Get slide info before deletion
-            slide_info = metadata["slides"][str(slide_number)]
-            slide_filename = slide_info["filename"]
-            
-            # Delete slide file
-            slide_path = f"{presentation_path}/{slide_filename}"
+            state = await self._storage.load(presentation_id, create_if_missing=False)
+            slide = state.slides.get(slide_number)
+            if not slide:
+                return self.fail_response(f"Slide {slide_number} not found in presentation '{presentation_id}'")
+
+            slide_full_path = f"{self._storage.root_dir}/{state.presentation_name}/{slide.filename}"
             try:
-                await self.sandbox.fs.delete_file(slide_path)
-            except:
-                pass  # File might not exist
-            
-            # Remove from metadata
-            del metadata["slides"][str(slide_number)]
-            
-            # Save updated metadata
-            await self._save_presentation_metadata(presentation_path, metadata)
-            
-            return self.success_response({
-                "message": f"Slide {slide_number} '{slide_info['title']}' deleted successfully",
-                "presentation_name": presentation_name,
+                await self.sandbox.fs.delete_file(slide_full_path)
+            except Exception as exc:
+                logger.debug("Unable to delete slide file %s: %s", slide_full_path, exc)
+
+            del state.slides[slide_number]
+            await self._storage.save(state)
+            await self._storage.update_index(state)
+
+            response = {
+                "message": f"Slide {slide_number} '{slide.title}' deleted successfully",
+                "presentation_name": state.presentation_name,
+                "presentation_path": state.directory_path,
                 "deleted_slide": slide_number,
-                "deleted_title": slide_info['title'],
-                "remaining_slides": len(metadata["slides"])
-            })
-            
-        except Exception as e:
-            return self.fail_response(f"Failed to delete slide: {str(e)}")
+                "deleted_title": slide.title,
+                "remaining_slides": state.slide_count(),
+            }
+            return self.success_response(response)
+        except FileNotFoundError:
+            return self.fail_response(f"Presentation '{presentation_id}' not found")
+        except Exception as exc:
+            logger.exception("Failed to delete slide: %s", exc)
+            return self.fail_response(f"Failed to delete slide: {exc}")
 
-
-
+    # ------------------------------------------------------------------
+    # list_presentations
+    # ------------------------------------------------------------------
 
     @openapi_schema({
         "type": "function",
         "function": {
             "name": "list_presentations",
-            "description": "List all available presentations in the workspace",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        }
+            "description": "List all presentations stored in the sandbox.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
     })
     async def list_presentations(self) -> ToolResult:
-        """List all presentations in the workspace"""
         try:
-            await self._ensure_sandbox()
-            presentations_path = f"{self.workspace_path}/{self.presentations_dir}"
-            
-            try:
-                files = await self.sandbox.fs.list_files(presentations_path)
-                presentations = []
-                
-                for file_info in files:
-                    if file_info.is_directory:
-                        metadata = await self._load_presentation_metadata(f"{presentations_path}/{file_info.name}")
-                        presentations.append({
-                            "folder": file_info.name,
-                            "title": metadata.get("title", "Unknown Title"),
-                            "description": metadata.get("description", ""),
-                            "total_slides": len(metadata.get("slides", {})),
-                            "created_at": metadata.get("created_at", "Unknown"),
-                            "updated_at": metadata.get("updated_at", "Unknown")
-                        })
-                
-                return self.success_response({
-                    "message": f"Found {len(presentations)} presentations",
-                    "presentations": presentations,
-                    "presentations_directory": f"/workspace/{self.presentations_dir}"
-                })
-                
-            except Exception as e:
-                return self.success_response({
-                    "message": "No presentations found",
-                    "presentations": [],
-                    "presentations_directory": f"/workspace/{self.presentations_dir}",
-                    "note": "Create your first slide using create_slide"
-                })
-                
-        except Exception as e:
-            return self.fail_response(f"Failed to list presentations: {str(e)}")
+            states = await self._storage.list_presentations()
+            presentations = [
+                {
+                    "folder": state.presentation_name,
+                    "title": state.title,
+                    "description": state.description,
+                    "total_slides": state.slide_count(),
+                    "theme": state.theme,
+                    "created_at": state.created_at,
+                    "updated_at": state.updated_at,
+                    "metadata_path": state.metadata_path,
+                }
+                for state in states
+            ]
+            response = {
+                "message": f"Found {len(presentations)} presentations",
+                "presentations": presentations,
+                "presentations_directory": "/workspace/presentations",
+            }
+            return self.success_response(response)
+        except Exception as exc:
+            logger.exception("Failed to list presentations: %s", exc)
+            return self.fail_response(f"Failed to list presentations: {exc}")
+
+    # ------------------------------------------------------------------
+    # delete_presentation
+    # ------------------------------------------------------------------
 
     @openapi_schema({
         "type": "function",
         "function": {
             "name": "delete_presentation",
-            "description": "Delete an entire presentation and all its files",
+            "description": "Delete an entire presentation and all slides.",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "presentation_name": {
-                        "type": "string",
-                        "description": "Name of the presentation to delete"
-                    }
-                },
-                "required": ["presentation_name"]
-            }
-        }
+                "properties": {"presentation_id": {"type": "string"}},
+                "required": ["presentation_id"],
+            },
+        },
     })
-    async def delete_presentation(self, presentation_name: str) -> ToolResult:
-        """Delete a presentation and all its files"""
+    async def delete_presentation(self, presentation_id: str) -> ToolResult:
         try:
-            await self._ensure_sandbox()
-            
-            if not presentation_name:
-                return self.fail_response("Presentation name is required.")
-            
-            safe_name = self._sanitize_filename(presentation_name)
-            presentation_path = f"{self.workspace_path}/{self.presentations_dir}/{safe_name}"
-            
+            slug = sanitize_presentation_id(presentation_id)
+            full_path = f"{self._storage.root_dir}/{slug}"
             try:
-                await self.sandbox.fs.delete_folder(presentation_path)
-                return self.success_response({
-                    "message": f"Presentation '{presentation_name}' deleted successfully",
-                    "deleted_path": f"{self.presentations_dir}/{safe_name}"
-                })
-            except Exception as e:
-                return self.fail_response(f"Presentation '{presentation_name}' not found or could not be deleted: {str(e)}")
-                
-        except Exception as e:
-            return self.fail_response(f"Failed to delete presentation: {str(e)}")
+                await self.sandbox.fs.delete_folder(full_path)
+            except Exception as exc:
+                return self.fail_response(f"Presentation '{presentation_id}' not found or could not be deleted: {exc}")
 
+            await self._storage.remove_from_index(slug)
+            return self.success_response({
+                "message": f"Presentation '{presentation_id}' deleted successfully",
+                "deleted_path": f"presentations/{slug}",
+            })
+        except Exception as exc:
+            logger.exception("Failed to delete presentation: %s", exc)
+            return self.fail_response(f"Failed to delete presentation: {exc}")
+
+    # ------------------------------------------------------------------
+    # validate_slide
+    # ------------------------------------------------------------------
 
     @openapi_schema({
         "type": "function",
         "function": {
             "name": "validate_slide",
-            "description": "Validate a slide by reading its HTML code and checking if the content height exceeds 1080px. Use this tool to ensure slides fit within the standard presentation dimensions before finalizing them. This helps maintain proper slide formatting and prevents content overflow issues.",
+            "description": "Validate rendered slide height using Playwright.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "presentation_name": {
-                        "type": "string",
-                        "description": "Name of the presentation containing the slide to validate"
-                    },
-                    "slide_number": {
-                        "type": "integer",
-                        "description": "Slide number to validate (1-based)"
-                    }
+                    "presentation_id": {"type": "string"},
+                    "slide_number": {"type": "integer"},
                 },
-                "required": ["presentation_name", "slide_number"]
-            }
-        }
+                "required": ["presentation_id", "slide_number"],
+            },
+        },
     })
-    async def validate_slide(self, presentation_name: str, slide_number: int) -> ToolResult:
-        """Validate a slide by rendering it in a browser and measuring actual content height"""
+    async def validate_slide(self, presentation_id: str, slide_number: int) -> ToolResult:
         try:
-            await self._ensure_sandbox()
-            
-            if not presentation_name:
-                return self.fail_response("Presentation name is required.")
-            
-            if slide_number < 1:
-                return self.fail_response("Slide number must be 1 or greater.")
-            
-            safe_name = self._sanitize_filename(presentation_name)
-            presentation_path = f"{self.workspace_path}/{self.presentations_dir}/{safe_name}"
-            
-            # Load metadata to verify slide exists
-            metadata = await self._load_presentation_metadata(presentation_path)
-            
-            if not metadata.get("slides") or str(slide_number) not in metadata["slides"]:
-                return self.fail_response(f"Slide {slide_number} not found in presentation '{presentation_name}'")
-            
-            # Get slide info
-            slide_info = metadata["slides"][str(slide_number)]
-            slide_filename = slide_info["filename"]
-            
-            # Create a Python script to measure the actual rendered height using Playwright
-            measurement_script = f'''
-import asyncio
-import json
+            state = await self._storage.load(presentation_id, create_if_missing=False)
+            slide = state.slides.get(slide_number)
+            if not slide:
+                return self.fail_response(f"Slide {slide_number} not found in presentation '{presentation_id}'")
+
+            script_name = f".validate_slide_{uuid.uuid4().hex}.py"
+            script_path = f"{self.workspace_path}/{script_name}"
+            script = f'''import asyncio, json
 from playwright.async_api import async_playwright
 
-async def measure_slide_height():
+async def measure():
     async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            args=['--no-sandbox', '--disable-setuid-sandbox']
-        )
+        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
         page = await browser.new_page(viewport={{"width": 1920, "height": 1080}})
-        
-        # Load the HTML file
-        await page.goto('file:///workspace/{self.presentations_dir}/{safe_name}/{slide_filename}')
-        
-        # Wait for page to load
-        await page.wait_for_load_state('networkidle')
-        
-        # Measure the actual content height
-        dimensions = await page.evaluate("""
-            () => {{
-                const body = document.body;
-                const html = document.documentElement;
-                
-                // Get the actual scroll height (total content height)
-                const scrollHeight = Math.max(
-                    body.scrollHeight, body.offsetHeight,
-                    html.clientHeight, html.scrollHeight, html.offsetHeight
-                );
-                
-                // Get viewport height
-                const viewportHeight = window.innerHeight;
-                
-                // Check if content overflows
-                const overflows = scrollHeight > 1080;
-                
-                return {{
-                    scrollHeight: scrollHeight,
-                    viewportHeight: viewportHeight,
-                    overflows: overflows,
-                    excessHeight: scrollHeight - 1080
-                }};
-            }}
-        """)
-        
+        await page.goto("file:///workspace/{slide.file_path}", wait_until="networkidle", timeout=25000)
+        dimensions = await page.evaluate("""() => {{
+            const html = document.documentElement;
+            const body = document.body;
+            const scrollHeight = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight);
+            return {{
+                scrollHeight,
+                overflows: scrollHeight > 1080,
+                excessHeight: Math.max(0, scrollHeight - 1080)
+            }};
+        }}""")
         await browser.close()
         return dimensions
 
-result = asyncio.run(measure_slide_height())
-print(json.dumps(result))
+print(json.dumps(asyncio.run(measure())))
 '''
-            
-            # Write the script to a temporary file in the sandbox
-            script_path = f"{self.workspace_path}/.validate_slide_temp.py"
-            await self.sandbox.fs.upload_file(measurement_script.encode(), script_path)
-            
-            # Execute the script
+            await self.sandbox.fs.upload_file(script.encode("utf-8"), script_path)
+
             try:
                 result = await self.sandbox.process.exec(
-                    f"/bin/sh -c 'cd /workspace && python3 .validate_slide_temp.py'",
-                    timeout=30
+                    f"/bin/sh -c 'cd /workspace && python3 {script_name}'",
+                    timeout=45,
                 )
-                
-                # Parse the result
                 output = (getattr(result, "result", None) or getattr(result, "output", "") or "").strip()
                 if not output:
-                    raise Exception("No output from validation script")
-                
+                    raise RuntimeError("No output produced by validation script")
                 dimensions = json.loads(output)
-                
-                # Clean up the temporary script
+            finally:
                 try:
                     await self.sandbox.fs.delete_file(script_path)
-                except:
+                except Exception:
                     pass
-                
-            except Exception as e:
-                # Clean up on error
-                try:
-                    await self.sandbox.fs.delete_file(script_path)
-                except:
-                    pass
-                return self.fail_response(f"Failed to measure slide dimensions: {str(e)}")
-            
-            # Analyze results - simple pass/fail
-            validation_passed = not dimensions["overflows"]
-            
-            validation_results = {
-                "presentation_name": presentation_name,
-                "presentation_path": presentation_path,
+
+            validation_passed = not dimensions.get("overflows", False)
+            response = {
+                "presentation_name": state.presentation_name,
+                "presentation_path": state.directory_path,
                 "slide_number": slide_number,
-                "slide_title": slide_info["title"],
-                "actual_content_height": dimensions["scrollHeight"],
+                "slide_title": slide.title,
+                "actual_content_height": dimensions.get("scrollHeight"),
                 "target_height": 1080,
-                "validation_passed": validation_passed
+                "validation_passed": validation_passed,
             }
-            
-            # Add pass/fail message
             if validation_passed:
-                validation_results["message"] = f"✓ Slide {slide_number} '{slide_info['title']}' validation passed. Content height: {dimensions['scrollHeight']}px"
+                response["message"] = f"✓ Slide {slide_number} '{slide.title}' validation passed. Content height: {dimensions.get('scrollHeight')}px"
             else:
-                validation_results["message"] = f"✗ Slide {slide_number} '{slide_info['title']}' validation failed. Content height: {dimensions['scrollHeight']}px exceeds 1080px limit by {dimensions['excessHeight']}px"
-                validation_results["excess_height"] = dimensions["excessHeight"]
-            
-            return self.success_response(validation_results)
-            
-        except Exception as e:
-            return self.fail_response(f"Failed to validate slide: {str(e)}")
+                response["message"] = (
+                    f"✗ Slide {slide_number} '{slide.title}' validation failed. Content height: "
+                    f"{dimensions.get('scrollHeight')}px exceeds 1080px limit by {dimensions.get('excessHeight')}px"
+                )
+                response["excess_height"] = dimensions.get("excessHeight")
+            return self.success_response(response)
+        except FileNotFoundError:
+            return self.fail_response(f"Presentation '{presentation_id}' not found")
+        except Exception as exc:
+            logger.exception("Failed to validate slide: %s", exc)
+            return self.fail_response(f"Failed to validate slide: {exc}")
+
+    # ------------------------------------------------------------------
+    # finalize_presentation
+    # ------------------------------------------------------------------
+
+    @openapi_schema({
+        "type": "function",
+        "function": {
+            "name": "finalize_presentation",
+            "description": "Finalize a presentation and regenerate slide footers.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "presentation_id": {"type": "string"},
+                    "presentation_title": {"type": "string"},
+                    "description": {"type": "string"},
+                },
+                "required": ["presentation_id", "presentation_title"],
+            },
+        },
+    })
+    async def finalize_presentation(
+        self,
+        presentation_id: str,
+        presentation_title: str,
+        description: str = "",
+    ) -> ToolResult:
+        try:
+            state = await self._storage.load(presentation_id, create_if_missing=False)
+            state.title = presentation_title
+            state.description = description or state.description
+
+            total_slides = state.slide_count()
+            if total_slides == 0:
+                return self.fail_response("No slides found in presentation")
+
+            for idx, slide in enumerate(state.ordered_slides(), start=1):
+                slide.title = slide.title or presentation_title
+                slide.updated_at = utc_now()
+                rendered = render_slide_html(
+                    presentation=state,
+                    slide=slide,
+                    slide_index=idx,
+                    total_slides=total_slides,
+                )
+                slide_full_path = f"{self._storage.root_dir}/{state.presentation_name}/{slide.filename}"
+                await self.sandbox.fs.upload_file(rendered.encode("utf-8"), slide_full_path)
+
+            await self._storage.save(state)
+            await self._storage.update_index(state)
+
+            sandbox_links = await self._get_sandbox_links()
+            sandbox_url = sandbox_links.get("sandbox_url")
+            attachments = [slide.file_path for slide in state.ordered_slides()]
+
+            response = {
+                "message": f"✓ Presentation '{presentation_title}' is ready!",
+                "presentation_id": state.presentation_id,
+                "presentation_name": state.presentation_name,
+                "presentation_title": state.title,
+                "presentation_path": state.directory_path,
+                "metadata_path": state.metadata_path,
+                "metadata_url": PresentationStorage.build_external_url(state.metadata_path, sandbox_url),
+                "description": state.description,
+                "theme": state.theme,
+                "slide_count": total_slides,
+                "attachments": attachments,
+                "sandbox_url": sandbox_url,
+                "status": "finalized",
+            }
+            return self.success_response(response)
+        except FileNotFoundError:
+            return self.fail_response(f"Presentation '{presentation_id}' not found")
+        except Exception as exc:
+            logger.exception("Failed to finalize presentation: %s", exc)
+            return self.fail_response(f"Failed to finalize presentation: {exc}")
+
+    # ------------------------------------------------------------------
+    # present_presentation
+    # ------------------------------------------------------------------
 
     @openapi_schema({
         "type": "function",
         "function": {
             "name": "present_presentation",
-            "description": "Present the final presentation to the user. Use this tool when: 1) All slides have been created and formatted, 2) The presentation is ready for user review, 3) You want to show the user the complete presentation with all files, 4) The presentation creation process is finished and you want to deliver the final result. IMPORTANT: This tool is specifically for presenting completed presentations, not for intermediate steps. Include the presentation name, slide count, and all relevant file attachments. This tool provides a special UI for presentation delivery.",
+            "description": "Deliver the final presentation summary to the user.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "presentation_name": {
-                        "type": "string",
-                        "description": "The identifier/folder name of the presentation (e.g., 'test_presentation'). This should match the presentation_name used in create_slide."
-                    },
-                    "presentation_title": {
-                        "type": "string",
-                        "description": "The human-readable title of the presentation (e.g., 'Test Presentation'). This will be displayed prominently to the user."
-                    },
-                    "presentation_path": {
-                        "type": "string",
-                        "description": "The file path where the presentation is located (e.g., 'presentations/my-presentation/'). This helps users locate the files."
-                    },
-                    "slide_count": {
-                        "type": "integer",
-                        "description": "The total number of slides in the presentation. This gives users a quick overview of the presentation size."
-                    },
-                    "text": {
-                        "type": "string",
-                        "description": "A summary or description of the presentation to present to the user. Include: 1) What the presentation covers, 2) Key highlights or features, 3) Any important notes about the presentation, 4) How to use or view the presentation."
-                    },
+                    "presentation_name": {"type": "string"},
+                    "presentation_title": {"type": "string"},
+                    "presentation_path": {"type": "string"},
+                    "slide_count": {"type": "integer"},
+                    "text": {"type": "string", "description": "Human readable summary."},
                     "attachments": {
                         "anyOf": [
                             {"type": "string"},
-                            {"items": {"type": "string"}, "type": "array"}
-                        ],
-                        "description": "List of presentation files to attach. Include: 1) All HTML slide files (e.g., 'presentations/my-presentation/slide_01.html'), 2) Any additional presentation files (PDF exports, etc.), 3) Supporting files if relevant. Always use relative paths to /workspace directory."
+                            {"type": "array", "items": {"type": "string"}},
+                        ]
                     },
-                    "presentation_url": {
-                        "type": "string",
-                        "description": "(Optional) A direct URL to view the presentation if available. This could be a hosted version or a specific viewing link."
-                    }
+                    "presentation_url": {"type": "string"},
                 },
-                "required": ["presentation_name", "presentation_title", "presentation_path", "slide_count", "text", "attachments"]
-            }
-        }
+                "required": [
+                    "presentation_name",
+                    "presentation_title",
+                    "presentation_path",
+                    "slide_count",
+                    "text",
+                    "attachments",
+                ],
+            },
+        },
     })
     async def present_presentation(
-        self, 
+        self,
         presentation_name: str,
         presentation_title: str,
         presentation_path: str,
         slide_count: int,
         text: str,
         attachments: Union[str, List[str]],
-        presentation_url: Optional[str] = None
+        presentation_url: Optional[str] = None,
     ) -> ToolResult:
-        """Present the final presentation to the user.
-
-        Args:
-            presentation_name: The identifier/folder name of the presentation
-            presentation_title: The human-readable title of the presentation
-            presentation_path: The file path where the presentation is located
-            slide_count: The total number of slides in the presentation
-            text: A summary or description of the presentation
-            attachments: List of presentation files to attach
-            presentation_url: Optional direct URL to view the presentation
-
-        Returns:
-            ToolResult indicating successful presentation delivery
-        """
         try:
-            # Convert single attachment to list for consistent handling
-            if attachments and isinstance(attachments, str):
-                attachments = [attachments]
+            if isinstance(attachments, str):
+                attachments_list = [att.strip() for att in attachments.split(",") if att.strip()]
+            else:
+                attachments_list = attachments
 
-            # Create a structured response with all presentation data
-            result_data = {
+            sandbox_links = await self._get_sandbox_links()
+            response = {
                 "presentation_name": presentation_name,
                 "presentation_title": presentation_title,
                 "presentation_path": presentation_path,
                 "slide_count": slide_count,
                 "text": text,
-                "attachments": attachments,
+                "attachments": attachments_list,
                 "presentation_url": presentation_url,
-                "status": "presentation_delivered"
+                "sandbox_url": sandbox_links.get("sandbox_url"),
+                "status": "presentation_delivered",
             }
-                
-            return self.success_response(result_data)
-        except Exception as e:
-            return self.fail_response(f"Error presenting presentation: {str(e)}")
+            return self.success_response(response)
+        except Exception as exc:
+            logger.exception("Failed to present presentation: %s", exc)
+            return self.fail_response(f"Error presenting presentation: {exc}")

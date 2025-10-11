@@ -130,13 +130,22 @@ const defaultRegistry: ToolViewRegistryType = {
 
   // New per-slide presentation tools
   'create-slide': PresentationViewer,
+  'create_slide': PresentationViewer,
   'list-slides': PresentationViewer,
+  'list_slides': PresentationViewer,
   'list-presentations': ListPresentationsToolView,
+  'list_presentations': ListPresentationsToolView,
   'delete-slide': DeleteSlideToolView,
+  'delete_slide': DeleteSlideToolView,
   'delete-presentation': DeletePresentationToolView,
+  'delete_presentation': DeletePresentationToolView,
   'validate-slide': PresentationViewer,
+  'validate_slide': PresentationViewer,
+  'finalize-presentation': PresentPresentationToolView,
+  'finalize_presentation': PresentPresentationToolView,
   // 'presentation-styles': PresentationStylesToolView,
   'present-presentation': PresentPresentationToolView,
+  'present_presentation': PresentPresentationToolView,
 
   'create-sheet': SheetsToolView,
   'update-sheet': SheetsToolView,

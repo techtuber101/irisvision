@@ -702,6 +702,9 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                     <div class="metadata-item">
                         <span>Generated on {current_time}</span>
                     </div>
+                    <div class="metadata-item">
+                        <span>Created by Iris Intelligence For You</span>
+                    </div>
         """
         
         if metadata:

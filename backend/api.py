@@ -118,6 +118,7 @@ async def log_requests_middleware(request: Request, call_next):
     try:
         response = await call_next(request)
         process_time = time.time() - start_time
+        response.headers["X-Daytona-Skip-Preview-Warning"] = "true"
         logger.debug(f"Request completed: {method} {path} | Status: {response.status_code} | Time: {process_time:.2f}s")
         return response
     except Exception as e:

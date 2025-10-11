@@ -6,7 +6,7 @@ async function installSunaForNewUser(userId: string) {
     const adminApiKey = process.env.KORTIX_ADMIN_API_KEY;
     
     if (!adminApiKey) {
-      console.error('KORTIX_ADMIN_API_KEY not configured - cannot install Suna agent');
+      console.error('KORTIX_ADMIN_API_KEY not configured - cannot install Iris agent');
       return;
     }
   
@@ -25,11 +25,11 @@ async function installSunaForNewUser(userId: string) {
       return true;
     } else {
       const errorData = await response.json().catch(() => ({}));
-      console.error(`Failed to install Suna agent for user:`, errorData);
+      console.error(`Failed to install Iris agent for user:`, errorData);
       return false;
     }
   } catch (error) {
-    console.error('Error installing Suna agent for new user:', error);
+    console.error('Error installing Iris agent for new user:', error);
     return false;
   }
 }

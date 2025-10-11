@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { constructHtmlPreviewUrl } from '@/lib/utils/url';
-import { downloadPresentation, DownloadFormat, handleGoogleSlidesUpload } from '../utils/presentation-utils';
+import { downloadPresentation, DownloadFormat, handleGoogleSlidesUpload, sanitizePresentationSlug } from '../utils/presentation-utils';
 
 interface SlideMetadata {
   title: string;
@@ -45,6 +45,7 @@ interface FullScreenPresentationViewerProps {
   onClose: () => void;
   presentationName?: string;
   sandboxUrl?: string;
+  metadataUrl?: string;
   initialSlide?: number;
 }
 
@@ -53,6 +54,7 @@ export function FullScreenPresentationViewer({
   onClose,
   presentationName,
   sandboxUrl,
+  metadataUrl,
   initialSlide = 1,
 }: FullScreenPresentationViewerProps) {
   const [metadata, setMetadata] = useState<PresentationMetadata | null>(null);
@@ -76,29 +78,37 @@ export function FullScreenPresentationViewer({
 
   const totalSlides = slides.length;
 
-  // Helper function to sanitize filename (matching backend logic)
-  const sanitizeFilename = (name: string): string => {
-    return name.replace(/[^a-zA-Z0-9\-_]/g, '').toLowerCase();
-  };
+  const resolvedSandboxUrl = useMemo(() => sandboxUrl, [sandboxUrl]);
+
+  const sanitizedPresentationName = useMemo(() => {
+    if (!presentationName) return undefined;
+    return sanitizePresentationSlug(presentationName);
+  }, [presentationName]);
+
+  const resolvedMetadataPath = useMemo(() => {
+    if (!sanitizedPresentationName) return undefined;
+    return `presentations/${sanitizedPresentationName}/metadata.json`;
+  }, [sanitizedPresentationName]);
+
+  const resolvedMetadataUrl = useMemo(() => {
+    if (metadataUrl) return metadataUrl;
+    if (resolvedSandboxUrl && resolvedMetadataPath) {
+      return constructHtmlPreviewUrl(resolvedSandboxUrl, resolvedMetadataPath);
+    }
+    return undefined;
+  }, [metadataUrl, resolvedSandboxUrl, resolvedMetadataPath]);
 
   // Load metadata with retry logic
   const loadMetadata = useCallback(async (retryCount = 0, maxRetries = 5) => {
-    if (!presentationName || !sandboxUrl) return;
+    if (!resolvedMetadataUrl) return;
     
     setIsLoading(true);
     setError(null);
     setRetryAttempt(retryCount);
     
     try {
-      // Sanitize the presentation name to match backend directory creation
-      const sanitizedPresentationName = sanitizeFilename(presentationName);
-      
-      const metadataUrl = constructHtmlPreviewUrl(
-        sandboxUrl, 
-        `presentations/${sanitizedPresentationName}/metadata.json`
-      );
-      
-      const urlWithCacheBust = `${metadataUrl}?t=${Date.now()}`;
+      const separator = resolvedMetadataUrl.includes('?') ? '&' : '?';
+      const urlWithCacheBust = `${resolvedMetadataUrl}${separator}t=${Date.now()}`;
       console.log(`Loading presentation metadata (attempt ${retryCount + 1}/${maxRetries + 1}):`, urlWithCacheBust);
       
       const response = await fetch(urlWithCacheBust, {
@@ -150,7 +160,7 @@ export function FullScreenPresentationViewer({
         setBackgroundRetryInterval(interval);
       }
     }
-  }, [presentationName, sandboxUrl, backgroundRetryInterval]);
+  }, [resolvedMetadataUrl, backgroundRetryInterval]);
 
   useEffect(() => {
     if (isOpen) {
@@ -265,7 +275,7 @@ export function FullScreenPresentationViewer({
 
   // Download handlers
   const handleDownload = async (format: DownloadFormat) => {
-    if (!sandboxUrl || !presentationName) return;
+    if (!resolvedSandboxUrl || !sanitizedPresentationName) return;
 
     const setDownloadState = format === DownloadFormat.PDF ? setIsDownloadingPDF : 
                            format === DownloadFormat.PPTX ? setIsDownloadingPPTX : 
@@ -274,13 +284,12 @@ export function FullScreenPresentationViewer({
     setDownloadState(true);
     try {
       if (format === DownloadFormat.GOOGLE_SLIDES) {
-        const result = await handleGoogleSlidesUpload(sandboxUrl, `/workspace/presentations/${presentationName}`);
-        // If redirected to auth, don't show error
+        const result = await handleGoogleSlidesUpload(resolvedSandboxUrl, `/workspace/presentations/${sanitizedPresentationName}`);
         if (result?.redirected_to_auth) {
-          return; // Don't set loading false, user is being redirected
+          return;
         }
       } else {
-        await downloadPresentation(format, sandboxUrl, `/workspace/presentations/${presentationName}`, presentationName);
+        await downloadPresentation(format, resolvedSandboxUrl, `/workspace/presentations/${sanitizedPresentationName}`, sanitizedPresentationName);
       }
     } catch (error) {
       console.error(`Error downloading ${format}:`, error);
@@ -330,7 +339,10 @@ export function FullScreenPresentationViewer({
         }
       }, [containerRef, scale]);
 
-      if (!sandboxUrl) {
+      const previewUrl = slide.preview_url || (resolvedSandboxUrl ? constructHtmlPreviewUrl(resolvedSandboxUrl, slide.file_path) : undefined);
+      const editorUrl = resolvedSandboxUrl ? `${resolvedSandboxUrl.replace(/\/$/, '')}/api/html/${slide.file_path}/editor` : undefined;
+
+      if (!previewUrl && !editorUrl) {
         return (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -341,9 +353,20 @@ export function FullScreenPresentationViewer({
         );
       }
 
-      const slideUrl = constructHtmlPreviewUrl(sandboxUrl, slide.file_path);
-      // Add cache-busting to iframe src to ensure fresh content
-      const slideUrlWithCacheBust = `${slideUrl}?t=${refreshTimestamp}`;
+      const cacheSeparator = previewUrl && previewUrl.includes('?') ? '&' : '?';
+      const slideUrlWithCacheBust = previewUrl ? `${previewUrl}${cacheSeparator}t=${refreshTimestamp}` : undefined;
+      const iframeSrc = showEditor ? editorUrl : slideUrlWithCacheBust;
+
+      if (!iframeSrc) {
+        return (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <Presentation className="h-12 w-12 mx-auto mb-4 text-zinc-400" />
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">No slide content to preview</p>
+            </div>
+          </div>
+        );
+      }
 
       return (
         <div className="w-full h-full flex items-center justify-center bg-transparent">
@@ -361,7 +384,7 @@ export function FullScreenPresentationViewer({
           >
             <iframe
               key={`slide-${slide.number}-${refreshTimestamp}-${showEditor}`} // Key with stable timestamp ensures iframe refreshes when metadata changes
-              src={showEditor ? `${sandboxUrl}/api/html/${slide.file_path}/editor` : slideUrlWithCacheBust}
+              src={iframeSrc}
               title={`Slide ${slide.number}: ${slide.title}`}
               className="border-0 rounded-xl"
               sandbox="allow-same-origin allow-scripts allow-modals"
@@ -391,14 +414,14 @@ export function FullScreenPresentationViewer({
     
     SlideIframeComponent.displayName = 'SlideIframeComponent';
     return SlideIframeComponent;
-  }, [sandboxUrl, refreshTimestamp, showEditor]);
+  }, [resolvedSandboxUrl, refreshTimestamp, showEditor]);
 
   // Render slide iframe with proper scaling
   const renderSlide = useMemo(() => {
-    if (!currentSlideData || !sandboxUrl) return null;
+    if (!currentSlideData || (!resolvedSandboxUrl && !currentSlideData.preview_url)) return null;
 
     return <SlideIframe slide={currentSlideData} />;
-  }, [currentSlideData, sandboxUrl, SlideIframe]);
+  }, [currentSlideData, resolvedSandboxUrl, SlideIframe]);
 
   if (!isOpen) return null;
 

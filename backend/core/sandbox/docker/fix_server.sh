@@ -1,3 +1,7 @@
+#!/bin/bash
+# Script to update server.py in a running sandbox to fix presentation serving
+
+cat > /app/server.py << 'EOFSERVER'
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -164,44 +168,6 @@ async def list_html_files():
                     margin-bottom: 8px;
                     color: #09090b;
                 }
-                .info {
-                    margin-top: 32px;
-                    padding: 20px;
-                    background: #fafafa;
-                    border: 1px solid #e4e4e7;
-                    border-radius: 8px;
-                }
-                .info h3 {
-                    font-size: 16px;
-                    font-weight: 500;
-                    margin-bottom: 12px;
-                }
-                .info-grid {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 20px;
-                }
-                .info-item {
-                    font-size: 14px;
-                    line-height: 1.4;
-                }
-                .info-item strong {
-                    font-weight: 500;
-                }
-                @media (max-width: 600px) {
-                    .info-grid {
-                        grid-template-columns: 1fr;
-                    }
-                    .file-item {
-                        flex-direction: column;
-                        align-items: flex-start;
-                        gap: 12px;
-                    }
-                    .file-actions {
-                        width: 100%;
-                        justify-content: flex-end;
-                    }
-                }
             </style>
         </head>
         <body>
@@ -234,24 +200,6 @@ async def list_html_files():
         
         html_content += """
             </div>
-            
-            <div class="info">
-                <h3>How to use</h3>
-                <div class="info-grid">
-                    <div class="info-item">
-                        <strong>Edit text:</strong> Hover over any text and click the edit icon
-                    </div>
-                    <div class="info-item">
-                        <strong>Delete elements:</strong> Click the trash icon to remove content
-                    </div>
-                    <div class="info-item">
-                        <strong>Save changes:</strong> Press Ctrl+Enter or click Save
-                    </div>
-                    <div class="info-item">
-                        <strong>Cancel editing:</strong> Press Escape or click Cancel
-                    </div>
-                </div>
-            </div>
         </body>
         </html>
         """
@@ -266,10 +214,18 @@ async def list_html_files():
 # Mount static files to serve all workspace files including presentations
 # This handles HTML files, JSON files, images, and all other static content
 # The StaticFiles mount properly handles subdirectories like presentations/name/slide_01.html
-app.mount('/', StaticFiles(directory=workspace_dir), name='site')
+app.mount('/', StaticFiles(directory=workspace_dir, html=True), name='site')
 
 # This is needed for the import string approach with uvicorn
 if __name__ == '__main__':
     print(f"Starting server with auto-reload, serving files from: {workspace_dir}")
     # Don't use reload directly in the run call
-    uvicorn.run("server:app", host="0.0.0.0", port=8080, reload=True) 
+    uvicorn.run("server:app", host="0.0.0.0", port=8080, reload=True)
+EOFSERVER
+
+# Restart the server using supervisorctl
+supervisorctl restart http-server
+
+echo "✅ Server updated and restarted successfully!"
+echo "Presentation slides should now display properly."
+

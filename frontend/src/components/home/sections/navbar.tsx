@@ -104,10 +104,10 @@ export function Navbar() {
   const handleOverlayClick = () => setIsDrawerOpen(false);
 
   const logoSrc = !mounted
-    ? '/kortix-logo.svg'
+    ? '/irislogoblack.png'
     : resolvedTheme === 'dark'
-      ? '/kortix-logo-white.svg'
-      : '/kortix-logo.svg';
+      ? '/irislogowhitebig.png'
+      : '/irislogoblack.png';
 
   return (
     <header
@@ -135,7 +135,7 @@ export function Navbar() {
               <Link href="/" className="flex items-center gap-3">
                 <Image
                   src={logoSrc}
-                  alt="Kortix Logo"
+                  alt="Iris Logo"
                   width={80}
                   height={14}
                   className="md:w-[100px] md:h-[18px]"
@@ -225,7 +225,7 @@ export function Navbar() {
                   <Link href="/" className="flex items-center gap-3">
                     <Image
                       src={logoSrc}
-                      alt="Kortix Logo"
+                      alt="Iris Logo"
                       width={120}
                       height={22}
                       priority

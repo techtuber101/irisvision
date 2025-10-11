@@ -268,7 +268,10 @@ async def convert_document_to_docx(request: ConvertRequest):
             return Response(
                 content=docx_content,
                 media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                headers={"Content-Disposition": f"attachment; filename=\"{doc_name}.docx\""}
+                headers={
+                    "Content-Disposition": f"attachment; filename=\"{doc_name}.docx\"",
+                    "X-Daytona-Skip-Preview-Warning": "true",
+                }
             )
         
         # Otherwise, store locally and return JSON with download URL

@@ -122,7 +122,7 @@ async def start_agent(
         logger.debug(f"[AGENT LOAD] Loading default agent")
         default_agent = await client.table('agents').select('agent_id').eq('account_id', account_id).eq('is_default', True).maybe_single().execute()
         
-        if default_agent.data:
+        if default_agent and default_agent.data:
             agent_data = await loader.load_agent(default_agent.data['agent_id'], user_id, load_config=True)
             logger.debug(f"Using default agent: {agent_data.name} ({agent_data.agent_id}) version {agent_data.version_name}")
         else:

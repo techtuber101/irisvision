@@ -224,7 +224,10 @@ async def convert_and_upload_to_google_slides(
         # Step 2: Call sandbox to convert HTML to PPTX
         logger.debug(f"Converting presentation at {request.presentation_path}")
         
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(
+            timeout=120.0,
+            headers={"X-Daytona-Skip-Preview-Warning": "true"},
+        ) as client:
             convert_response = await client.post(
                 f"{request.sandbox_url}/presentation/convert-to-pptx",
                 json={

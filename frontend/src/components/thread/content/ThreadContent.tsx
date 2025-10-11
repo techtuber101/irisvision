@@ -1,5 +1,6 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { CircleDashed, CheckCircle, AlertTriangle } from 'lucide-react';
+import { CircleDashed, CheckCircle, AlertTriangle, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { UnifiedMessage, ParsedContent, ParsedMetadata } from '@/components/thread/types';
 import { FileAttachmentGrid } from '@/components/thread/file-attachment';
 import { useFilePreloader } from '@/hooks/react-query/files';
@@ -113,6 +114,48 @@ export function renderMarkdownContent(
     project?: Project,
     debugMode?: boolean
 ) {
+    // Handle special thinking message
+    if (content === 'HMM_THINKING_MESSAGE') {
+        return (
+            <motion.div 
+                className="flex items-center gap-2 text-muted-foreground/70"
+                initial={{ opacity: 0, y: 4, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                transition={{ 
+                    duration: 0.2, 
+                    ease: "easeOut",
+                    opacity: { duration: 0.15 }
+                }}
+            >
+                <motion.div 
+                    className="w-6 h-6 rounded-full border border-muted-foreground/30 flex items-center justify-center bg-muted/20"
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ 
+                        delay: 0.05, 
+                        duration: 0.15, 
+                        ease: "easeOut" 
+                    }}
+                >
+                    <Sparkles className="w-3 h-3 text-muted-foreground/60" />
+                </motion.div>
+                <motion.span 
+                    className="text-sm italic"
+                    initial={{ opacity: 0, x: -4 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ 
+                        delay: 0.1, 
+                        duration: 0.15, 
+                        ease: "easeOut" 
+                    }}
+                >
+                    Hmm...
+                </motion.span>
+            </motion.div>
+        );
+    }
+
     // Preprocess content to convert text-only tools to natural text
     content = preprocessTextOnlyTools(content);
 
@@ -470,8 +513,8 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
         if (agentData && !isSunaDefaultAgent) {
             // Use modern icon system for agent display
             const avatar = (
-                <div className="h-5 w-5 flex items-center justify-center rounded text-xs">
-                    <KortixLogo size={16} />
+                <div className="h-25 w-25 flex items-center justify-center rounded text-xs">
+                    <KortixLogo size={80} />
                 </div>
             );
             return {
@@ -486,18 +529,18 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
             const avatar = !isSunaDefaultAgent ? (
                 <>
                     {isSunaAgent ? (
-                        <div className="h-5 w-5 flex items-center justify-center rounded text-xs">
-                            <KortixLogo size={16} />
+                        <div className="h-25 w-25 flex items-center justify-center rounded text-xs">
+                            <KortixLogo size={80} />
                         </div>
                     ) : (
-                        <div className="h-5 w-5 flex items-center justify-center rounded text-xs">
-                            <span className="text-lg">{recentAssistantWithAgent.agents.name.charAt(0).toUpperCase()}</span>
+                        <div className="h-25 w-25 flex items-center justify-center rounded text-xs">
+                            <span className="text-6xl">{recentAssistantWithAgent.agents.name.charAt(0).toUpperCase()}</span>
                         </div>
                     )}
                 </>
             ) : (
-                <div className="h-5 w-5 flex items-center justify-center rounded text-xs">
-                    <KortixLogo size={16} />
+                <div className="h-25 w-25 flex items-center justify-center rounded text-xs">
+                    <KortixLogo size={80} />
                 </div>
             );
             return {
@@ -511,15 +554,15 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
             return {
                 name: agentName || 'Iris',
                 avatar: (
-                    <div className="h-5 w-5 flex items-center justify-center rounded text-xs">
-                        <KortixLogo size={16} />
+                    <div className="h-25 w-25 flex items-center justify-center rounded text-xs">
+                        <KortixLogo size={80} />
                     </div>
                 )
             };
         }
 
         return {
-            name: agentName || 'Suna',
+            name: agentName || 'Iris',
             avatar: agentAvatar
         };
     }, [threadMetadata, displayMessages, agentName, agentAvatar, agentMetadata, agentData]);
@@ -865,7 +908,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                     <div className="flex items-center">
                                                         <div className="rounded-md flex items-center justify-center relative">
                                                             {groupAgent || groupAgentId ? (
-                                                                <AgentAvatar agent={groupAgent} agentId={groupAgentId} size={24} className="h-6 w-6" />
+                                                                <AgentAvatar agent={groupAgent} agentId={groupAgentId} size={100} className="h-25 w-25" />
                                                             ) : (
                                                                 getAgentInfo().avatar
                                                             )}
@@ -944,11 +987,22 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                                         );
 
                                                                         elements.push(
-                                                                            <div key={msgKey} className={assistantMessageCount > 0 ? "mt-4" : ""}>
-                                                                                <div className="prose prose-sm dark:prose-invert chat-markdown max-w-none [&>:first-child]:mt-0 prose-headings:mt-3 break-words overflow-hidden">
-                                                                                    {renderedContent}
-                                                                                </div>
-                                                                            </div>
+                                                                            <AnimatePresence key={msgKey} mode="wait">
+                                                                                <motion.div 
+                                                                                    className={assistantMessageCount > 0 ? "mt-4" : ""}
+                                                                                    initial={{ opacity: 0, y: 8 }}
+                                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                                    exit={{ opacity: 0, y: -8 }}
+                                                                                    transition={{ 
+                                                                                        duration: 0.2, 
+                                                                                        ease: "easeOut" 
+                                                                                    }}
+                                                                                >
+                                                                                    <div className="prose prose-sm dark:prose-invert chat-markdown max-w-none [&>:first-child]:mt-0 prose-headings:mt-3 break-words overflow-hidden">
+                                                                                        {renderedContent}
+                                                                                    </div>
+                                                                                </motion.div>
+                                                                            </AnimatePresence>
                                                                         );
 
                                                                         assistantMessageCount++; // Increment after adding the element

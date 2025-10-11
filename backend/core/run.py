@@ -28,7 +28,7 @@ from core.billing.billing_integration import billing_integration
 from core.tools.sb_vision_tool import SandboxVisionTool
 from core.tools.sb_image_edit_tool import SandboxImageEditTool
 from core.tools.sb_designer_tool import SandboxDesignerTool
-from core.tools.sb_presentation_tool import SandboxPresentationTool
+from core.tools.sb_presentation_tool import ProfessionalPresentationTool
 from core.tools.sb_document_parser import SandboxDocumentParserTool
 
 from core.services.langfuse import langfuse
@@ -114,7 +114,7 @@ class ToolManager:
             ('sb_image_edit_tool', SandboxImageEditTool, {'project_id': self.project_id, 'thread_id': self.thread_id, 'thread_manager': self.thread_manager}),
             ('sb_kb_tool', SandboxKbTool, {'project_id': self.project_id, 'thread_manager': self.thread_manager}),
             ('sb_design_tool', SandboxDesignerTool, {'project_id': self.project_id, 'thread_id': self.thread_id, 'thread_manager': self.thread_manager}),
-            ('sb_presentation_tool', SandboxPresentationTool, {'project_id': self.project_id, 'thread_manager': self.thread_manager}),
+            ('sb_presentation_tool', ProfessionalPresentationTool, {'project_id': self.project_id, 'thread_manager': self.thread_manager}),
             ('sb_upload_file_tool', SandboxUploadFileTool, {'project_id': self.project_id, 'thread_manager': self.thread_manager}),
             ('sb_docs_tool', SandboxDocsTool, {'project_id': self.project_id, 'thread_manager': self.thread_manager}),
         ]

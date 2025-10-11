@@ -26,16 +26,14 @@ import {
   Maximize2,
   Download,
   ExternalLink,
-  ChevronDown,
 } from 'lucide-react';
 import { ToolViewProps } from '../types';
 import { formatTimestamp, extractToolData, getToolTitle } from '../utils';
-import { downloadPresentation, handleGoogleSlidesUpload } from '../utils/presentation-utils';
+import { downloadPresentation, handleGoogleSlidesUpload, sanitizePresentationSlug, DownloadFormat } from '../utils/presentation-utils';
 import { constructHtmlPreviewUrl } from '@/lib/utils/url';
 import { CodeBlockCode } from '@/components/ui/code-block';
 import { LoadingState } from '../shared/LoadingState';
 import { FullScreenPresentationViewer } from './FullScreenPresentationViewer';
-import { DownloadFormat } from '../utils/presentation-utils';
 
 interface SlideMetadata {
   title: string;
@@ -87,6 +85,9 @@ export function PresentationViewer({
   const { toolResult } = extractToolData(toolContent);
   let extractedPresentationName: string | undefined;
   let extractedPresentationPath: string | undefined;
+  let extractedMetadataPath: string | undefined;
+  let extractedMetadataUrl: string | undefined;
+  let extractedSandboxUrl: string | undefined;
   let currentSlideNumber: number | undefined;
   let presentationTitle: string | undefined;
   let toolExecutionError: string | undefined;
@@ -122,6 +123,9 @@ export function PresentationViewer({
         extractedPresentationPath = output.presentation_path;
         currentSlideNumber = output.slide_number;
         presentationTitle = output.presentation_title || output.title;
+        extractedMetadataPath = output.metadata_path || output.metadataPath;
+        extractedMetadataUrl = output.metadata_url || output.metadataUrl;
+        extractedSandboxUrl = output.sandbox_url || output.sandboxUrl;
       }
     } catch (e) {
       console.error('Failed to process tool output:', e);
@@ -134,33 +138,44 @@ export function PresentationViewer({
   // Get tool title for display
   const toolTitle = getToolTitle(name || 'presentation-viewer');
 
-  // Helper function to sanitize filename (matching backend logic)
-  const sanitizeFilename = (name: string): string => {
-    return name.replace(/[^a-zA-Z0-9\-_]/g, '').toLowerCase();
-  };
+  const resolvedSandboxUrl = useMemo(() => {
+    return project?.sandbox?.sandbox_url || extractedSandboxUrl;
+  }, [project?.sandbox?.sandbox_url, extractedSandboxUrl]);
+
+  const sanitizedPresentationName = useMemo(() => {
+    if (!extractedPresentationName) return undefined;
+    return sanitizePresentationSlug(extractedPresentationName);
+  }, [extractedPresentationName]);
+
+  const resolvedMetadataPath = useMemo(() => {
+    if (extractedMetadataPath) return extractedMetadataPath;
+    if (sanitizedPresentationName) {
+      return `presentations/${sanitizedPresentationName}/metadata.json`;
+    }
+    return undefined;
+  }, [extractedMetadataPath, sanitizedPresentationName]);
+
+  const metadataUrlFromSandbox = useMemo(() => {
+    if (!resolvedSandboxUrl || !resolvedMetadataPath) return undefined;
+    return constructHtmlPreviewUrl(resolvedSandboxUrl, resolvedMetadataPath);
+  }, [resolvedSandboxUrl, resolvedMetadataPath]);
+
+  const resolvedMetadataUrl = extractedMetadataUrl || metadataUrlFromSandbox;
 
   // Load metadata.json for the presentation with retry logic
   const loadMetadata = async (retryCount = 0, maxRetries = 5) => {
-    if (!extractedPresentationName || !project?.sandbox?.sandbox_url) return;
-    
+    if (!resolvedMetadataUrl) return;
+
     setIsLoadingMetadata(true);
     setError(null);
     setRetryAttempt(retryCount);
     
     try {
-      // Sanitize the presentation name to match backend directory creation
-      const sanitizedPresentationName = sanitizeFilename(extractedPresentationName);
-      
-      const metadataUrl = constructHtmlPreviewUrl(
-        project.sandbox.sandbox_url, 
-        `presentations/${sanitizedPresentationName}/metadata.json`
-      );
-      
-      // Add cache-busting parameter to ensure fresh data
-      const urlWithCacheBust = `${metadataUrl}?t=${Date.now()}`;
-      
+      const separator = resolvedMetadataUrl.includes('?') ? '&' : '?';
+      const urlWithCacheBust = `${resolvedMetadataUrl}${separator}t=${Date.now()}`;
+
       console.log(`Loading presentation metadata (attempt ${retryCount + 1}/${maxRetries + 1}):`, urlWithCacheBust);
-      
+
       const response = await fetch(urlWithCacheBust, {
         cache: 'no-cache',
         headers: {
@@ -221,7 +236,7 @@ export function PresentationViewer({
       setBackgroundRetryInterval(null);
     }
     loadMetadata();
-  }, [extractedPresentationName, project?.sandbox?.sandbox_url, toolContent]);
+  }, [resolvedMetadataUrl, toolContent]);
 
   // Cleanup background retry interval on unmount
   useEffect(() => {
@@ -409,7 +424,9 @@ export function PresentationViewer({
         }
       }, [containerRef, scale]);
 
-      if (!project?.sandbox?.sandbox_url) {
+      const previewUrl = slide.preview_url || (resolvedSandboxUrl ? constructHtmlPreviewUrl(resolvedSandboxUrl, slide.file_path) : undefined);
+
+      if (!previewUrl) {
         return (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -420,9 +437,9 @@ export function PresentationViewer({
         );
       }
 
-      const slideUrl = constructHtmlPreviewUrl(project.sandbox.sandbox_url, slide.file_path);
       // Add cache-busting to iframe src to ensure fresh content
-      const slideUrlWithCacheBust = `${slideUrl}?t=${refreshTimestamp}`;
+      const cacheSeparator = previewUrl.includes('?') ? '&' : '?';
+      const slideUrlWithCacheBust = `${previewUrl}${cacheSeparator}t=${refreshTimestamp}`;
 
       return (
         <div className="w-full h-full flex items-center justify-center bg-transparent">
@@ -466,7 +483,7 @@ export function PresentationViewer({
     
     SlideIframeComponent.displayName = 'SlideIframeComponent';
     return SlideIframeComponent;
-  }, [project?.sandbox?.sandbox_url, refreshTimestamp]);
+  }, [resolvedSandboxUrl, refreshTimestamp]);
 
   // Render individual slide using the original approach
   const renderSlidePreview = useCallback((slide: SlideMetadata & { number: number }) => {
@@ -474,22 +491,29 @@ export function PresentationViewer({
   }, [SlideIframe]);
 
   const handleDownload = async (setIsDownloading: (isDownloading: boolean) => void, format: DownloadFormat) => {
-    
-    if (!project?.sandbox?.sandbox_url || !extractedPresentationName) return;
+    if (!resolvedSandboxUrl || !sanitizedPresentationName) return;
 
     setIsDownloading(true);
-    try{
-      if (format === DownloadFormat.GOOGLE_SLIDES){
-        const result = await handleGoogleSlidesUpload(project!.sandbox!.sandbox_url, `/workspace/presentations/${extractedPresentationName}`);
+    try {
+      if (format === DownloadFormat.GOOGLE_SLIDES) {
+        const result = await handleGoogleSlidesUpload(
+          resolvedSandboxUrl,
+          `/workspace/presentations/${sanitizedPresentationName}`
+        );
         // If redirected to auth, don't show error
         if (result?.redirected_to_auth) {
           return; // Don't set loading false, user is being redirected
         }
-      } else{
-        await downloadPresentation(format, project.sandbox.sandbox_url, `/workspace/presentations/${extractedPresentationName}`, extractedPresentationName);
+      } else {
+        await downloadPresentation(
+          format,
+          resolvedSandboxUrl,
+          `/workspace/presentations/${sanitizedPresentationName}`,
+          sanitizedPresentationName
+        );
       }
     } catch (error) {
-      console.error('Error downloading PDF:', error);
+      console.error(`Error downloading ${format}:`, error);
     } finally {
       setIsDownloading(false);
     }
@@ -748,8 +772,9 @@ export function PresentationViewer({
             loadMetadata();
           }, 300);
         }}
-        presentationName={extractedPresentationName}
-        sandboxUrl={project?.sandbox?.sandbox_url}
+        presentationName={sanitizedPresentationName || extractedPresentationName || metadata?.presentation_name}
+        sandboxUrl={resolvedSandboxUrl}
+        metadataUrl={resolvedMetadataUrl}
         initialSlide={fullScreenInitialSlide || visibleSlide || currentSlideNumber || slides[0]?.number || 1}
       />
     </Card>

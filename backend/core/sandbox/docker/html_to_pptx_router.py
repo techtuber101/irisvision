@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import tempfile
 import shutil
+import traceback
 from dataclasses import dataclass
 
 from fastapi import APIRouter, HTTPException
@@ -134,6 +135,7 @@ class OptimizedHTMLToPPTXConverter:
         self.metadata_path = self.presentation_dir / "metadata.json"
         self.metadata = None
         self.slides_info = []
+        self._log_prefix = "[PPTX-CONVERTER]"
         
         # Validate inputs
         if not self.presentation_dir.exists():
@@ -141,10 +143,21 @@ class OptimizedHTMLToPPTXConverter:
         
         if not self.metadata_path.exists():
             raise FileNotFoundError(f"metadata.json not found in: {self.presentation_dir}")
+
+        self.log("Initialized converter", presentation_dir=str(self.presentation_dir), metadata_path=str(self.metadata_path))
+
+    def log(self, message: str, **context: Dict[str, object]) -> None:
+        """Emit structured debug logs for PPTX conversion."""
+        if context:
+            context_str = " ".join(f"{key}={context[key]}" for key in sorted(context))
+            print(f"{self._log_prefix} {message} | {context_str}")
+        else:
+            print(f"{self._log_prefix} {message}")
     
     def load_metadata(self) -> Dict:
         """Load and parse metadata.json"""
         try:
+            self.log("Loading metadata.json")
             with open(self.metadata_path, 'r', encoding='utf-8') as f:
                 self.metadata = json.load(f)
             
@@ -166,24 +179,33 @@ class OptimizedHTMLToPPTXConverter:
                     
                     # Verify the path exists
                     if html_path.exists():
+                        self.log("Queued slide for conversion", slide_number=slide_num, title=title, html_path=str(html_path))
                         self.slides_info.append({
                             'number': int(slide_num),
                             'title': title,
                             'filename': filename,
                             'path': html_path
                         })
+                    else:
+                        self.log("Slide HTML missing on disk", slide_number=slide_num, expected_path=str(html_path))
+                else:
+                    self.log("Slide entry missing file_path", slide_number=slide_num)
             
             # Sort slides by number
             self.slides_info.sort(key=lambda x: x['number'])
             
             if not self.slides_info:
+                self.log("No valid slides discovered in metadata", metadata_keys=list(slides.keys()))
                 raise ValueError("No valid slides found in metadata.json")
             
+            self.log("Metadata loaded successfully", slide_count=len(self.slides_info), presentation_title=self.metadata.get('title'))
             return self.metadata
             
         except json.JSONDecodeError as e:
+            self.log("Failed to decode metadata.json", error=str(e))
             raise ValueError(f"Invalid JSON in metadata.json: {e}")
         except Exception as e:
+            self.log("Unexpected error loading metadata", error=str(e), traceback=traceback.format_exc())
             raise ValueError(f"Error loading metadata: {e}")
     
     async def extract_visual_elements(self, page, html_path: Path, temp_dir: Path) -> List[Dict]:
@@ -1238,12 +1260,15 @@ class OptimizedHTMLToPPTXConverter:
     
     async def convert_to_pptx(self, store_locally: bool = True) -> tuple:
         """Main conversion method - optimized and reliable."""
+        self.log("Starting PPTX conversion", store_locally=store_locally)
         # Load metadata
         self.load_metadata()
+        self.log("Slides prepared", total_slides=len(self.slides_info))
         
         # Create temporary directory for images
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
+            self.log("Created temporary workspace", temp_dir=temp_dir)
             
             # Launch browser for processing
             async with async_playwright() as p:
@@ -1266,6 +1291,7 @@ class OptimizedHTMLToPPTXConverter:
                         '--disable-ipc-flooding-protection'
                     ]
                 )
+                self.log("Chromium launched")
                 
                 try:
                     # Process all slides in parallel
@@ -1278,11 +1304,13 @@ class OptimizedHTMLToPPTXConverter:
                     context = await browser.new_context(
                         viewport={'width': 1920, 'height': 1080}
                     )
+                    self.log("Browser context ready")
                     
                     async def process_single_slide(slide_info: Dict) -> Dict:
                         """Process a single slide with controlled concurrency."""
                         async with semaphore:
                             slide_num = slide_info['number']
+                            self.log("Processing slide", slide_number=slide_num, title=slide_info.get('title'))
                             
                             try:
                                 # Create a new page for this slide
@@ -1317,10 +1345,18 @@ class OptimizedHTMLToPPTXConverter:
                                         'background_path': background_path,
                                         'text_elements': text_elements
                                     }
+                                    self.log(
+                                        "Slide assets extracted",
+                                        slide_number=slide_num,
+                                        visuals=len(visual_elements),
+                                        text_elements=len(text_elements),
+                                        background=str(background_path) if background_path else "none"
+                                    )
                                     
                                     return slide_analysis
                                     
                                 except Exception as e:
+                                    self.log("Error while extracting slide assets", slide_number=slide_num, error=str(e), traceback=traceback.format_exc())
                                     return {
                                         'slide_info': slide_info,
                                         'visual_elements': [],
@@ -1334,6 +1370,7 @@ class OptimizedHTMLToPPTXConverter:
                                     await page.close()
                                     
                             except Exception as e:
+                                self.log("Failed to prepare slide page", slide_number=slide_num, error=str(e), traceback=traceback.format_exc())
                                 return {
                                     'slide_info': slide_info,
                                     'visual_elements': [],
@@ -1350,11 +1387,14 @@ class OptimizedHTMLToPPTXConverter:
                     
                     # Wait for ALL slides to complete in parallel
                     slide_analyses = await asyncio.gather(*parallel_tasks, return_exceptions=True)
+                    self.log("Slide processing completed", requested=len(self.slides_info))
                     
                     # Handle any top-level exceptions
                     processed_analyses = []
                     for i, result in enumerate(slide_analyses):
                         if isinstance(result, Exception):
+                            traceback_str = "".join(traceback.format_exception(type(result), result, result.__traceback__))
+                            self.log("Top-level slide processing exception", slide_number=self.slides_info[i]['number'], error=str(result), traceback=traceback_str)
                             error_analysis = {
                                 'slide_info': self.slides_info[i],
                                 'visual_elements': [],
@@ -1370,6 +1410,7 @@ class OptimizedHTMLToPPTXConverter:
                     
                 finally:
                     await browser.close()
+                    self.log("Chromium browser closed")
             
             # Build PPTX presentation
             # Create new PowerPoint presentation
@@ -1389,6 +1430,7 @@ class OptimizedHTMLToPPTXConverter:
             for i, slide_analysis in enumerate(all_slide_analyses, 1):
                 try:
                     if 'error' in slide_analysis and slide_analysis['error']:
+                        self.log("Slide analysis reported error", slide_number=slide_analysis['slide_info']['number'], error=slide_analysis['error'])
                         # Create a blank slide with error message
                         blank_slide_layout = presentation.slide_layouts[6]
                         slide = presentation.slides.add_slide(blank_slide_layout)
@@ -1404,8 +1446,10 @@ class OptimizedHTMLToPPTXConverter:
                     else:
                         await self.build_slide_from_analysis(presentation, slide_analysis, temp_path)
                         successful_slides += 1
+                        self.log("Slide added to PPTX", slide_number=slide_analysis['slide_info']['number'])
                         
                 except Exception as e:
+                    self.log("Unhandled exception building slide", slide_number=slide_analysis['slide_info']['number'] if 'slide_info' in slide_analysis else i, error=str(e), traceback=traceback.format_exc())
                     # Create error slide
                     blank_slide_layout = presentation.slide_layouts[6]
                     slide = presentation.slides.add_slide(blank_slide_layout)
@@ -1423,6 +1467,13 @@ class OptimizedHTMLToPPTXConverter:
             temp_output_path = temp_path / f"{presentation_name}.pptx"
             
             presentation.save(str(temp_output_path))
+            self.log(
+                "PPTX saved to temporary path",
+                presentation_name=presentation_name,
+                temp_output=str(temp_output_path),
+                slides_total=len(presentation.slides),
+                successful_slides=successful_slides,
+            )
             
             if store_locally:
                 # Store in the static files directory for URL serving
@@ -1433,6 +1484,7 @@ class OptimizedHTMLToPPTXConverter:
                 
                 # Copy from temp to final location
                 shutil.copy2(temp_output_path, final_output)
+                self.log("Stored PPTX on disk", final_output=str(final_output))
                 
                 return final_output, len(presentation.slides)
             else:
@@ -1441,8 +1493,10 @@ class OptimizedHTMLToPPTXConverter:
                     with open(temp_output_path, 'rb') as f:
                         pptx_content = f.read()
                 except Exception as e:
+                    self.log("Failed to read PPTX content for download", error=str(e), traceback=traceback.format_exc())
                     raise
                 
+                self.log("Prepared PPTX content for direct download", bytes=len(pptx_content))
                 return pptx_content, len(presentation.slides), presentation_name
 
 
@@ -1456,33 +1510,42 @@ async def convert_presentation_to_pptx(request: ConvertRequest):
     - JSON response with download URL (if download=false, default)
     """
     try:
+        print("[PPTX-CONVERTER] Received convert-to-pptx request", request=request.dict())
         # Validate presentation path exists
         presentation_path = Path(request.presentation_path)
         if not presentation_path.exists():
+            print("[PPTX-CONVERTER] Presentation path missing", presentation_path=str(presentation_path))
             raise HTTPException(status_code=404, detail=f"Presentation path not found: {request.presentation_path}")
         
         # Check if metadata.json exists
         metadata_path = presentation_path / "metadata.json"
         if not metadata_path.exists():
+            print("[PPTX-CONVERTER] metadata.json missing", metadata_path=str(metadata_path))
             raise HTTPException(status_code=400, detail=f"metadata.json not found in: {request.presentation_path}")
         
         # Create converter
         converter = OptimizedHTMLToPPTXConverter(request.presentation_path)
+        print("[PPTX-CONVERTER] Converter instantiated", download=request.download)
         
         # If download is requested, don't store locally and return file directly
         if request.download:
             pptx_content, total_slides, presentation_name = await converter.convert_to_pptx(store_locally=False)
+            print("[PPTX-CONVERTER] Conversion successful (direct download)", presentation_name=presentation_name, total_slides=total_slides)
             
             return Response(
                 content=pptx_content,
                 media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                headers={"Content-Disposition": f"attachment; filename=\"{presentation_name}.pptx\""}
+                headers={
+                    "Content-Disposition": f"attachment; filename=\"{presentation_name}.pptx\"",
+                    "X-Daytona-Skip-Preview-Warning": "true",
+                }
             )
         
         # Otherwise, store locally and return JSON with download URL
         pptx_path, total_slides = await converter.convert_to_pptx(store_locally=True)
         
         pptx_url = f"/downloads/{pptx_path.name}"
+        print("[PPTX-CONVERTER] Conversion successful (stored file)", pptx_path=str(pptx_path), total_slides=total_slides, pptx_url=pptx_url)
         
         return ConvertResponse(
             success=True,
@@ -1493,10 +1556,13 @@ async def convert_presentation_to_pptx(request: ConvertRequest):
         )
         
     except FileNotFoundError as e:
+        print("[PPTX-CONVERTER] File not found error", error=str(e), traceback=traceback.format_exc())
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
+        print("[PPTX-CONVERTER] Value error", error=str(e), traceback=traceback.format_exc())
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        print("[PPTX-CONVERTER] Unexpected error", error=str(e), traceback=traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"PPTX conversion failed: {str(e)}")
 
 

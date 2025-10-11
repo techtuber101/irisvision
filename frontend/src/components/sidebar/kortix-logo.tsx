@@ -17,13 +17,13 @@ export function KortixLogo({ size = 24 }: KortixLogoProps) {
   }, []);
 
   const shouldInvert = mounted && (
-    theme === 'dark' || (theme === 'system' && systemTheme === 'dark')
+    theme === 'light' || (theme === 'system' && systemTheme === 'light')
   );
 
   return (
     <Image
-        src="/kortix-symbol.svg"
-        alt="Kortix"
+        src="/irissymbolwhite.png"
+        alt="Iris"
         width={size}
         height={size}
         className={`${shouldInvert ? 'invert' : ''} flex-shrink-0`}

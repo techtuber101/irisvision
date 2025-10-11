@@ -8,6 +8,20 @@ export enum DownloadFormat {
   GOOGLE_SLIDES = 'google-slides',
 }
 
+export function sanitizePresentationSlug(name: string): string {
+  if (!name) {
+    return 'presentation';
+  }
+
+  const normalized = name.normalize('NFKD');
+  const stripped = normalized.replace(/[\u0300-\u036f]/g, '');
+  const lower = stripped.toLowerCase();
+  const ascii = lower.replace(/[^a-z0-9\s-]/g, '');
+  const collapsed = ascii.trim().replace(/[\s-]+/g, '_');
+  const trimmed = collapsed.replace(/^_+|_+$/g, '');
+  return trimmed.slice(0, 64) || 'presentation';
+}
+
 /**
  * Utility functions for handling presentation slide file paths
  */
@@ -85,6 +99,7 @@ export async function downloadPresentation(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-Daytona-Skip-Preview-Warning': 'true',
       },
       body: JSON.stringify({
         presentation_path: presentationPath,

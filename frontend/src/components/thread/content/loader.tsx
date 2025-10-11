@@ -18,7 +18,15 @@ const items = [
     { id: 13, content: "Fine-tuning cognitive models..." },
     { id: 14, content: "Weaving narrative threads..." },
     { id: 15, content: "Crystallizing insights..." },
-    { id: 16, content: "Preparing comprehensive analysis..." }
+    { id: 16, content: "Preparing comprehensive analysis..." },
+    { id: 17, content: "Executing deep learning models..." },
+    { id: 18, content: "Cross-referencing knowledge base..." },
+    { id: 19, content: "Computing probability matrices..." },
+    { id: 20, content: "Activating neural networks..." },
+    { id: 21, content: "Processing linguistic patterns..." },
+    { id: 22, content: "Generating contextual embeddings..." },
+    { id: 23, content: "Analyzing semantic relationships..." },
+    { id: 24, content: "Optimizing inference engines..." }
   ];
 
 export const AgentLoader = () => {
@@ -29,16 +37,16 @@ export const AgentLoader = () => {
         if (state >= items.length - 1) return 0;
         return state + 1;
       });
-    }, 1500);
+    }, 300);
     return () => clearInterval(id);
   }, []);
 
   return (
     <div className="flex py-2 items-center w-full gap-3">
       <div className="flex items-center gap-1">
-        <div className="h-1 w-1 rounded-full bg-primary/40 animate-pulse duration-1000" />
-        <div className="h-1 w-1 rounded-full bg-primary/40 animate-pulse duration-1000 delay-150" />
-        <div className="h-1 w-1 rounded-full bg-primary/40 animate-pulse duration-1000 delay-300" />
+        <div className="h-1 w-1 rounded-full bg-primary/40 animate-pulse duration-400" />
+        <div className="h-1 w-1 rounded-full bg-primary/40 animate-pulse duration-400 delay-100" />
+        <div className="h-1 w-1 rounded-full bg-primary/40 animate-pulse duration-400 delay-200" />
       </div>
       <div className="relative flex-1 h-7">
         <AnimatePresence mode="wait">
@@ -47,7 +55,7 @@ export const AgentLoader = () => {
               initial={{ y: 10, opacity: 0, filter: "blur(4px)" }}
               animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
               exit={{ y: -10, opacity: 0, filter: "blur(4px)" }}
-              transition={{ ease: "easeInOut", duration: 0.3 }}
+              transition={{ ease: "easeInOut", duration: 0.12 }}
               className="absolute left-0 top-0"
           >
               <AnimatedShinyText className='text-xs whitespace-nowrap'>{items[index].content}</AnimatedShinyText>

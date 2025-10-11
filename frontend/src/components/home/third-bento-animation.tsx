@@ -116,9 +116,9 @@ export function AITaskExecution({
         >
           <div className="size-12 bg-black rounded-full flex items-center justify-center">
             <img 
-              src="/kortix-symbol.svg" 
-              alt="Kortix Symbol" 
-              className="size-6 filter brightness-0 invert"
+              src="/irissymbolwhite.png" 
+              alt="Iris Symbol" 
+              className="size-6"
             />
           </div>
           {/* Pulsing ring */}
