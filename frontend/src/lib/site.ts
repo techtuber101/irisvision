@@ -1,6 +1,6 @@
 export const siteConfig = {
   name: 'Iris',
-  url: 'https://suna.so/',
+  url: 'https://irisvision.ai/',
   description: 'Kortix AI',
   links: {
     twitter: 'https://x.com/kortixai',

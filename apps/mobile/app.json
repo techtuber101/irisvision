@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "Iris",
-    "slug": "suna-mobile",
+    "slug": "suna-mobiles",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "owner": "kortix",
+    "owner": "iris",
     "scheme": "sunamobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -28,7 +28,7 @@
       "research",
       "data analysis"
     ],
-    "githubUrl": "https://github.com/kortix-ai/suna",
+    "githubUrl": "",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.kortix.suna",
@@ -58,7 +58,7 @@
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png",
-      "name": "Iris - Open Source Generalist AI Agent",
+      "name": "Iris - General AI Agent",
       "shortName": "Iris",
       "description": "Iris is a fully open source AI assistant that helps you accomplish real-world tasks with ease through natural conversation.",
       "startUrl": "/",
@@ -90,12 +90,12 @@
     "extra": {
       "metadata": {
         "applicationName": "Iris",
-        "authors": "Kortix Team",
-        "creator": "Kortix Team",
-        "publisher": "Kortix Team",
+        "authors": "Iris Team",
+        "creator": "Iris Team",
+        "publisher": "Iris Team",
         "category": "Technology",
-        "siteUrl": "https://suna.so",
-        "twitterHandle": "@kortixai"
+        "siteUrl": "https://irisvision.ai",
+        "twitterHandle": "@irisintelligence"
       }
     }
   }

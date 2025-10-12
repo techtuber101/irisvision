@@ -1,4 +1,4 @@
-import { ThemeProvider } from '@/components/home/theme-provider';
+import { ThemeProvider } from '@/components/theme-provider';
 import { siteConfig } from '@/lib/site';
 import type { Metadata, Viewport } from 'next';
 import { GeistSans } from 'geist/font/sans';

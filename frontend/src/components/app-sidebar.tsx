@@ -9,7 +9,6 @@ import {
 
 import { TeamSwitcher } from "@/components/team-switcher"
 import { NavUser } from "@/components/nav-user"
-import { DocsThemeToggle } from "@/components/ui/docs-theme-toggle"
 import { Badge } from "@/components/ui/badge"
 
 import {
@@ -25,7 +24,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
-import { ThemeToggle } from "./home/theme-toggle"
+import { DocsThemeToggle } from "./docs/theme-toggle"
 import { KortixLogo } from "./sidebar/kortix-logo"
 import Image from "next/image"
 import { useEffect } from "react"
@@ -166,7 +165,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter className="bg-transparent p-4 flex flex-row justify-between items-center">
         <div className="text-muted-foreground text-xs">Version 0.1.0</div>
-        <ThemeToggle/>
+        <DocsThemeToggle/>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

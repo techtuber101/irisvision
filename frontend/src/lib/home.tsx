@@ -1,7 +1,3 @@
-import { FirstBentoAnimation } from '@/components/home/first-bento-animation';
-import { FourthBentoAnimation } from '@/components/home/fourth-bento-animation';
-import { SecondBentoAnimation } from '@/components/home/second-bento-animation';
-import { ThirdBentoAnimation } from '@/components/home/third-bento-animation';
 import { FlickeringGrid } from '@/components/home/ui/flickering-grid';
 import { Globe } from '@/components/home/ui/globe';
 import { cn } from '@/lib/utils';
@@ -534,48 +530,6 @@ export const siteConfig = {
           'Suna delivers results and learns from each interaction, continuously improving its performance to better serve your needs.',
         image:
           'https://images.unsplash.com/photo-1666882990322-e7f3b8df4f75?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1yZWxhdGVkfDF8fHxlbnwwfHx8fHw%3D',
-      },
-    ],
-  },
-  bentoSection: {
-    title: 'Empower Your Workflow with Kortix Suna',
-    description:
-      'Let Kortix Suna act on your behalf with advanced AI capabilities, seamless integrations, and autonomous task execution.',
-    items: [
-      {
-        id: 1,
-        content: <FirstBentoAnimation />,
-        title: 'Autonomous Task Execution',
-        description:
-          'Experience true automation with Suna. Ask your AI Worker to complete tasks, research information, and handle complex workflows with minimal supervision.',
-      },
-      {
-        id: 2,
-        content: <SecondBentoAnimation />,
-        title: 'Seamless Integrations',
-        description:
-          'Connect Suna to your existing tools for a unified workflow. Boost productivity through AI-powered interconnected systems.',
-      },
-      {
-        id: 3,
-        content: (
-          <ThirdBentoAnimation
-            data={[20, 30, 25, 45, 40, 55, 75]}
-            toolTipValues={[
-              1234, 1678, 2101, 2534, 2967, 3400, 3833, 4266, 4700, 5133,
-            ]}
-          />
-        ),
-        title: 'Intelligent Data Analysis',
-        description:
-          "Transform raw data into actionable insights in seconds. Make better decisions with Suna's real-time, adaptive intelligence.",
-      },
-      {
-        id: 4,
-        content: <FourthBentoAnimation once={false} />,
-        title: 'Complete Customization',
-        description:
-          'Tailor Suna to your specific needs. As an open source solution, you have full control over its capabilities, integrations, and implementation.',
       },
     ],
   },

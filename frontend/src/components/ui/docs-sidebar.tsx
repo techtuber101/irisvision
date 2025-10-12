@@ -23,7 +23,6 @@ import {
   SidebarGroupContent,
   SidebarRail,
 } from '@/components/ui/sidebar';
-import { ThemeToggle } from '../home/theme-toggle';
 
 export interface DocsNavigationItem {
   id?: string;
