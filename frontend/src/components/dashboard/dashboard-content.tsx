@@ -3,7 +3,6 @@
 import React, { useState, Suspense, useCallback, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Joyride, { CallBackProps, STATUS, Step } from 'react-joyride';
 import {
   ChatInput,
   ChatInputHandles,
@@ -34,36 +33,11 @@ import { AgentRunLimitDialog } from '@/components/thread/agent-run-limit-dialog'
 import { CustomAgentsSection } from './custom-agents-section';
 import { toast } from 'sonner';
 import { ReleaseBadge } from '../auth/release-badge';
-import { useDashboardTour } from '@/hooks/use-dashboard-tour';
-import { TourConfirmationDialog } from '@/components/tour/TourConfirmationDialog';
 import { Calendar, MessageSquare, Plus, Sparkles, Zap } from 'lucide-react';
 import { AgentConfigurationDialog } from '@/components/agents/agent-configuration-dialog';
 
 const PENDING_PROMPT_KEY = 'pendingAgentPrompt';
 
-const dashboardTourSteps: Step[] = [
-  {
-    target: '[data-tour="chat-input"]',
-    content: 'Type your questions or tasks here. Suna can help with research, analysis, automation, and much more.',
-    title: 'Start a Conversation',
-    placement: 'top',
-    disableBeacon: true,
-  },
-  {
-    target: '[data-tour="my-agents"]',
-    content: 'Create and manage your custom AI agents here. Build specialized agents for different tasks and workflows.',
-    title: 'Manage Your Agents',
-    placement: 'right',
-    disableBeacon: true,
-  },
-  {
-    target: '[data-tour="examples"]',
-    content: 'Get started quickly with these example prompts. Click any example to try it out.',
-    title: 'Example Prompts',
-    placement: 'top',
-    disableBeacon: true,
-  },
-];
 
 export function DashboardContent() {
   const [inputValue, setInputValue] = useState('');
@@ -108,16 +82,6 @@ export function DashboardContent() {
   const initiateAgentMutation = useInitiateAgentWithInvalidation();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-  // Tour integration
-  const {
-    run,
-    stepIndex,
-    setStepIndex,
-    stopTour,
-    showWelcome,
-    handleWelcomeAccept,
-    handleWelcomeDecline,
-  } = useDashboardTour();
 
   // Feature flag for custom agents section
 
@@ -167,15 +131,6 @@ export function DashboardContent() {
     }
   }, [threadQuery.data, initiatedThreadId, router]);
 
-  const handleTourCallback = useCallback((data: CallBackProps) => {
-    const { status, type, index } = data;
-
-    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
-      stopTour();
-    } else if (type === 'step:after') {
-      setStepIndex(index + 1);
-    }
-  }, [stopTour, setStepIndex]);
 
   const handleSubmit = async (
     message: string,
@@ -271,79 +226,6 @@ export function DashboardContent() {
 
   return (
     <>
-      <Joyride
-        steps={dashboardTourSteps}
-        run={run}
-        stepIndex={stepIndex}
-        callback={handleTourCallback}
-        continuous
-        showProgress
-        showSkipButton
-        disableOverlayClose
-        disableScrollParentFix
-        styles={{
-          options: {
-            primaryColor: '#000000',
-            backgroundColor: '#ffffff',
-            textColor: '#000000',
-            overlayColor: 'rgba(0, 0, 0, 0.7)',
-            arrowColor: '#ffffff',
-            zIndex: 1000,
-          },
-          tooltip: {
-            backgroundColor: '#ffffff',
-            borderRadius: 8,
-            fontSize: 14,
-            padding: 20,
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            border: '1px solid #e5e7eb',
-          },
-          tooltipTitle: {
-            color: '#000000',
-            fontSize: 16,
-            fontWeight: 600,
-            marginBottom: 8,
-          },
-          tooltipContent: {
-            color: '#000000',
-            fontSize: 14,
-            lineHeight: 1.5,
-          },
-          buttonNext: {
-            backgroundColor: '#000000',
-            color: '#ffffff',
-            fontSize: 12,
-            padding: '8px 16px',
-            borderRadius: 6,
-            border: 'none',
-            fontWeight: 500,
-          },
-          buttonBack: {
-            color: '#6b7280',
-            backgroundColor: 'transparent',
-            fontSize: 12,
-            padding: '8px 16px',
-            border: '1px solid #e5e7eb',
-            borderRadius: 6,
-          },
-          buttonSkip: {
-            color: '#6b7280',
-            backgroundColor: 'transparent',
-            fontSize: 12,
-            border: 'none',
-          },
-          buttonClose: {
-            color: '#6b7280',
-            backgroundColor: 'transparent',
-          },
-        }}
-      />
-
-      <TourConfirmationDialog
-        open={showWelcome}
-        onAccept={handleWelcomeAccept}
-        onDecline={handleWelcomeDecline}
-      />
 
       <BillingModal
         open={showPaymentModal}
@@ -375,14 +257,13 @@ export function DashboardContent() {
                       <div className="flex flex-col items-center text-center w-full">
                         <p
                           className="tracking-tight text-2xl md:text-3xl font-normal text-foreground/90 text-center relative z-10"
-                          data-tour="dashboard-title"
                           style={{ fontFamily: 'Geist, -apple-system, BlinkMacSystemFont, sans-serif', fontWeight: 400 }}
                         >
                           Iris is ready, are you?
                         </p>
                       </div>
 
-                      <div className="w-full" data-tour="chat-input">
+                      <div className="w-full">
                         <ChatInput
                           ref={chatInputRef}
                           onSubmit={handleSubmit}
@@ -462,7 +343,7 @@ export function DashboardContent() {
                   </div>
 
                   {(isStagingMode() || isLocalMode()) && (
-                    <div className="w-full px-4 pb-8" data-tour="custom-agents">
+                    <div className="w-full px-4 pb-8">
                       <div className="max-w-7xl mx-auto">
                         <CustomAgentsSection
                           onAgentSelect={setSelectedAgent}
