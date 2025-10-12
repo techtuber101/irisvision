@@ -8,7 +8,10 @@ RUN apk add --no-cache curl git \
     freetype-dev \
     gcc \
     musl-dev \
-    python3-dev
+    python3-dev \
+    # Rust compiler for tiktoken
+    rust \
+    cargo
 
 # Install Python dependencies
 COPY pyproject.toml uv.lock ./

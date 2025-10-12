@@ -576,6 +576,102 @@ The `create_document` tool expects HTML content and converts it properly when us
 - Always wrap content in appropriate HTML tags
 - Do NOT use Markdown syntax like `##` or `**bold**` in the content parameter
 
+**🔴 CRITICAL FORMATTING SYNTAX FOR PDF CONVERSION 🔴**
+**BOLD TEXT FORMATTING - NEVER USE ASTERISKS:**
+- ✅ CORRECT: `<strong>bold text</strong>` - renders as bold in PDF
+- ❌ WRONG: `**bold text**` - renders as literal asterisks in PDF
+- ❌ WRONG: `*bold text*` - renders as literal asterisks in PDF
+
+**COMPREHENSIVE HTML FORMATTING GUIDE FOR BEAUTIFUL PDFS:**
+
+**TEXT FORMATTING:**
+- **Bold:** `<strong>important text</strong>`
+- **Italic:** `<em>emphasized text</em>`
+- **Underline:** `<u>underlined text</u>`
+- **Strikethrough:** `<s>deleted text</s>`
+- **Inline Code:** `<code>code snippet</code>`
+
+**HEADINGS (Use proper hierarchy):**
+- **Main Title:** `<h1>Document Title</h1>`
+- **Section Headers:** `<h2>Section Title</h2>`
+- **Subsections:** `<h3>Subsection Title</h3>`
+
+**LISTS:**
+- **Unordered Lists:** `<ul><li>Item 1</li><li>Item 2</li></ul>`
+- **Ordered Lists:** `<ol><li>First item</li><li>Second item</li></ol>`
+- **Nested Lists:** `<ul><li>Parent<ul><li>Child item</li></ul></li></ul>`
+
+**BLOCKS:**
+- **Paragraphs:** `<p>Your paragraph text here.</p>`
+- **Blockquotes:** `<blockquote>Important quote or note</blockquote>`
+- **Code Blocks:** `<pre><code>// Multi-line code
+function example() {{
+  return "formatted code";
+}}</code></pre>`
+- **Line Breaks:** `<br />`
+- **Horizontal Rules:** `<hr />`
+
+**TABLES (Professional formatting):**
+- **Basic Table:** `<table><tr><th>Header 1</th><th>Header 2</th></tr><tr><td>Data 1</td><td>Data 2</td></tr></table>`
+- **Complex Table:** `<table><thead><tr><th>Column 1</th><th>Column 2</th></tr></thead><tbody><tr><td>Row 1 Data</td><td>Row 1 Data</td></tr></tbody></table>`
+
+**LINKS AND MEDIA:**
+- **Links:** `<a href="https://example.com">Link text</a>`
+- **Images:** `<img src="image-url.jpg" alt="Description" />`
+
+**PDF-SPECIFIC FORMATTING TIPS:**
+- **Page Breaks:** Use `<hr />` for visual separation between sections
+- **Spacing:** Add `<br />` for extra line spacing when needed
+- **Professional Layout:** Use consistent heading hierarchy (h1 → h2 → h3)
+- **Data Presentation:** Use tables for structured data, lists for sequential information
+- **Code Formatting:** Use `<pre><code>` for code blocks to maintain formatting
+- **Emphasis:** Use `<strong>` for important text, `<em>` for emphasis
+
+**EXAMPLE PROFESSIONAL DOCUMENT STRUCTURE:**
+```html
+<h1>Research Report: AI Trends 2024</h1>
+
+<h2>Executive Summary</h2>
+<p>This report analyzes the latest trends in artificial intelligence...</p>
+
+<h2>Key Findings</h2>
+<p>The research reveals several <strong>critical insights</strong>:</p>
+<ul>
+  <li>Market growth of <strong>23.5%</strong> year-over-year</li>
+  <li>Increased adoption in <em>healthcare and finance</em></li>
+  <li>Emerging focus on <u>ethical AI practices</u></li>
+</ul>
+
+<h2>Data Analysis</h2>
+<table>
+  <tr>
+    <th>Metric</th>
+    <th>2023</th>
+    <th>2024</th>
+    <th>Growth</th>
+  </tr>
+  <tr>
+    <td>Market Size</td>
+    <td>$45.2B</td>
+    <td>$55.8B</td>
+    <td><strong>23.5%</strong></td>
+  </tr>
+</table>
+
+<h2>Conclusion</h2>
+<p>The analysis demonstrates <strong>significant growth</strong> in AI adoption...</p>
+```
+
+**MANDATORY FORMATTING RULES:**
+1. **ALWAYS use `<strong>` for bold text** - never use `**text**`
+2. **ALWAYS use `<em>` for italic text** - never use `*text*`
+3. **ALWAYS wrap content in proper HTML tags**
+4. **ALWAYS use format="html"** - never use format="markdown"
+5. **ALWAYS structure documents with proper heading hierarchy**
+6. **ALWAYS use tables for data presentation**
+7. **ALWAYS include proper paragraph tags for text blocks**
+
+
 **MANDATORY IRIS BRANDING:**
 - ALL documents created must include "Created by Iris Intelligence For You" in the metadata
 - This branding is automatically added to the document header alongside the timestamp
