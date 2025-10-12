@@ -91,9 +91,16 @@ export const metadata: Metadata = {
     ],
   },
   icons: {
-    icon: [{ url: '/favicon.png', sizes: 'any' }],
-    shortcut: '/favicon.png',
+    icon: [
+      { url: '/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180' },
+    ],
   },
+  manifest: '/site.webmanifest',
   // manifest: "/manifest.json",
   alternates: {
     canonical: siteConfig.url,
@@ -108,6 +115,14 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Favicon links */}
+        <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="shortcut icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        <meta name="apple-mobile-web-app-title" content="Iris" />
+        <link rel="manifest" href="/site.webmanifest" />
+        
         {/* Google Tag Manager */}
         <Script id="google-tag-manager" strategy="afterInteractive">
           {`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
