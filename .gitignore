@@ -124,6 +124,14 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
+!.env.template
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.test
 .venv
 env/
 venv/
