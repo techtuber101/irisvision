@@ -513,8 +513,8 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
         if (agentData && !isSunaDefaultAgent) {
             // Use modern icon system for agent display
             const avatar = (
-                <div className="h-25 w-25 flex items-center justify-center rounded text-xs">
-                    <KortixLogo size={32} />
+                <div className="h-5 w-5 flex items-center justify-center rounded text-xs">
+                    <KortixLogo size={21} />
                 </div>
             );
             return {
@@ -529,18 +529,18 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
             const avatar = !isSunaDefaultAgent ? (
                 <>
                     {isSunaAgent ? (
-                        <div className="h-25 w-25 flex items-center justify-center rounded text-xs">
-                            <KortixLogo size={32} />
+                        <div className="h-5 w-5 flex items-center justify-center rounded text-xs">
+                            <KortixLogo size={16} />
                         </div>
                     ) : (
-                        <div className="h-25 w-25 flex items-center justify-center rounded text-xs">
-                            <span className="text-6xl">{recentAssistantWithAgent.agents.name.charAt(0).toUpperCase()}</span>
+                        <div className="h-5 w-5 flex items-center justify-center rounded text-xs">
+                            <span className="text-lg">{recentAssistantWithAgent.agents.name.charAt(0).toUpperCase()}</span>
                         </div>
                     )}
                 </>
             ) : (
-                <div className="h-25 w-25 flex items-center justify-center rounded text-xs">
-                    <KortixLogo size={32} />
+                <div className="h-5 w-5 flex items-center justify-center rounded text-xs">
+                    <KortixLogo size={16} />
                 </div>
             );
             return {
@@ -554,8 +554,8 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
             return {
                 name: agentName || 'Iris',
                 avatar: (
-                    <div className="h-25 w-25 flex items-center justify-center rounded text-xs">
-                        <KortixLogo size={32} />
+                    <div className="h-5 w-5 flex items-center justify-center rounded text-xs">
+                        <KortixLogo size={16} />
                     </div>
                 )
             };
@@ -908,7 +908,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                     <div className="flex items-center">
                                                         <div className="rounded-md flex items-center justify-center relative">
                                                             {groupAgent || groupAgentId ? (
-                                                                <AgentAvatar agent={groupAgent} agentId={groupAgentId} size={100} className="h-25 w-25" />
+                                                                <AgentAvatar agent={groupAgent} agentId={groupAgentId} size={20} className="h-5 w-5" />
                                                             ) : (
                                                                 getAgentInfo().avatar
                                                             )}
