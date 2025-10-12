@@ -514,7 +514,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
             // Use modern icon system for agent display
             const avatar = (
                 <div className="h-25 w-25 flex items-center justify-center rounded text-xs">
-                    <KortixLogo size={80} />
+                    <KortixLogo size={32} />
                 </div>
             );
             return {
@@ -530,7 +530,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                 <>
                     {isSunaAgent ? (
                         <div className="h-25 w-25 flex items-center justify-center rounded text-xs">
-                            <KortixLogo size={80} />
+                            <KortixLogo size={32} />
                         </div>
                     ) : (
                         <div className="h-25 w-25 flex items-center justify-center rounded text-xs">
@@ -540,7 +540,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                 </>
             ) : (
                 <div className="h-25 w-25 flex items-center justify-center rounded text-xs">
-                    <KortixLogo size={80} />
+                    <KortixLogo size={32} />
                 </div>
             );
             return {
@@ -555,7 +555,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                 name: agentName || 'Iris',
                 avatar: (
                     <div className="h-25 w-25 flex items-center justify-center rounded text-xs">
-                        <KortixLogo size={80} />
+                        <KortixLogo size={32} />
                     </div>
                 )
             };
