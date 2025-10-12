@@ -149,7 +149,7 @@ export default function GitHubSignIn({ returnUrl }: GitHubSignInProps) {
       <button
         onClick={handleGitHubSignIn}
         disabled={isLoading}
-        className="w-full h-12 flex items-center justify-center text-sm font-medium tracking-wide rounded-full bg-background text-foreground border border-border hover:bg-accent/30 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed font-sans"
+        className="w-full h-12 flex items-center justify-center text-sm font-medium tracking-wide rounded-full bg-black/30 text-white/90 border border-white/20 hover:bg-black/40 hover:border-white/30 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed font-sans backdrop-blur-sm"
         aria-label={
           isLoading ? 'Signing in with GitHub...' : 'Sign in with GitHub'
         }

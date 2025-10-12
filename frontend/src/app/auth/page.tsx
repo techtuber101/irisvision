@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { Input } from '@/components/ui/input';
 import GoogleSignIn from '@/components/GoogleSignIn';
@@ -28,10 +29,9 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import GitHubSignIn from '@/components/GithubSignIn';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
-import { Ripple } from '@/components/ui/ripple';
-import { ReleaseBadge } from '@/components/auth/release-badge';
 
 function LoginContent() {
   const router = useRouter();
@@ -44,396 +44,297 @@ function LoginContent() {
   const isSignUp = mode === 'signup';
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [mounted, setMounted] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   const { wasLastMethod: wasEmailLastMethod, markAsUsed: markEmailAsUsed } = useAuthMethodTracking('email');
 
   useEffect(() => {
     if (!isLoading && user) {
-      router.push(returnUrl || '/dashboard');
+      if (returnUrl) {
+        router.push(returnUrl);
+      } else {
+        router.push('/');
+      }
     }
   }, [user, isLoading, router, returnUrl]);
-
-  const isSuccessMessage =
-    message &&
-    (message.includes('Check your email') ||
-      message.includes('Account created') ||
-      message.includes('success'));
-
-  // Registration success state
-  const [registrationSuccess, setRegistrationSuccess] =
-    useState(!!isSuccessMessage);
-  const [registrationEmail, setRegistrationEmail] = useState('');
-
-  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
-  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
-  const [forgotPasswordStatus, setForgotPasswordStatus] = useState<{
-    success?: boolean;
-    message?: string;
-  }>({});
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (isSuccessMessage) {
-      setRegistrationSuccess(true);
-    }
-  }, [isSuccessMessage]);
-
-  const handleSignIn = async (prevState: any, formData: FormData) => {
-    markEmailAsUsed();
-
-    const finalReturnUrl = returnUrl || '/dashboard';
-    formData.append('returnUrl', finalReturnUrl);
-    const result = await signIn(prevState, formData);
-
-    if (
-      result &&
-      typeof result === 'object' &&
-      'success' in result &&
-      result.success &&
-      'redirectTo' in result
-      ) {
-      window.location.href = result.redirectTo as string;
-      return null;
-    }
-
-    if (result && typeof result === 'object' && 'message' in result) {
-      toast.error('Login failed', {
-        description: result.message as string,
-        duration: 5000,
-      });
-      return {};
-    }
-
-    return result;
-  };
-
-  const handleSignUp = async (prevState: any, formData: FormData) => {
-    markEmailAsUsed();
-
-    const email = formData.get('email') as string;
-    setRegistrationEmail(email);
-
-    const finalReturnUrl = returnUrl || '/dashboard';
-    formData.append('returnUrl', finalReturnUrl);
-
-    // Add origin for email redirects
-    formData.append('origin', window.location.origin);
-
-    const result = await signUp(prevState, formData);
-
-    // Check for success and redirectTo properties (direct login case)
-    if (
-      result &&
-      typeof result === 'object' &&
-      'success' in result &&
-      result.success &&
-      'redirectTo' in result
-    ) {
-      // Use window.location for hard navigation to avoid stale state
-      window.location.href = result.redirectTo as string;
-      return null; // Return null to prevent normal form action completion
-    }
-
-    // Check if registration was successful but needs email verification
-    if (result && typeof result === 'object' && 'message' in result) {
-      const resultMessage = result.message as string;
-      if (resultMessage.includes('Check your email')) {
-        setRegistrationSuccess(true);
-
-        // Update URL without causing a refresh
-        const params = new URLSearchParams(window.location.search);
-        params.set('message', resultMessage);
-
-        const newUrl =
-          window.location.pathname +
-          (params.toString() ? '?' + params.toString() : '');
-
-        window.history.pushState({ path: newUrl }, '', newUrl);
-
-        return result;
-      } else {
-        toast.error('Sign up failed', {
-          description: resultMessage,
-          duration: 5000,
-        });
-        return {};
-      }
-    }
-
-    return result;
-  };
-
-  const handleForgotPassword = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    setForgotPasswordStatus({});
-
-    if (!forgotPasswordEmail || !forgotPasswordEmail.includes('@')) {
-      setForgotPasswordStatus({
-        success: false,
-        message: 'Please enter a valid email address',
-      });
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('email', forgotPasswordEmail);
-    formData.append('origin', window.location.origin);
-
-    const result = await forgotPassword(null, formData);
-
-    setForgotPasswordStatus(result);
-  };
-
-  const resetRegistrationSuccess = () => {
-    setRegistrationSuccess(false);
-    // Remove message from URL and set mode to signin
-    const params = new URLSearchParams(window.location.search);
-    params.delete('message');
-    params.set('mode', 'signin');
-
-    const newUrl =
-      window.location.pathname +
-      (params.toString() ? '?' + params.toString() : '');
-
-    window.history.pushState({ path: newUrl }, '', newUrl);
-
-    router.refresh();
-  };
-
-  // Show loading spinner while checking auth state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // Registration success view
-  if (registrationSuccess) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="w-full max-w-md mx-auto">
-          <div className="text-center">
-            <div className="bg-green-50 dark:bg-green-950/20 rounded-full p-4 mb-6 inline-flex">
-              <MailCheck className="h-12 w-12 text-green-500 dark:text-green-400" />
-            </div>
-
-            <h1 className="text-3xl font-semibold text-foreground mb-4">
-              Check your email
-            </h1>
-
-            <p className="text-muted-foreground mb-2">
-              We've sent a confirmation link to:
-            </p>
-
-            <p className="text-lg font-medium mb-6">
-              {registrationEmail || 'your email address'}
-            </p>
-
-            <div className="bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900/50 rounded-lg p-4 mb-8">
-              <p className="text-sm text-green-800 dark:text-green-400">
-                Click the link in the email to activate your account. If you don't see the email, check your spam folder.
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-              <Link
-                href="/"
-                className="flex h-11 items-center justify-center px-6 text-center rounded-lg border border-border bg-background hover:bg-accent transition-colors"
-              >
-                Return to home
-              </Link>
-              <button
-                onClick={resetRegistrationSuccess}
-                className="flex h-11 items-center justify-center px-6 text-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                Back to sign in
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  if (!mounted) {
+    return null;
   }
 
   return (
-      <div className="min-h-screen bg-background relative">
-        <div className="absolute top-6 left-6 z-10">
-            <KortixLogo size={28} />
+    <div className="min-h-screen bg-gray-950 bg-pattern-grid flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Geometric shapes - Top Left */}
+      <div className="absolute -top-32 -left-32 w-80 h-80 border border-primary/10 rounded-full animate-spin-slow"></div>
+      <div className="absolute -top-24 -left-24 w-64 h-64 border border-primary/15 rounded-full animate-spin-slow" style={{ animationDuration: '30s', animationDirection: 'reverse' }}></div>
+      
+      {/* Geometric shapes - Bottom Right */}
+      <div className="absolute -bottom-32 -right-32 w-80 h-80 border border-primary/10 rotate-45 animate-spin-slow"></div>
+      <div className="absolute -bottom-24 -right-24 w-64 h-64 border border-primary/15 rotate-45 animate-spin-slow" style={{ animationDuration: '30s', animationDirection: 'reverse' }}></div>
+      
+      {/* Abstract lines */}
+      <div className="absolute top-1/2 left-16 w-[400px] h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent -translate-y-12 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent w-full h-full animate-line-shine"></div>
+      </div>
+      <div className="absolute top-1/2 left-16 w-[400px] h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent translate-y-12 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent w-full h-full animate-line-shine"></div>
+      </div>
+      
+      {/* Floating Info Card - Enclosed between lines */}
+      <button 
+        onClick={() => setShowModal(true)}
+        className="absolute top-1/2 left-16 transform -translate-y-1/2 bg-navy-800/30 backdrop-blur-md border border-navy-600/40 rounded-xl p-3 shadow-lg hover:bg-navy-800/40 transition-all duration-200 cursor-pointer group animate-pulse-slow"
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+            <svg className="w-3 h-3 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="text-left">
+            <h4 className="text-xs font-medium text-white/90">What's New</h4>
+            <p className="text-xs text-white/70">Iris is now available worldwide rolling out update 1.0.2</p>
+          </div>
+          <svg className="w-3 h-3 text-white/50 group-hover:text-white/80 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
         </div>
-        <div className="flex min-h-screen">
-          <div className="relative flex-1 flex items-center justify-center p-4 lg:p-8">
-            <div className="w-full max-w-sm">
-              <div className="mb-4 flex items-center flex-col gap-3 sm:gap-4 justify-center">
-                <h1 className="text-xl sm:text-2xl font-semibold text-foreground text-center leading-tight">
-                  {isSignUp ? 'Create your account' : 'Log into your account'}
-                </h1>
-              </div>
-            <div className="space-y-3 mb-4">
-              <GoogleSignIn returnUrl={returnUrl || undefined} />
-              <GitHubSignIn returnUrl={returnUrl || undefined} />
-            </div>
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-background text-muted-foreground">
-                  or email
-                </span>
-              </div>
-            </div>
-            <form className="space-y-3">
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="Email address"
-                className="h-10 rounded-lg"
-                required
-              />
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="Password"
-                className="h-10 rounded-lg"
-                required
-              />
-              {isSignUp && (
-                <Input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  placeholder="Confirm password"
-                  className="h-10 rounded-lg"
-                  required
-                />
-              )}
-              <div className="pt-2">
-                <div className="relative">
-                  <SubmitButton
-                    formAction={isSignUp ? handleSignUp : handleSignIn}
-                    className="w-full h-10 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors rounded-lg"
-                    pendingText={isSignUp ? "Creating account..." : "Signing in..."}
-                  >
-                    {isSignUp ? 'Create account' : 'Sign in'}
-                  </SubmitButton>
-                  {wasEmailLastMethod && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-background shadow-sm">
-                      <div className="w-full h-full bg-green-500 rounded-full animate-pulse" />
-                    </div>
-                  )}
+      </button>
+      
+      {/* Corner accents */}
+      <div className="absolute top-0 right-0 w-40 h-40 border-t-2 border-r-2 border-primary/10"></div>
+      <div className="absolute bottom-0 left-0 w-40 h-40 border-b-2 border-l-2 border-primary/10"></div>
+      
+      {/* Hexagon pattern */}
+      <svg className="absolute top-1/3 right-20 w-32 h-32 opacity-5 animate-pulse" viewBox="0 0 100 100" style={{ animationDelay: '1s' }}>
+        <polygon points="50 1 95 25 95 75 50 99 5 75 5 25" fill="none" stroke="currentColor" strokeWidth="1" className="text-primary"/>
+      </svg>
+
+      
+      {/* Logo */}
+      <div className="absolute top-6 left-6 z-10">
+        <Link href="/">
+          <KortixLogo size={28} />
+        </Link>
+      </div>
+
+      {/* Update Modal */}
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="bg-navy-900/20 backdrop-blur-xl border border-navy-700/30 rounded-3xl max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-white/90 text-xl font-semibold">What's New in Iris 1.0.2</DialogTitle>
+            <DialogDescription className="text-white/70">
+              Iris just evolved from a conversational AI into a fully agentic system
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-white/80">
+            <p className="text-sm leading-relaxed">
+              With update 1.0.2, Iris just evolved from a conversational AI into a fully agentic system — capable of reasoning, planning, and acting across complex workflows.
+            </p>
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-white/90">✨ New in this release:</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <span className="text-primary">🧩</span>
+                  <span>Agentic Core: Iris can now autonomously plan, call tools, and complete long-running multi-step tasks</span>
                 </div>
-              </div>
-            </form>
-            
-            <div className="mt-4 space-y-3 text-center text-sm">
-              {!isSignUp && (
-                <button
-                  type="button"
-                  onClick={() => setForgotPasswordOpen(true)}
-                  className="text-primary hover:underline"
-                >
-                  Forgot password?
-                </button>
-              )}
-              
-              <div>
-                <Link
-                  href={isSignUp 
-                    ? `/auth${returnUrl ? `?returnUrl=${returnUrl}` : ''}`
-                    : `/auth?mode=signup${returnUrl ? `&returnUrl=${returnUrl}` : ''}`
-                  }
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {isSignUp 
-                    ? 'Already have an account? Sign in' 
-                    : "Don't have an account? Sign up"
-                  }
-                </Link>
+                <div className="flex items-start gap-2">
+                  <span className="text-primary">⚡</span>
+                  <span>Execution Graphs: Every action is now traceable, visual, and optimized — no black boxes, just transparent reasoning.</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-primary">💬</span>
+                  <span>Context Memory: Persistent memory lets Iris understand tasks over sessions and recall previous context seamlessly.</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-primary">🎯</span>
+                  <span>Task View: A reimagined workspace where Iris thinks, executes, and shows progress — live.</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-primary">🎨</span>
+                  <span>Refreshed UI: Minimal, fluid, and designed for focus — built with speed and elegance in mind.</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-primary">🧠</span>
+                  <span>Smarter Planning: New reasoning layer improves decision-making, tool sequencing, and self-correction.</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        <div className="hidden lg:flex flex-1 items-center justify-center bg-sidebar relative overflow-hidden">
-          <div className="absolute inset-0">
-            <Ripple />
+          <DialogFooter>
+            <Button 
+              onClick={() => setShowModal(false)}
+              className="bg-black hover:bg-black/90 text-white"
+            >
+              Got it!
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Main content */}
+      <div className="relative w-full max-w-md mx-auto">
+        <div className="relative rounded-3xl border border-white/10 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] overflow-hidden transform hover:scale-[1.02] transition-all duration-300 ease-out">
+          {/* Gradient border */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-3xl" style={{
+            background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+            WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+            WebkitMaskComposite: 'xor',
+            maskComposite: 'exclude',
+            padding: '1px',
+            borderRadius: '24px'
+          }}></div>
+          
+          {/* Top glow */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-24" style={{
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+            filter: 'blur(6px)',
+            mixBlendMode: 'screen'
+          }}></div>
+          
+          {/* Noise texture */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-30" style={{
+            backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+            backgroundSize: '100px 100px',
+            mixBlendMode: 'overlay'
+          }}></div>
+          
+          {/* Corner dots */}
+          <div className="pointer-events-none" aria-hidden="true">
+            <div className="absolute left-3 top-3 h-1.5 w-1.5 rounded-full bg-white/30"></div>
+            <div className="absolute right-3 top-3 h-1.5 w-1.5 rounded-full bg-white/30"></div>
+            <div className="absolute left-3 bottom-3 h-1.5 w-1.5 rounded-full bg-white/30"></div>
+            <div className="absolute right-3 bottom-3 h-1.5 w-1.5 rounded-full bg-white/30"></div>
+          </div>
+          
+          <div className="p-8">
+          <div className="relative z-10 text-center mb-8">
+            <div className="mb-6">
+              <Image
+                src="/irislogowhitebig.png"
+                alt="Iris Logo"
+                width={120}
+                height={22}
+                className="mx-auto h-6 w-auto drop-shadow-lg"
+              />
+            </div>
+            <h1 className="text-2xl font-semibold text-white/90 mb-2">
+              {isSignUp ? 'Create your account' : 'Welcome back'}
+            </h1>
+            <p className="text-white/70 text-sm">
+              {isSignUp ? 'Sign up to get started with Iris' : 'Sign in to your account to continue'}
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            {message && (
+              <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm text-center">
+                {message}
+              </div>
+            )}
+
+            <form className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="email" className="text-sm font-medium text-white/80">
+                  Email
+                </label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  className="bg-navy-800/30 border-navy-600/40 text-white placeholder:text-white/50 focus:border-primary/50"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="password" className="text-sm font-medium text-white/80">
+                  Password
+                </label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  className="bg-navy-800/30 border-navy-600/40 text-white placeholder:text-white/50 focus:border-primary/50"
+                  required
+                />
+              </div>
+
+              {!isSignUp && (
+                <div className="text-right">
+                  <Link
+                    href="/auth?mode=forgot"
+                    className="text-sm text-primary hover:text-primary/80 transition-colors"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+              )}
+
+              <SubmitButton 
+                formAction={isSignUp ? signUp : signIn}
+                className="w-full bg-primary hover:bg-primary/90 text-black font-medium py-2.5 rounded-lg transition-colors"
+              >
+                {isSignUp ? 'Sign up' : 'Sign in'}
+              </SubmitButton>
+            </form>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-navy-600/30"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="px-4 text-white/50">or continue with email</span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <GoogleSignIn />
+              <GitHubSignIn />
+            </div>
+
+            <div className="text-center text-sm text-white/60">
+              {isSignUp ? (
+                <>
+                  Already have an account?{' '}
+                  <Link
+                    href="/auth"
+                    className="text-primary hover:text-primary/80 transition-colors"
+                  >
+                    Sign in
+                  </Link>
+                </>
+              ) : (
+                <>
+                  Don't have an account?{' '}
+                  <Link
+                    href="/auth?mode=signup"
+                    className="text-primary hover:text-primary/80 transition-colors"
+                  >
+                    Sign up
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
           </div>
         </div>
       </div>
-      <Dialog open={forgotPasswordOpen} onOpenChange={setForgotPasswordOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle>Reset Password</DialogTitle>
-            </div>
-            <DialogDescription>
-              Enter your email address and we'll send you a link to reset your password.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleForgotPassword} className="space-y-4">
-            <Input
-              id="forgot-password-email"
-              type="email"
-              placeholder="Email address"
-              value={forgotPasswordEmail}
-              onChange={(e) => setForgotPasswordEmail(e.target.value)}
-              className="h-11 rounded-xl"
-              required
-            />
-            {forgotPasswordStatus.message && (
-              <div
-                className={`p-3 rounded-md flex items-center gap-3 ${
-                  forgotPasswordStatus.success
-                    ? 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900/50 text-green-800 dark:text-green-400'
-                    : 'bg-destructive/10 border border-destructive/20 text-destructive'
-                }`}
-              >
-                {forgotPasswordStatus.success ? (
-                  <CheckCircle className="h-4 w-4 flex-shrink-0" />
-                ) : (
-                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                )}
-                <span className="text-sm">{forgotPasswordStatus.message}</span>
-              </div>
-            )}
-            <DialogFooter className="gap-2">
-              <button
-                type="button"
-                onClick={() => setForgotPasswordOpen(false)}
-                className="h-10 px-4 border border-border bg-background hover:bg-accent transition-colors rounded-md"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="h-10 px-4 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors rounded-md"
-              >
-                Send Reset Link
-              </button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
 
-export default function Login() {
+export default function AuthPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    </div>}>
       <LoginContent />
     </Suspense>
   );
