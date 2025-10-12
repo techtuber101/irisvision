@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     template: `%s - ${siteConfig.name}`,
   },
   description:
-    'Kortix is a fully open source AI assistant that helps you accomplish real-world tasks with ease. Through natural conversation, Kortix becomes your digital companion for research, data analysis, and everyday challenges.',
+    'Iris is a fully open source AI assistant that helps you accomplish real-world tasks with ease. Through natural conversation, Iris becomes your digital companion for research, data analysis, and everyday challenges.',
   keywords: [
     'AI',
     'artificial intelligence',
@@ -36,13 +36,13 @@ export const metadata: Metadata = {
     'research',
     'data analysis',
   ],
-  authors: [{ name: 'Kortix Team', url: 'https://suna.so' }],
+  authors: [{ name: 'Iris Team', url: 'https://irisvision.ai' }],
   creator:
-    'Kortix Team',
+    'Iris Team',
   publisher:
-    'Kortix Team',
+    'Iris Team',
   category: 'Technology',
-  applicationName: 'Suna',
+  applicationName: 'Iris',
   formatDetection: {
     telephone: false,
     email: false,
@@ -57,17 +57,17 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: 'Suna - Open Source Generalist AI Worker',
+    title: 'Iris - Open Source AI Assistant',
     description:
-      'Suna is a fully open source AI assistant that helps you accomplish real-world tasks with ease through natural conversation.',
+      'Iris is a fully open source AI assistant that helps you accomplish real-world tasks with ease through natural conversation.',
     url: siteConfig.url,
-    siteName: 'Suna',
+    siteName: 'Iris',
     images: [
       {
         url: '/banner.png',
         width: 1200,
         height: 630,
-        alt: 'Suna - Open Source Generalist AI Worker',
+        alt: 'Iris - Open Source AI Assistant',
         type: 'image/png',
       },
     ],
@@ -76,9 +76,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Suna - Open Source Generalist AI Worker',
+    title: 'Iris - Open Source AI Assistant',
     description:
-      'Suna is a fully open source AI assistant that helps you accomplish real-world tasks with ease through natural conversation.',
+      'Iris is a fully open source AI assistant that helps you accomplish real-world tasks with ease through natural conversation.',
     creator: '@kortixai',
     site: '@kortixai',
     images: [
@@ -86,7 +86,7 @@ export const metadata: Metadata = {
         url: '/banner.png',
         width: 1200,
         height: 630,
-        alt: 'Suna - Open Source Generalist AI Worker',
+        alt: 'Iris - Open Source AI Assistant',
       },
     ],
   },
