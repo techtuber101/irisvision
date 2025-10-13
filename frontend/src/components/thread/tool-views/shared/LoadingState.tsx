@@ -48,17 +48,65 @@ export function LoadingState({
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[400px] overflow-hidden scrollbar-hide py-12 px-6">
       <div className="text-center w-full max-w-sm">
-        <div className={cn("w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center", bgColor)}>
-          <Icon className={cn("h-8 w-8", iconColor, Icon === Loader2 && "animate-spin")} />
+        <div className="w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] relative overflow-hidden">
+          {/* Gradient rim */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full" style={{
+            background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+            WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+            WebkitMaskComposite: 'xor',
+            maskComposite: 'exclude',
+            padding: '1px',
+            borderRadius: '50%'
+          }}></div>
+          
+          {/* Specular streak */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-8" style={{
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+            filter: 'blur(4px)',
+            mixBlendMode: 'screen'
+          }}></div>
+          
+          {/* Fine noise */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{
+            backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+            backgroundSize: '100px 100px',
+            mixBlendMode: 'overlay'
+          }}></div>
+          
+          <Icon className={cn("h-8 w-8 text-white/90 relative z-10", Icon === Loader2 && "animate-spin")} />
         </div>
         
-        <h3 className="text-xl font-semibold mb-4 text-zinc-900 dark:text-zinc-100">
+        <h3 className="text-xl font-semibold mb-4 text-white/90">
           {title}
         </h3>
         
         {filePath && (
-          <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 w-full text-center mb-6 shadow-sm">
-            <code className="text-sm font-mono text-zinc-700 dark:text-zinc-300 break-all">
+          <div className="bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] rounded-lg p-4 w-full text-center mb-6 relative overflow-hidden">
+            {/* Gradient rim */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg" style={{
+              background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+              WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+              WebkitMaskComposite: 'xor',
+              maskComposite: 'exclude',
+              padding: '1px',
+              borderRadius: '8px'
+            }}></div>
+            
+            {/* Specular streak */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-6" style={{
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+              filter: 'blur(3px)',
+              mixBlendMode: 'screen'
+            }}></div>
+            
+            {/* Fine noise */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{
+              backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+              backgroundSize: '100px 100px',
+              mixBlendMode: 'overlay'
+            }}></div>
+            
+            <code className="text-sm font-mono text-white/90 break-all relative z-10">
               {filePath}
             </code>
           </div>
@@ -67,7 +115,7 @@ export function LoadingState({
         {showProgress && (
           <div className="space-y-3">
             <Progress value={Math.min(progress, 100)} className="w-full h-1" />
-            <div className="flex justify-between items-center text-xs text-zinc-500 dark:text-zinc-400">
+            <div className="flex justify-between items-center text-xs text-white/70">
               <span>{progressText || 'Processing...'}</span>
               <span className="font-mono">{Math.round(Math.min(progress, 100))}%</span>
             </div>
@@ -75,7 +123,7 @@ export function LoadingState({
         )}
         
         {subtitle && (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-4">
+          <p className="text-sm text-white/70 mt-4">
             {subtitle}
           </p>
         )}

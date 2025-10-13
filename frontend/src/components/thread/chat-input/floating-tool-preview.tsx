@@ -108,42 +108,58 @@ export const FloatingToolPreview: React.FC<FloatingToolPreviewProps> = ({
               damping: 30
             }
           }}
-          className="-mb-4 w-full"
+          className="pb-3 w-full"
           style={{ pointerEvents: 'auto' }}
         >
           <motion.div
             layoutId={CONTENT_LAYOUT_ID}
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.99 }}
-            className="bg-card border border-border rounded-3xl p-2 w-full cursor-pointer group"
+            className="bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] rounded-3xl p-2 w-full cursor-pointer group relative overflow-hidden"
             onClick={handleClick}
             style={{ opacity: isExpanding ? 0 : 1 }}
           >
+            {/* Gradient rim */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-3xl" style={{
+              background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+              WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+              WebkitMaskComposite: 'xor',
+              maskComposite: 'exclude',
+              padding: '1px',
+              borderRadius: '24px'
+            }}></div>
+            
+            {/* Specular streak */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-24" style={{
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+              filter: 'blur(6px)',
+              mixBlendMode: 'screen'
+            }}></div>
+            
+            {/* Fine noise */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-30" style={{
+              backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+              backgroundSize: '100px 100px',
+              mixBlendMode: 'overlay'
+            }}></div>
             <div className="flex items-center gap-3">
               <div className="flex-shrink-0">
                 <motion.div
                   layoutId="tool-icon"
-                  className={cn(
-                    "w-10 h-10 rounded-2xl flex items-center justify-center",
-                    isStreaming
-                      ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
-                      : isSuccess
-                        ? "bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-800"
-                        : "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
-                  )}
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/10 backdrop-blur-sm border border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] relative z-10"
                   style={{ opacity: isExpanding ? 0 : 1 }}
                 >
                   {isStreaming ? (
-                    <CircleDashed className="h-5 w-5 text-blue-500 dark:text-blue-400 animate-spin" style={{ opacity: isExpanding ? 0 : 1 }} />
+                    <CircleDashed className="h-5 w-5 text-white/90 animate-spin" style={{ opacity: isExpanding ? 0 : 1 }} />
                   ) : (
-                    <CurrentToolIcon className="h-5 w-5 text-foreground" style={{ opacity: isExpanding ? 0 : 1 }} />
+                    <CurrentToolIcon className="h-5 w-5 text-white/90" style={{ opacity: isExpanding ? 0 : 1 }} />
                   )}
                 </motion.div>
               </div>
 
-              <div className="flex-1 min-w-0" style={{ opacity: isExpanding ? 0 : 1 }}>
+              <div className="flex-1 min-w-0 relative z-10" style={{ opacity: isExpanding ? 0 : 1 }}>
                 <motion.div layoutId="tool-title" className="flex items-center gap-2 mb-1">
-                  <h4 className="text-sm font-medium text-foreground truncate">
+                  <h4 className="text-sm font-medium text-white/90 truncate">
                     {getUserFriendlyToolName(toolName)}
                   </h4>
                 </motion.div>
@@ -152,12 +168,12 @@ export const FloatingToolPreview: React.FC<FloatingToolPreviewProps> = ({
                   <div className={cn(
                     "w-2 h-2 rounded-full",
                     isStreaming
-                      ? "bg-blue-500 animate-pulse"
+                      ? "bg-white/80 animate-pulse"
                       : isSuccess
-                        ? "bg-green-500"
-                        : "bg-red-500"
+                        ? "bg-green-400"
+                        : "bg-red-400"
                   )} />
-                  <span className="text-xs text-muted-foreground truncate">
+                  <span className="text-xs text-white/70 truncate">
                     {isStreaming
                       ? `${agentName || 'Iris'} is working...`
                       : isSuccess
@@ -177,7 +193,7 @@ export const FloatingToolPreview: React.FC<FloatingToolPreviewProps> = ({
                     const nextIndex = indicatorIndex === 0 ? 1 : 0;
                     onIndicatorClick?.(nextIndex);
                   }}
-                  className="flex items-center gap-1.5 mr-3 px-2 py-1.5 rounded-lg hover:bg-muted/30 transition-colors"
+                  className="flex items-center gap-1.5 mr-3 px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors relative z-10"
                   style={{ opacity: isExpanding ? 0 : 1 }}
                 >
                   {Array.from({ length: indicatorTotal }).map((_, index) => (
@@ -186,16 +202,16 @@ export const FloatingToolPreview: React.FC<FloatingToolPreviewProps> = ({
                       className={cn(
                         "transition-all duration-300 ease-out rounded-full",
                         index === indicatorIndex
-                          ? "w-6 h-2 bg-foreground"
-                          : "w-3 h-2 bg-muted-foreground/40"
+                          ? "w-6 h-2 bg-white/80"
+                          : "w-3 h-2 bg-white/40"
                       )}
                     />
                   ))}
                 </button>
               )}
 
-              <Button value='ghost' className="bg-transparent hover:bg-transparent flex-shrink-0" style={{ opacity: isExpanding ? 0 : 1 }}>
-                <Maximize2 className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <Button value='ghost' className="bg-transparent hover:bg-transparent flex-shrink-0 relative z-10" style={{ opacity: isExpanding ? 0 : 1 }}>
+                <Maximize2 className="h-4 w-4 text-white/70 group-hover:text-white/90 transition-colors" />
               </Button>
             </div>
           </motion.div>

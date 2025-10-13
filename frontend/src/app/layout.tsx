@@ -79,8 +79,8 @@ export const metadata: Metadata = {
     title: 'Iris - Open Source AI Assistant',
     description:
       'Iris is a fully open source AI assistant that helps you accomplish real-world tasks with ease through natural conversation.',
-    creator: '@kortixai',
-    site: '@kortixai',
+    creator: '@irisvisionai',
+    site: '@irisvisionai',
     images: [
       {
         url: '/banner.png',

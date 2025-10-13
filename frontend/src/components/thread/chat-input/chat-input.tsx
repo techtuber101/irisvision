@@ -508,212 +508,19 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
       }
       // Unified compact menu for both logged and non-logged (non-logged shows only models subset via menu trigger)
       return (
-        <div className="flex items-center gap-2">
-          <UnifiedConfigMenu
-            isLoggedIn={isLoggedIn}
-            selectedAgentId={!hideAgentSelection ? selectedAgentId : undefined}
-            onAgentSelect={!hideAgentSelection ? onAgentSelect : undefined}
-            selectedModel={selectedModel}
-            onModelChange={handleModelChange}
-            modelOptions={modelOptions}
-            subscriptionStatus={subscriptionStatus}
-            canAccessModel={canAccessModel}
-            refreshCustomModels={refreshCustomModels}
-          />
-        </div>
+        <UnifiedConfigMenu
+          isLoggedIn={isLoggedIn}
+          selectedAgentId={!hideAgentSelection ? selectedAgentId : undefined}
+          onAgentSelect={!hideAgentSelection ? onAgentSelect : undefined}
+          selectedModel={selectedModel}
+          onModelChange={handleModelChange}
+          modelOptions={modelOptions}
+          subscriptionStatus={subscriptionStatus}
+          canAccessModel={canAccessModel}
+          refreshCustomModels={refreshCustomModels}
+        />
       );
     }, [mounted, isLoggedIn, hideAgentSelection, selectedAgentId, onAgentSelect, selectedModel, handleModelChange, modelOptions, subscriptionStatus, canAccessModel, refreshCustomModels]);
-
-    const renderTextArea = useMemo(() => (
-      <div className="flex flex-col gap-1 px-2">
-        <Textarea
-          ref={textareaRef}
-          value={value}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          placeholder={animatedPlaceholder}
-          className={cn(
-            'w-full bg-transparent dark:bg-transparent border-none shadow-none focus-visible:ring-0 px-0.5 pb-6 pt-4 !text-[15px] min-h-[72px] max-h-[200px] overflow-y-auto resize-none',
-            isDraggingOver ? 'opacity-40' : '',
-          )}
-          disabled={loading || (disabled && !isAgentRunning)}
-          rows={1}
-        />
-      </div>
-    ), [value, handleChange, handleKeyDown, handlePaste, animatedPlaceholder, isDraggingOver, loading, disabled, isAgentRunning]);
-
-    const renderControls = useMemo(() => (
-      <div className="flex items-center justify-between mt-0 mb-1 px-2">
-        <div className="flex items-center gap-3">
-          {!hideAttachments && (
-            <FileUploadHandler
-              ref={fileInputRef}
-              loading={loading}
-              disabled={disabled}
-              isAgentRunning={isAgentRunning}
-              isUploading={isUploading}
-              sandboxId={sandboxId}
-              setPendingFiles={setPendingFiles}
-              setUploadedFiles={setUploadedFiles}
-              setIsUploading={setIsUploading}
-              messages={messages}
-              isLoggedIn={isLoggedIn}
-            />
-          )}
-          
-          {/* Agent Mode Switcher - Only for Suna */}
-          {ENABLE_SUNA_AGENT_MODES && (isStagingMode() || isLocalMode()) && isSunaAgent && (
-            <TooltipProvider>
-              <div className="flex items-center gap-1 p-0.5 bg-muted/50 rounded-lg">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => setSunaAgentModes('adaptive')}
-                      className={cn(
-                        "p-1.5 rounded-md transition-all duration-200 cursor-pointer",
-                        sunaAgentModes === 'adaptive'
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                      )}
-                    >
-                      <Sparkles className="w-4 h-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <div className="space-y-1">
-                      <p className="font-medium text-white">Adaptive</p>
-                      <p className="text-xs text-gray-200">Quick responses with smart context switching</p>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => setSunaAgentModes('autonomous')}
-                      className={cn(
-                        "p-1.5 rounded-md transition-all duration-200 cursor-pointer",
-                        sunaAgentModes === 'autonomous'
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                      )}
-                    >
-                      <BrainIcon className="w-4 h-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <div className="space-y-1">
-                      <p className="font-medium text-white">Autonomous</p>
-                      <p className="text-xs text-gray-200">Deep work mode for multi-step problem solving</p>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => setSunaAgentModes('chat')}
-                      className={cn(
-                        "p-1.5 rounded-md transition-all duration-200 cursor-pointer",
-                        sunaAgentModes === 'chat'
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                      )}
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <div className="space-y-1">
-                      <p className="font-medium text-white">Chat</p>
-                      <p className="text-xs text-gray-200">Simple back-and-forth conversation</p>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            </TooltipProvider>
-          )}
-          
-          {(selectedMode || isModeDismissing) && onModeDeselect && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!isModeDismissing) {
-                  handleModeDeselect();
-                }
-              }}
-              className={cn(
-                "h-8 px-3 py-2 bg-transparent border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/50 flex items-center gap-1.5 cursor-pointer transition-all duration-200",
-                !isModeDismissing && "animate-in fade-in-0 zoom-in-95",
-                isModeDismissing && "animate-out fade-out-0 zoom-out-95"
-              )}
-            >
-              {selectedMode && getModeIcon(selectedMode)}
-              <span className="text-sm">{selectedMode?.charAt(0).toUpperCase()}{selectedMode?.slice(1)}</span>
-              <X className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-
-        <div className='flex items-center gap-2'>
-          {renderConfigDropdown}
-          <BillingModal
-            open={billingModalOpen}
-            onOpenChange={setBillingModalOpen}
-            returnUrl={typeof window !== 'undefined' ? window.location.href : '/'}
-          />
-
-          {isLoggedIn && <VoiceRecorder
-            onTranscription={handleTranscription}
-            disabled={loading || (disabled && !isAgentRunning)}
-          />}
-
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="submit"
-                  onClick={isAgentRunning && onStopAgent ? onStopAgent : handleSubmit}
-                  size="sm"
-                  className={cn(
-                    'w-8 h-8 flex-shrink-0 self-end rounded-xl',
-                    (!value.trim() && uploadedFiles.length === 0 && !isAgentRunning) ||
-                      loading ||
-                      (disabled && !isAgentRunning) ||
-                      isUploading
-                      ? 'opacity-50'
-                      : '',
-                  )}
-                  disabled={
-                    (!value.trim() && uploadedFiles.length === 0 && !isAgentRunning) ||
-                    loading ||
-                    (disabled && !isAgentRunning) ||
-                    isUploading
-                  }
-                >
-                  {loading || isUploading ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : isAgentRunning ? (
-                    <div className="min-h-[14px] min-w-[14px] w-[14px] h-[14px] rounded-sm bg-current" />
-                  ) : (
-                    <ArrowUp className="h-5 w-5" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              {isUploading && (
-                <TooltipContent side="top">
-                  <p>Uploading {pendingFiles.length} file{pendingFiles.length !== 1 ? 's' : ''}...</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      </div>
-    ), [hideAttachments, loading, disabled, isAgentRunning, isUploading, sandboxId, messages, isLoggedIn, renderConfigDropdown, billingModalOpen, setBillingModalOpen, handleTranscription, onStopAgent, handleSubmit, value, uploadedFiles, selectedMode, onModeDeselect, handleModeDeselect, isModeDismissing, isSunaAgent, sunaAgentModes, pendingFiles]);
 
 
 
@@ -744,8 +551,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
               <ArrowDown className="w-4 h-4 text-muted-foreground" />
             </button>
           )}
-          <Card
-            className={`-mb-2 shadow-none w-full max-w-4xl mx-auto bg-transparent border-none overflow-visible ${enableAdvancedConfig && selectedAgentId ? '' : 'rounded-3xl'} relative z-10`}
+          
+          {/* New integrated chat container with glassmorphism */}
+          <div 
+            className="relative rounded-[32px] border border-white/10 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] transition-all duration-300 overflow-hidden hover:scale-[1.01]"
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={(e) => {
@@ -766,35 +575,253 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
               }
             }}
           >
-            <div className="w-full text-sm flex flex-col justify-between items-start rounded-lg">
-              <CardContent className={`w-full p-1.5 pb-2 ${bgColor} border rounded-3xl`}>
-                {(uploadedFiles.length > 0 || isUploading) && (
-                  <div className="relative">
-                    <AttachmentGroup
-                      files={uploadedFiles || []}
-                      sandboxId={sandboxId}
-                      onRemove={removeUploadedFile}
-                      layout="inline"
-                      maxHeight="216px"
-                      showPreviews={true}
-                    />
-                    {isUploading && pendingFiles.length > 0 && (
-                      <div className="absolute inset-0 bg-background/50 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                        <div className="flex items-center gap-2 bg-background/90 px-3 py-2 rounded-lg border border-border">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="text-sm">Uploading {pendingFiles.length} file{pendingFiles.length !== 1 ? 's' : ''}...</span>
-                        </div>
+            {/* Gradient rim (subtle) */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 rounded-[32px]"
+              style={{
+                background:
+                  "linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))",
+                WebkitMask: "linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)",
+                WebkitMaskComposite: "xor" as any,
+                maskComposite: "exclude",
+                padding: 1,
+                borderRadius: 32,
+              }}
+            />
+            
+            {/* Specular streak */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 h-24"
+              style={{
+                background:
+                  "linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)",
+                filter: "blur(6px)",
+                mixBlendMode: "screen",
+              }}
+            />
+            
+            {/* Fine noise */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 opacity-30"
+              style={{
+                backgroundImage:
+                  "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"60\" height=\"60\"><filter id=\"n\"><feTurbulence type=\"fractalNoise\" baseFrequency=\"0.8\" numOctaves=\"4\"/><feColorMatrix type=\"saturate\" values=\"0\"/><feComponentTransfer><feFuncA type=\"table\" tableValues=\"0 0.03\"/></feComponentTransfer></filter><rect width=\"100%\" height=\"100%\" filter=\"url(%23n)\" /></svg>')",
+                backgroundSize: "100px 100px",
+                mixBlendMode: "overlay",
+              }}
+            />
+            
+            <div className="relative p-3 z-10">
+              {/* Attachments */}
+              {(uploadedFiles.length > 0 || isUploading) && (
+                <div className="relative mb-3">
+                  <AttachmentGroup
+                    files={uploadedFiles || []}
+                    sandboxId={sandboxId}
+                    onRemove={removeUploadedFile}
+                    layout="inline"
+                    maxHeight="216px"
+                    showPreviews={true}
+                  />
+                  {isUploading && pendingFiles.length > 0 && (
+                    <div className="absolute inset-0 bg-background/50 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                      <div className="flex items-center gap-2 bg-background/90 px-3 py-2 rounded-lg border border-border">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm">Uploading {pendingFiles.length} file{pendingFiles.length !== 1 ? 's' : ''}...</span>
                       </div>
-                    )}
-                  </div>
-                )}
-                <div className="relative flex flex-col w-full h-full gap-2 justify-between">
-                  {renderTextArea}
-                  {renderControls}
+                    </div>
+                  )}
                 </div>
-              </CardContent>
+              )}
+
+              {/* Selected Mode Badge */}
+              {(selectedMode || isModeDismissing) && onModeDeselect && (
+                <div className="mb-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (!isModeDismissing) {
+                        handleModeDeselect();
+                      }
+                    }}
+                    className={cn(
+                      "h-8 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white/70 hover:text-white hover:bg-white/10 hover:border-white/20 flex items-center gap-1.5 cursor-pointer transition-all duration-200",
+                      !isModeDismissing && "animate-in fade-in-0 zoom-in-95",
+                      isModeDismissing && "animate-out fade-out-0 zoom-out-95"
+                    )}
+                  >
+                    {selectedMode && getModeIcon(selectedMode)}
+                    <span className="text-sm">{selectedMode?.charAt(0).toUpperCase()}{selectedMode?.slice(1)}</span>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+
+              {/* Input area with controls - sticky at bottom */}
+              <div>
+                <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+                  {/* Textarea */}
+                  <div className="relative py-2">
+                    <Textarea
+                      ref={textareaRef}
+                      value={value}
+                      onChange={handleChange}
+                      onKeyDown={handleKeyDown}
+                      onPaste={handlePaste}
+                      placeholder={animatedPlaceholder}
+                      className={cn(
+                        'w-full bg-transparent dark:bg-transparent border-none shadow-none focus-visible:ring-0 pl-2 pr-0 !text-base min-h-[44px] max-h-[200px] overflow-y-auto resize-none placeholder:text-white/40 text-white',
+                        isDraggingOver ? 'opacity-40' : '',
+                      )}
+                      disabled={loading || (disabled && !isAgentRunning)}
+                      rows={1}
+                    />
+                  </div>
+                  
+                  {/* Separator line */}
+                  <div className="border-t border-white/5 pt-2"></div>
+                  
+                  {/* Controls row */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      {!hideAttachments && (
+                        <FileUploadHandler
+                          ref={fileInputRef}
+                          loading={loading}
+                          disabled={disabled}
+                          isAgentRunning={isAgentRunning}
+                          isUploading={isUploading}
+                          sandboxId={sandboxId}
+                          setPendingFiles={setPendingFiles}
+                          setUploadedFiles={setUploadedFiles}
+                          setIsUploading={setIsUploading}
+                          messages={messages}
+                          isLoggedIn={isLoggedIn}
+                        />
+                      )}
+                      
+                      {/* Agent Mode Switcher - Only for Suna */}
+                      {ENABLE_SUNA_AGENT_MODES && (isStagingMode() || isLocalMode()) && isSunaAgent && (
+                        <TooltipProvider>
+                          <div className="flex items-center gap-1 p-0.5 bg-muted/50 rounded-lg">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={() => setSunaAgentModes('adaptive')}
+                                  className={cn(
+                                    "p-1.5 rounded-md transition-all duration-200 cursor-pointer",
+                                    sunaAgentModes === 'adaptive'
+                                      ? "bg-background text-foreground shadow-sm"
+                                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                  )}
+                                >
+                                  <Sparkles className="w-4 h-4" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <div className="space-y-1">
+                                  <p className="font-medium text-white">Adaptive</p>
+                                  <p className="text-xs text-gray-200">Quick responses with smart context switching</p>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={() => setSunaAgentModes('autonomous')}
+                                  className={cn(
+                                    "p-1.5 rounded-md transition-all duration-200 cursor-pointer",
+                                    sunaAgentModes === 'autonomous'
+                                      ? "bg-background text-foreground shadow-sm"
+                                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                  )}
+                                >
+                                  <BrainIcon className="w-4 h-4" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <div className="space-y-1">
+                                  <p className="font-medium text-white">Autonomous</p>
+                                  <p className="text-xs text-gray-200">Deep work mode for multi-step problem solving</p>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={() => setSunaAgentModes('chat')}
+                                  className={cn(
+                                    "p-1.5 rounded-md transition-all duration-200 cursor-pointer",
+                                    sunaAgentModes === 'chat'
+                                      ? "bg-background text-foreground shadow-sm"
+                                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                  )}
+                                >
+                                  <MessageSquare className="w-4 h-4" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <div className="space-y-1">
+                                  <p className="font-medium text-white">Chat</p>
+                                  <p className="text-xs text-gray-200">Simple back-and-forth conversation</p>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </TooltipProvider>
+                      )}
+                      
+                      {renderConfigDropdown}
+                      
+                      {isLoggedIn && <VoiceRecorder
+                        onTranscription={handleTranscription}
+                        disabled={loading || (disabled && !isAgentRunning)}
+                      />}
+                    </div>
+
+                    <Button
+                      type="submit"
+                      onClick={isAgentRunning && onStopAgent ? onStopAgent : handleSubmit}
+                      disabled={
+                        (!value.trim() && uploadedFiles.length === 0 && !isAgentRunning) ||
+                        loading ||
+                        (disabled && !isAgentRunning) ||
+                        isUploading
+                      }
+                      className={cn(
+                        'h-9 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm px-4 text-sm font-medium text-white/90 shadow-[0_2px_8px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-200 hover:border-white/30 hover:bg-white/15 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] active:scale-[0.98]',
+                        ((!value.trim() && uploadedFiles.length === 0 && !isAgentRunning) ||
+                          loading ||
+                          (disabled && !isAgentRunning) ||
+                          isUploading) && 'opacity-[0.55] cursor-not-allowed'
+                      )}
+                    >
+                      {loading || isUploading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : isAgentRunning ? (
+                        <span>Stop</span>
+                      ) : (
+                        <span>Send</span>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </Card>
+          </div>
+          
+          <BillingModal
+            open={billingModalOpen}
+            onOpenChange={setBillingModalOpen}
+          />
 
           {enableAdvancedConfig && selectedAgentId && (
             <div className="w-full max-w-4xl mx-auto -mt-12 relative z-20">

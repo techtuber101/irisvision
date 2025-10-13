@@ -282,31 +282,54 @@ export const ShowToolStream: React.FC<ShowToolStreamProps> = ({
         return (
             <div className="my-1">
                 {/* Always render the container for smooth transitions */}
-                <div className={`border border-neutral-200 dark:border-neutral-700/50 rounded-2xl overflow-hidden transition-all duration-500 ease-in-out transform-gpu ${
-                    shouldShowContent ? 'bg-zinc-100 dark:bg-neutral-900' : 'bg-muted scale-95 opacity-80'
-                }`}>
+                <div className={`border border-white/10 rounded-2xl overflow-hidden transition-all duration-500 ease-in-out transform-gpu ${
+                    shouldShowContent ? 'bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)]' : 'bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl scale-95 opacity-80'
+                } relative`}>
+                    {/* Gradient rim */}
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl" style={{
+                        background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+                        WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                        WebkitMaskComposite: 'xor',
+                        maskComposite: 'exclude',
+                        padding: '1px',
+                        borderRadius: '16px'
+                    }}></div>
+                    
+                    {/* Specular streak */}
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-12" style={{
+                        background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+                        filter: 'blur(4px)',
+                        mixBlendMode: 'screen'
+                    }}></div>
+                    
+                    {/* Fine noise */}
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{
+                        backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                        backgroundSize: '100px 100px',
+                        mixBlendMode: 'overlay'
+                    }}></div>
                     {/* Tool name header */}
                     <button
                         onClick={() => onToolClick?.(messageId, toolName)}
-                        className={`w-full flex items-center gap-1.5 py-1 px-2 text-xs text-muted-foreground hover:bg-muted/80 transition-all duration-400 ease-in-out cursor-pointer ${
-                            shouldShowContent ? 'bg-muted' : 'bg-muted rounded-2xl'
+                        className={`w-full flex items-center gap-1.5 py-1 px-2 text-xs text-white/90 hover:bg-white/10 transition-all duration-400 ease-in-out cursor-pointer relative z-10 ${
+                            shouldShowContent ? 'bg-white/5' : 'bg-white/5 rounded-2xl'
                         }`}
                     >
-                        <div className=' flex items-center justify-center p-1 rounded-sm'>
-                            <CircleDashed className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 animate-spin animation-duration-2000" />
+                        <div className='border border-white/20 bg-white/10 backdrop-blur-sm flex items-center justify-center p-1 rounded-sm'>
+                            <CircleDashed className="h-3.5 w-3.5 text-white/90 flex-shrink-0 animate-spin animation-duration-2000" />
                         </div>
-                        <span className="font-mono text-xs text-foreground">{displayName}</span>
-                        {paramDisplay && <span className="ml-1 text-muted-foreground truncate max-w-[200px]" title={paramDisplay}>{paramDisplay}</span>}
+                        <span className="font-mono text-white/90" style={{ fontSize: '12px' }}>{displayName}</span>
+                        {paramDisplay && <span className="ml-1 text-white/70 truncate max-w-[200px]" title={paramDisplay}>{paramDisplay}</span>}
                     </button>
 
                     {/* Streaming content below - smooth height transition */}
                     <div className={`transition-all duration-500 ease-in-out overflow-hidden transform-gpu ${
-                        shouldShowContent ? 'max-h-[350px] border-t border-neutral-200 dark:border-neutral-700/50 opacity-100' : 'max-h-0 border-t-0 opacity-0 scale-y-95'
+                        shouldShowContent ? 'max-h-[350px] border-t border-white/10 opacity-100' : 'max-h-0 border-t-0 opacity-0 scale-y-95'
                     }`}>
                         <div className="relative">
                             <div
                                 ref={containerRef}
-                                className={`max-h-[300px] overflow-y-auto scrollbar-none text-xs text-foreground transition-all duration-400 ease-in-out transform-gpu ${
+                                className={`max-h-[300px] overflow-y-auto scrollbar-none text-xs text-white/90 transition-all duration-400 ease-in-out transform-gpu relative z-10 ${
                                     STREAMABLE_TOOLS.FILE_OPERATIONS.has(toolName || '') || STREAMABLE_TOOLS.COMMAND_TOOLS.has(toolName || '') 
                                         ? 'font-mono whitespace-pre-wrap' 
                                         : 'whitespace-pre-wrap'
@@ -367,14 +390,14 @@ export const ShowToolStream: React.FC<ShowToolStreamProps> = ({
                             {/* Top gradient */}
                             <div className={`absolute top-0 left-0 right-0 h-8 pointer-events-none transition-all duration-400 ease-in-out ${
                                 shouldShowContent
-                                    ? 'opacity-100 bg-gradient-to-b from-zinc-100 dark:from-neutral-900 via-zinc-100/80 dark:via-neutral-900/80 to-transparent'
-                                    : 'opacity-0 bg-gradient-to-b from-muted via-muted/80 to-transparent'
+                                    ? 'opacity-100 bg-gradient-to-b from-[rgba(10,14,22,0.55)] via-[rgba(10,14,22,0.3)] to-transparent'
+                                    : 'opacity-0 bg-gradient-to-b from-[rgba(10,14,22,0.55)] via-[rgba(10,14,22,0.3)] to-transparent'
                             }`} />
                             {/* Bottom gradient */}
                             <div className={`absolute bottom-0 left-0 right-0 h-8 pointer-events-none transition-all duration-400 ease-in-out ${
                                 shouldShowContent
-                                    ? 'opacity-100 bg-gradient-to-t from-zinc-100 dark:from-neutral-900 via-zinc-100/80 dark:via-neutral-900/80 to-transparent'
-                                    : 'opacity-0 bg-gradient-to-t from-muted via-muted/80 to-transparent'
+                                    ? 'opacity-100 bg-gradient-to-t from-[rgba(10,14,22,0.55)] via-[rgba(10,14,22,0.3)] to-transparent'
+                                    : 'opacity-0 bg-gradient-to-t from-[rgba(10,14,22,0.55)] via-[rgba(10,14,22,0.3)] to-transparent'
                             }`} />
                         </div>
                     </div>
@@ -388,13 +411,37 @@ export const ShowToolStream: React.FC<ShowToolStreamProps> = ({
         <div className="my-1">
             <button
                 onClick={() => onToolClick?.(messageId, toolName)}
-                className="animate-shimmer inline-flex items-center gap-1.5 py-1 px-1 pr-1.5 text-xs text-muted-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors cursor-pointer border border-neutral-200 dark:border-neutral-700/50"
+                className="inline-flex items-center gap-1.5 py-1 px-1 pr-1.5 text-xs text-white/90 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] rounded-lg transition-all duration-200 hover:border-white/20 hover:bg-[rgba(10,14,22,0.65)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] cursor-pointer relative overflow-hidden"
             >
-                <div className='border-2 bg-gradient-to-br from-neutral-200 to-neutral-300 dark:from-neutral-700 dark:to-neutral-800 flex items-center justify-center p-0.5 rounded-sm border-neutral-400/20 dark:border-neutral-600'>
-                    <CircleDashed className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 animate-spin animation-duration-2000" />
+                {/* Gradient rim */}
+                <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg" style={{
+                    background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+                    WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                    WebkitMaskComposite: 'xor',
+                    maskComposite: 'exclude',
+                    padding: '1px',
+                    borderRadius: '8px'
+                }}></div>
+                
+                {/* Specular streak */}
+                <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-12" style={{
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+                    filter: 'blur(4px)',
+                    mixBlendMode: 'screen'
+                }}></div>
+                
+                {/* Fine noise */}
+                <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{
+                    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                    backgroundSize: '100px 100px',
+                    mixBlendMode: 'overlay'
+                }}></div>
+                
+                <div className='border border-white/20 bg-white/10 backdrop-blur-sm flex items-center justify-center p-0.5 rounded-sm relative z-10'>
+                    <CircleDashed className="h-3.5 w-3.5 text-white/90 flex-shrink-0 animate-spin animation-duration-2000" />
                 </div>
-                <span className="font-mono text-xs text-foreground">{displayName}</span>
-                {paramDisplay && <span className="ml-1 text-muted-foreground truncate max-w-[200px]" title={paramDisplay}>{paramDisplay}</span>}
+                <span className="font-mono text-white/90 relative z-10" style={{ fontSize: '12px' }}>{displayName}</span>
+                {paramDisplay && <span className="ml-1 text-white/70 truncate max-w-[200px] relative z-10" title={paramDisplay}>{paramDisplay}</span>}
             </button>
         </div>
     );

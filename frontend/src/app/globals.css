@@ -596,7 +596,7 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.185 0.005 285.823);
+  --sidebar: rgba(10, 14, 22, 0.55);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -701,7 +701,7 @@
 
   /* Fix headings to be more compact in chat context */
   & h1 {
-    font-size: 1.5rem;
+    font-size: 1.65rem;
     font-weight: 700;
     font-family: var(--font-sans);
     margin-top: 1em;
@@ -710,7 +710,7 @@
   }
 
   & h2 {
-    font-size: 1.25rem;
+    font-size: 1.375rem;
     font-weight: 600;
     font-family: var(--font-sans);
     margin-top: 0.8em;
@@ -719,7 +719,7 @@
   }
 
   & h3 {
-    font-size: 1.125rem;
+    font-size: 1.24rem;
     font-weight: 600;
     font-family: var(--font-sans);
     margin-top: 0.6em;
@@ -729,7 +729,7 @@
   & h4,
   & h5,
   & h6 {
-    font-size: 1rem;
+    font-size: 1.1rem;
     font-weight: 600;
     font-family: var(--font-sans);
     margin-top: 0.5em;
@@ -742,6 +742,7 @@
   & span,
   & div {
     font-family: var(--font-sans);
+    font-size: 0.96rem;
   }
 
   /* Improve lists */
@@ -819,7 +820,7 @@
     border-collapse: collapse;
     margin-top: 0.75em;
     margin-bottom: 0.75em;
-    font-size: 0.9em;
+    font-size: 0.96rem;
   }
 
   & th {
@@ -1324,4 +1325,47 @@
       transition: outline 0.15s;
     }
   }
+}
+
+/* Reusable glass surface skin (no layout impact) */
+.glass-surface {
+  position: relative;
+  background: rgba(10, 14, 22, 0.55);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 20px 60px -10px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.glass-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06));
+  -webkit-mask: linear-gradient(#000,#000) content-box, linear-gradient(#000,#000);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  padding: 1px; /* gradient rim without changing size */
+  border-radius: inherit;
+}
+.glass-surface::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 96px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%);
+  filter: blur(6px);
+  mix-blend-mode: screen;
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+.glass-surface > .glass-noise {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.30;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 0.03"/></feComponentTransfer></filter><rect width="100%" height="100%" filter="url(%23n)"/></svg>');
+  background-size: 100px 100px;
+  mix-blend-mode: overlay;
+  border-radius: inherit;
 }

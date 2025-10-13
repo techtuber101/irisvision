@@ -238,6 +238,10 @@ function LoginContent() {
             )}
 
             <form className="space-y-4">
+              {/* Hidden fields for server actions */}
+              <input type="hidden" name="origin" value={typeof window !== 'undefined' ? window.location.origin : ''} />
+              {returnUrl && <input type="hidden" name="returnUrl" value={returnUrl} />}
+              
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium text-white/80">
                   Email
@@ -265,6 +269,22 @@ function LoginContent() {
                   required
                 />
               </div>
+
+              {isSignUp && (
+                <div className="space-y-2">
+                  <label htmlFor="confirmPassword" className="text-sm font-medium text-white/80">
+                    Confirm Password
+                  </label>
+                  <Input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type="password"
+                    placeholder="Confirm your password"
+                    className="bg-navy-800/30 border-navy-600/40 text-white placeholder:text-white/50 focus:border-primary/50"
+                    required
+                  />
+                </div>
+              )}
 
               {!isSignUp && (
                 <div className="text-right">

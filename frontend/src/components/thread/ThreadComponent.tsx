@@ -642,21 +642,45 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
       return (
         <div className="space-y-1">
           <div className="flex justify-between items-center">
-            <div className="text-xs font-medium text-muted-foreground">
+            <div className="text-xs font-medium text-white/70">
               Tool Result
             </div>
             <div
               className={`px-2 py-0.5 rounded-full text-xs ${
                 isSuccess
-                  ? 'bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-300'
-                  : 'bg-red-50 text-red-700 dark:bg-red-900 dark:text-red-300'
+                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                  : 'bg-red-500/20 text-red-400 border border-red-500/30'
               }`}
             >
               {isSuccess ? 'Success' : 'Failed'}
             </div>
           </div>
-          <div className="rounded-md border bg-muted/50 p-3">
-            <div className="text-xs prose prose-xs dark:prose-invert chat-markdown max-w-none">
+          <div className="rounded-2xl border border-white/10 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] p-3 relative overflow-hidden">
+            {/* Gradient rim */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl" style={{
+              background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+              WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+              WebkitMaskComposite: 'xor',
+              maskComposite: 'exclude',
+              padding: '1px',
+              borderRadius: '16px'
+            }}></div>
+            
+            {/* Specular streak */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-12" style={{
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+              filter: 'blur(4px)',
+              mixBlendMode: 'screen'
+            }}></div>
+            
+            {/* Fine noise */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{
+              backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+              backgroundSize: '100px 100px',
+              mixBlendMode: 'overlay'
+            }}></div>
+            
+            <div className="text-xs prose prose-xs dark:prose-invert chat-markdown max-w-none text-white/90 relative z-10">
               {toolContent}
             </div>
           </div>
@@ -1095,7 +1119,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
 
         <div
           className={cn(
-            'fixed bottom-0 z-10 bg-gradient-to-t from-background via-background/90 to-transparent px-4 pt-8',
+            'fixed bottom-0 z-10 bg-gradient-to-t from-background via-background/90 to-transparent px-4 pt-8 pb-5',
             isSidePanelAnimating
               ? ''
               : 'transition-all duration-200 ease-in-out',

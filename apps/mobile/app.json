@@ -1,15 +1,15 @@
 {
   "expo": {
     "name": "Iris",
-    "slug": "suna-mobiles",
+    "slug": "iris-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "owner": "iris",
-    "scheme": "sunamobile",
+    "scheme": "irismobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "description": "Iris is a fully open source AI assistant that helps you accomplish real-world tasks with ease. Through natural conversation, Iris becomes your digital companion for research, data analysis, and everyday challenges.",
+    "description": "Iris is a fully autonomous AI assistant that helps you accomplish real-world tasks with ease. Through natural conversation, Iris becomes your digital companion for research, data analysis, and everyday challenges.",
     "primaryColor": "#121215",
     "privacy": "public",
     "platforms": [
@@ -31,7 +31,7 @@
     "githubUrl": "",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.kortix.suna",
+      "bundleIdentifier": "com.irisvision.iris",
       "buildNumber": "1.0.0",
       "infoPlist": {
         "CFBundleDisplayName": "Iris",
@@ -46,7 +46,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.kortix.suna",
+      "package": "com.irisvision.iris",
       "versionCode": 1,
       "permissions": [
         "INTERNET",

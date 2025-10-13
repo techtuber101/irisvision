@@ -50,6 +50,16 @@ export function DashboardContent() {
   const [viewMode, setViewMode] = useState<'super-worker' | 'worker-templates'>('super-worker');
   const [selectedCharts, setSelectedCharts] = useState<string[]>([]);
   const [selectedOutputFormat, setSelectedOutputFormat] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Update time every minute
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+    
+    return () => clearInterval(timer);
+  }, []);
   
   // Reset data selections when mode changes
   React.useEffect(() => {
@@ -233,9 +243,9 @@ export function DashboardContent() {
         showUsageLimitAlert={true}
       />
 
-      <div className="flex flex-col h-screen w-full overflow-hidden relative">
+      <div className="flex flex-col h-screen w-full overflow-hidden relative bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl">
         {/* White checkered pattern background */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{
+        <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{
           backgroundImage: `
             linear-gradient(to right, rgba(255, 255, 255, 0.5) 1px, transparent 1px),
             linear-gradient(to bottom, rgba(255, 255, 255, 0.5) 1px, transparent 1px)
@@ -245,6 +255,13 @@ export function DashboardContent() {
 
         <div className="flex-1 overflow-y-auto relative z-10">
           <div className="min-h-full flex flex-col">
+
+            {/* Date and Time - Top Right (fixed position) */}
+            {viewMode === 'super-worker' && (
+              <div className="fixed top-8 right-8 text-[16px] text-foreground/75 font-medium z-10" style={{ fontFamily: 'Geist, -apple-system, BlinkMacSystemFont, sans-serif' }}>
+                {currentTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} • {currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+              </div>
+            )}
 
             {/* Centered content area */}
             <div className="flex-1 flex items-center justify-center">
@@ -257,7 +274,11 @@ export function DashboardContent() {
                       <div className="flex flex-col items-center text-center w-full">
                         <p
                           className="tracking-tight text-2xl md:text-3xl font-normal text-foreground/90 text-center relative z-10"
-                          style={{ fontFamily: 'Geist, -apple-system, BlinkMacSystemFont, sans-serif', fontWeight: 400 }}
+                          style={{ 
+                            fontFamily: 'Geist, -apple-system, BlinkMacSystemFont, sans-serif', 
+                            fontWeight: 400,
+                            textShadow: '0 0 35px rgba(255, 255, 255, 0.25), 0 0 70px rgba(255, 255, 255, 0.12)'
+                          }}
                         >
                           Iris is ready, are you?
                         </p>

@@ -147,13 +147,37 @@ export function ExecuteDataProviderCallToolView({
         {isStreaming ? (
           <div className="flex flex-col items-center justify-center h-full py-8 px-6">
             <div className="text-center w-full max-w-xs">
-              <div className="w-16 h-16 rounded-xl mx-auto mb-4 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
-                <Loader2 className="h-8 w-8 animate-spin text-zinc-500 dark:text-zinc-400" />
+              <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] relative overflow-hidden">
+                {/* Gradient rim */}
+                <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full" style={{
+                  background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+                  WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                  WebkitMaskComposite: 'xor',
+                  maskComposite: 'exclude',
+                  padding: '1px',
+                  borderRadius: '50%'
+                }}></div>
+                
+                {/* Specular streak */}
+                <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-8" style={{
+                  background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+                  filter: 'blur(4px)',
+                  mixBlendMode: 'screen'
+                }}></div>
+                
+                {/* Fine noise */}
+                <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{
+                  backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                  backgroundSize: '100px 100px',
+                  mixBlendMode: 'overlay'
+                }}></div>
+                
+                <Loader2 className="h-8 w-8 animate-spin text-white/90 relative z-10" />
               </div>
-              <h3 className="text-base font-medium text-zinc-900 dark:text-zinc-100 mb-2">
+              <h3 className="text-base font-medium text-white/90 mb-2">
                 Executing call...
               </h3>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="text-sm text-white/70">
                 Calling {serviceName || 'data provider'}
               </p>
             </div>

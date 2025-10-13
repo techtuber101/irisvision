@@ -182,7 +182,7 @@ export function renderMarkdownContent(
                 const textBeforeBlock = content.substring(lastIndex, match.index);
                 if (textBeforeBlock.trim()) {
                     contentParts.push(
-                        <ComposioUrlDetector key={`md-${lastIndex}`} content={textBeforeBlock} className="text-sm prose prose-sm dark:prose-invert chat-markdown max-w-none break-words" />
+                        <ComposioUrlDetector key={`md-${lastIndex}`} content={textBeforeBlock} className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none break-words" />
                     );
                 }
             }
@@ -205,7 +205,7 @@ export function renderMarkdownContent(
                     // Render ask tool content with attachment UI
                     contentParts.push(
                         <div key={`ask-${match.index}-${index}`} className="space-y-3">
-                            <ComposioUrlDetector content={askText} className="text-sm prose prose-sm dark:prose-invert chat-markdown max-w-none break-words [&>:first-child]:mt-0 prose-headings:mt-3" />
+                            <ComposioUrlDetector content={askText} className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none break-words [&>:first-child]:mt-0 prose-headings:mt-3" />
                             {renderAttachments(attachmentArray, fileViewerHandler, sandboxId, project)}
                         </div>
                     );
@@ -231,7 +231,7 @@ export function renderMarkdownContent(
                     // Render complete tool content with attachment UI
                     contentParts.push(
                         <div key={`complete-${match.index}-${index}`} className="space-y-3">
-                            <ComposioUrlDetector content={completeText} className="text-sm prose prose-sm dark:prose-invert chat-markdown max-w-none break-words [&>:first-child]:mt-0 prose-headings:mt-3" />
+                            <ComposioUrlDetector content={completeText} className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none break-words [&>:first-child]:mt-0 prose-headings:mt-3" />
                             {renderAttachments(attachmentArray, fileViewerHandler, sandboxId, project)}
                         </div>
                     );
@@ -267,13 +267,37 @@ export function renderMarkdownContent(
                         >
                             <button
                                 onClick={() => handleToolClick(messageId, toolName)}
-                                className="inline-flex items-center gap-1.5 py-1 px-1 pr-1.5 text-xs text-muted-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors cursor-pointer border border-neutral-200 dark:border-neutral-700/50"
+                                className="inline-flex items-center gap-1.5 py-1.25 px-1.5 pr-1.5 text-sm text-white/90 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] rounded-lg transition-all duration-200 hover:border-white/20 hover:bg-[rgba(10,14,22,0.65)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] cursor-pointer relative overflow-hidden"
                             >
-                                <div className='border-2 bg-gradient-to-br from-neutral-200 to-neutral-300 dark:from-neutral-700 dark:to-neutral-800 flex items-center justify-center p-0.5 rounded-sm border-neutral-400/20 dark:border-neutral-600'>
-                                    <IconComponent className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                {/* Gradient rim */}
+                                <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg" style={{
+                                    background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+                                    WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                                    WebkitMaskComposite: 'xor',
+                                    maskComposite: 'exclude',
+                                    padding: '1px',
+                                    borderRadius: '8px'
+                                }}></div>
+                                
+                                {/* Specular streak */}
+                                <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-12" style={{
+                                    background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+                                    filter: 'blur(4px)',
+                                    mixBlendMode: 'screen'
+                                }}></div>
+                                
+                                {/* Fine noise */}
+                                <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{
+                                    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                                    backgroundSize: '100px 100px',
+                                    mixBlendMode: 'overlay'
+                                }}></div>
+                                
+                                <div className='border border-white/20 bg-white/10 backdrop-blur-sm flex items-center justify-center p-0.75 rounded-lg relative z-10'>
+                                    <IconComponent className="h-3.5 w-3.5 text-white/90 flex-shrink-0" />
                                 </div>
-                                <span className="font-mono text-xs text-foreground">{getUserFriendlyToolName(toolName)}</span>
-                                {paramDisplay && <span className="ml-1 text-muted-foreground truncate max-w-[200px]" title={paramDisplay}>{paramDisplay}</span>}
+                                <span className="font-mono text-white/90 relative z-10" style={{ fontSize: '12px' }}>{getUserFriendlyToolName(toolName)}</span>
+                                {paramDisplay && <span className="ml-1 text-white/70 truncate max-w-[200px] relative z-10" title={paramDisplay}>{paramDisplay}</span>}
                             </button>
                         </div>
                     );
@@ -288,12 +312,12 @@ export function renderMarkdownContent(
             const remainingText = content.substring(lastIndex);
             if (remainingText.trim()) {
                 contentParts.push(
-                    <ComposioUrlDetector key={`md-${lastIndex}`} content={remainingText} className="text-sm prose prose-sm dark:prose-invert chat-markdown max-w-none break-words" />
+                    <ComposioUrlDetector key={`md-${lastIndex}`} content={remainingText} className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none break-words" />
                 );
             }
         }
 
-        return contentParts.length > 0 ? contentParts : <ComposioUrlDetector content={content} className="text-sm prose prose-sm dark:prose-invert chat-markdown max-w-none break-words" />;
+        return contentParts.length > 0 ? contentParts : <ComposioUrlDetector content={content} className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none break-words" />;
     }
 
     // Fall back to old XML format handling
@@ -304,7 +328,7 @@ export function renderMarkdownContent(
 
     // If no XML tags found, just return the full content as markdown
     if (!content.match(xmlRegex)) {
-        return <ComposioUrlDetector content={content} className="text-sm prose prose-sm dark:prose-invert chat-markdown max-w-none break-words" />;
+        return <ComposioUrlDetector content={content} className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none break-words" />;
     }
 
     while ((match = xmlRegex.exec(content)) !== null) {
@@ -312,7 +336,7 @@ export function renderMarkdownContent(
         if (match.index > lastIndex) {
             const textBeforeTag = content.substring(lastIndex, match.index);
             contentParts.push(
-                <ComposioUrlDetector key={`md-${lastIndex}`} content={textBeforeTag} className="text-sm prose prose-sm dark:prose-invert chat-markdown max-w-none inline-block mr-1 break-words" />
+                <ComposioUrlDetector key={`md-${lastIndex}`} content={textBeforeTag} className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none inline-block mr-1 break-words" />
             );
         }
 
@@ -334,7 +358,7 @@ export function renderMarkdownContent(
             // Render <ask> tag content with attachment UI (using the helper)
             contentParts.push(
                 <div key={`ask-${match.index}`} className="space-y-3">
-                    <ComposioUrlDetector content={askContent} className="text-sm prose prose-sm dark:prose-invert chat-markdown max-w-none break-words [&>:first-child]:mt-0 prose-headings:mt-3" />
+                    <ComposioUrlDetector content={askContent} className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none break-words [&>:first-child]:mt-0 prose-headings:mt-3" />
                     {renderAttachments(attachments, fileViewerHandler, sandboxId, project)}
                 </div>
             );
@@ -362,7 +386,7 @@ export function renderMarkdownContent(
             // Render <complete> tag content with attachment UI (using the helper)
             contentParts.push(
                 <div key={`complete-${match.index}`} className="space-y-3">
-                    <ComposioUrlDetector content={completeContent} className="text-sm prose prose-sm dark:prose-invert chat-markdown max-w-none break-words [&>:first-child]:mt-0 prose-headings:mt-3" />
+                    <ComposioUrlDetector content={completeContent} className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none break-words [&>:first-child]:mt-0 prose-headings:mt-3" />
                     {renderAttachments(attachments, fileViewerHandler, sandboxId, project)}
                 </div>
             );
@@ -388,13 +412,37 @@ export function renderMarkdownContent(
                 >
                     <button
                         onClick={() => handleToolClick(messageId, toolName)}
-                        className="inline-flex items-center gap-1.5 py-1 px-1 pr-1.5 text-xs text-muted-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors cursor-pointer border border-neutral-200 dark:border-neutral-700/50"
+                        className="inline-flex items-center gap-1.5 py-1.25 px-1.5 pr-1.5 text-sm text-white/90 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] rounded-lg transition-all duration-200 hover:border-white/20 hover:bg-[rgba(10,14,22,0.65)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] cursor-pointer relative overflow-hidden"
                     >
-                        <div className='border-2 bg-gradient-to-br from-neutral-200 to-neutral-300 dark:from-neutral-700 dark:to-neutral-800 flex items-center justify-center p-0.5 rounded-sm border-neutral-400/20 dark:border-neutral-600'>
-                            <IconComponent className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                        {/* Gradient rim */}
+                        <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg" style={{
+                            background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+                            WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                            WebkitMaskComposite: 'xor',
+                            maskComposite: 'exclude',
+                            padding: '1px',
+                            borderRadius: '8px'
+                        }}></div>
+                        
+                        {/* Specular streak */}
+                        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-12" style={{
+                            background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+                            filter: 'blur(4px)',
+                            mixBlendMode: 'screen'
+                        }}></div>
+                        
+                        {/* Fine noise */}
+                        <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{
+                            backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                            backgroundSize: '100px 100px',
+                            mixBlendMode: 'overlay'
+                        }}></div>
+                        
+                        <div className='border border-white/20 bg-white/10 backdrop-blur-sm flex items-center justify-center p-0.75 rounded-lg relative z-10'>
+                            <IconComponent className="h-3.5 w-3.5 text-white/90 flex-shrink-0" />
                         </div>
-                        <span className="font-mono text-xs text-foreground">{getUserFriendlyToolName(toolName)}</span>
-                        {paramDisplay && <span className="ml-1 text-muted-foreground truncate max-w-[200px]" title={paramDisplay}>{paramDisplay}</span>}
+                        <span className="font-mono text-white/90 relative z-10" style={{ fontSize: '12px' }}>{getUserFriendlyToolName(toolName)}</span>
+                        {paramDisplay && <span className="ml-1 text-white/70 truncate max-w-[200px] relative z-10" title={paramDisplay}>{paramDisplay}</span>}
                     </button>
                 </div>
             );
@@ -405,7 +453,7 @@ export function renderMarkdownContent(
     // Add text after the last tag
     if (lastIndex < content.length) {
         contentParts.push(
-            <ComposioUrlDetector key={`md-${lastIndex}`} content={content.substring(lastIndex)} className="text-sm prose prose-sm dark:prose-invert chat-markdown max-w-none break-words" />
+            <ComposioUrlDetector key={`md-${lastIndex}`} content={content.substring(lastIndex)} className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none break-words" />
         );
     }
 
@@ -488,7 +536,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
 
     const containerClassName = isPreviewMode
         ? "flex-1 overflow-y-auto scrollbar-thin scrollbar-track-secondary/0 scrollbar-thumb-primary/10 scrollbar-thumb-rounded-full hover:scrollbar-thumb-primary/10 py-4 pb-0"
-        : "flex-1 overflow-y-auto scrollbar-thin scrollbar-track-secondary/0 scrollbar-thumb-primary/10 scrollbar-thumb-rounded-full hover:scrollbar-thumb-primary/10 py-4 pb-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60";
+        : "flex-1 overflow-y-auto scrollbar-thin scrollbar-track-secondary/0 scrollbar-thumb-primary/10 scrollbar-thumb-rounded-full hover:scrollbar-thumb-primary/10 py-4 pb-0 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl";
 
     // In playback mode, we use visibleMessages instead of messages
     // Filter out image_context messages (they're for LLM only, not for display)
@@ -856,8 +904,32 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                         if (debugMode) {
                                             return (
                                                 <div key={group.key} className="flex justify-end">
-                                                    <div className="flex max-w-[85%] rounded-2xl bg-card px-4 py-3 break-words overflow-hidden">
-                                                        <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto min-w-0 flex-1">
+                                                    <div className="flex max-w-[85%] rounded-2xl bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] px-4 py-3 break-words overflow-hidden relative">
+                                                        {/* Gradient rim */}
+                                                        <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl" style={{
+                                                            background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+                                                            WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                                                            WebkitMaskComposite: 'xor',
+                                                            maskComposite: 'exclude',
+                                                            padding: '1px',
+                                                            borderRadius: '16px'
+                                                        }}></div>
+                                                        
+                                                        {/* Specular streak */}
+                                                        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-24" style={{
+                                                            background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+                                                            filter: 'blur(6px)',
+                                                            mixBlendMode: 'screen'
+                                                        }}></div>
+                                                        
+                                                        {/* Fine noise */}
+                                                        <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-30" style={{
+                                                            backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                                                            backgroundSize: '100px 100px',
+                                                            mixBlendMode: 'overlay'
+                                                        }}></div>
+                                                        
+                                                        <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto min-w-0 flex-1 relative z-10">
                                                             {message.content}
                                                         </pre>
                                                     </div>
@@ -883,10 +955,34 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                 {renderStandaloneAttachments(attachments as string[], handleOpenFileViewer, sandboxId, project, true)}
 
                                                 <div className="flex justify-end">
-                                                    <div className="flex max-w-[85%] rounded-3xl rounded-br-lg bg-card border px-4 py-3 break-words overflow-hidden">
-                                                        <div className="space-y-3 min-w-0 flex-1">
+                                                    <div className="flex max-w-[85%] rounded-3xl bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] px-4 py-3 break-words overflow-hidden relative">
+                                                        {/* Gradient rim */}
+                                                        <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-3xl" style={{
+                                                            background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+                                                            WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                                                            WebkitMaskComposite: 'xor',
+                                                            maskComposite: 'exclude',
+                                                            padding: '1px',
+                                                            borderRadius: '24px'
+                                                        }}></div>
+                                                        
+                                                        {/* Specular streak */}
+                                                        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-24" style={{
+                                                            background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+                                                            filter: 'blur(6px)',
+                                                            mixBlendMode: 'screen'
+                                                        }}></div>
+                                                        
+                                                        {/* Fine noise */}
+                                                        <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-30" style={{
+                                                            backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                                                            backgroundSize: '100px 100px',
+                                                            mixBlendMode: 'overlay'
+                                                        }}></div>
+                                                        
+                                                        <div className="space-y-3 min-w-0 flex-1 relative z-10">
                                                             {cleanContent && (
-                                                                <ComposioUrlDetector content={cleanContent} className="text-sm prose prose-sm dark:prose-invert chat-markdown max-w-none [&>:first-child]:mt-0 prose-headings:mt-3 break-words overflow-wrap-anywhere" />
+                                                                <ComposioUrlDetector content={cleanContent} className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none [&>:first-child]:mt-0 prose-headings:mt-3 break-words overflow-wrap-anywhere" />
                                                             )}
 
                                                             {/* Use the helper function to render regular (non-spreadsheet) attachments */}
@@ -998,7 +1094,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                                                         ease: "easeOut" 
                                                                                     }}
                                                                                 >
-                                                                                    <div className="prose prose-sm dark:prose-invert chat-markdown max-w-none [&>:first-child]:mt-0 prose-headings:mt-3 break-words overflow-hidden">
+                                                                                    <div className="prose prose-base dark:prose-invert chat-markdown max-w-none [&>:first-child]:mt-0 prose-headings:mt-3 break-words overflow-hidden">
                                                                                         {renderedContent}
                                                                                     </div>
                                                                                 </motion.div>
@@ -1080,7 +1176,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                                             <>
                                                                                 <StreamingText
                                                                                     content={textBeforeTag}
-                                                                                    className="text-sm prose prose-sm dark:prose-invert chat-markdown max-w-none [&>:first-child]:mt-0 prose-headings:mt-3 break-words overflow-wrap-anywhere"
+                                                                                    className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none [&>:first-child]:mt-0 prose-headings:mt-3 break-words overflow-wrap-anywhere"
                                                                                 />
 
                                                                                 {detectedTag && detectedTag !== 'partial' && (
@@ -1152,7 +1248,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                                                     <>
                                                                                         <StreamingText
                                                                                             content={textBeforeTag}
-                                                                                            className="text-sm prose prose-sm dark:prose-invert chat-markdown max-w-none [&>:first-child]:mt-0 prose-headings:mt-3 break-words overflow-wrap-anywhere"
+                                                                                            className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none [&>:first-child]:mt-0 prose-headings:mt-3 break-words overflow-wrap-anywhere"
                                                                                         />
 
                                                                                         {detectedTag && detectedTag !== 'partial' && (
@@ -1217,9 +1313,33 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
 
                                         {/* Tool call content */}
                                         <div className="space-y-2">
-                                            <div className="animate-shimmer inline-flex items-center gap-1.5 py-1.5 px-3 text-xs font-medium text-primary bg-primary/10 rounded-md border border-primary/20">
-                                                <CircleDashed className="h-3.5 w-3.5 text-primary flex-shrink-0 animate-spin animation-duration-2000" />
-                                                <span className="font-mono text-xs text-primary">
+                                            <div className="inline-flex items-center gap-1.5 py-1.5 px-2 text-sm font-medium text-white/90 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] rounded-lg relative overflow-hidden">
+                                                {/* Gradient rim */}
+                                                <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg" style={{
+                                                    background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+                                                    WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                                                    WebkitMaskComposite: 'xor',
+                                                    maskComposite: 'exclude',
+                                                    padding: '1px',
+                                                    borderRadius: '8px'
+                                                }}></div>
+                                                
+                                                {/* Specular streak */}
+                                                <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-6" style={{
+                                                    background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+                                                    filter: 'blur(3px)',
+                                                    mixBlendMode: 'screen'
+                                                }}></div>
+                                                
+                                                {/* Fine noise */}
+                                                <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{
+                                                    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                                                    backgroundSize: '100px 100px',
+                                                    mixBlendMode: 'overlay'
+                                                }}></div>
+                                                
+                                                <CircleDashed className="h-3.5 w-3.5 text-white/90 flex-shrink-0 animate-spin animation-duration-2000 relative z-10" />
+                                                <span className="font-mono text-white/90 relative z-10" style={{ fontSize: '12px' }}>
                                                     {currentToolCall.name || 'Using Tool'}
                                                 </span>
                                             </div>

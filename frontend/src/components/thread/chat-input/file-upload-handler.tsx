@@ -256,9 +256,7 @@ export const FileUploadHandler = forwardRef<
                 <Button
                   type="button"
                   onClick={handleFileUpload}
-                  variant="outline"
-                  size="sm"
-                  className="h-8 px-3 bg-transparent border border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/50 flex items-center justify-center gap-2 cursor-pointer"
+                  className="h-9 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm px-4 text-sm font-medium text-white/90 shadow-[0_2px_8px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-200 hover:border-white/30 hover:bg-white/15 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] active:scale-[0.98] opacity-45 cursor-pointer flex items-center justify-center gap-2"
                   disabled={
                     !isLoggedIn || loading || (disabled && !isAgentRunning) || isUploading
                   }

@@ -3,15 +3,27 @@ FROM ghcr.io/astral-sh/uv:python3.11-alpine
 ENV ENV_MODE production
 WORKDIR /app
 
-RUN apk add --no-cache curl git \
-    # Dependencies for Python package compilation
+# Install system dependencies in stages to avoid I/O issues
+RUN apk update && apk add --no-cache \
+    curl \
+    git \
+    # Basic build tools
+    build-base \
+    linux-headers
+
+# Install Python development dependencies
+RUN apk add --no-cache \
     freetype-dev \
     gcc \
     musl-dev \
-    python3-dev \
-    # Rust compiler for tiktoken
-    rust \
-    cargo
+    python3-dev
+
+# Install Rust compiler separately to avoid conflicts
+RUN apk add --no-cache rust cargo
+
+# Set Rust environment variables to optimize compilation
+ENV RUSTFLAGS="-C target-cpu=native"
+ENV CARGO_BUILD_JOBS=2
 
 # Install Python dependencies
 COPY pyproject.toml uv.lock ./

@@ -32,13 +32,13 @@ import { useTheme } from "next-themes"
 
 const data = {
   user: {
-    name: "Kortix User",
-    email: "docs@kortix.ai",
+    name: "Iris User",
+    email: "docs@irisvision.ai",
     avatar: "/favicon.png",
   },
   teams: [
     {
-      name: "Kortix AI",
+      name: "Iris AI",
       logo: GalleryVerticalEnd,
       plan: "Open Source",
     },
@@ -48,7 +48,7 @@ const data = {
       title: "Getting Started",
       items: [
         {
-          title: "What is Kortix?",
+          title: "What is Iris?",
           url: "/docs/introduction",
         },
         {
@@ -80,7 +80,7 @@ const data = {
       items: [
         {
           title: "GitHub Repository",
-          url: "https://github.com/kortix-ai/suna",
+          url: "https://github.com/irisvision-ai/iris",
           external: true,
         },
         {
@@ -114,7 +114,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }
 
   return (
-    <Sidebar className="w-72 [&_[data-sidebar=sidebar]]:bg-white dark:[&_[data-sidebar=sidebar]]:bg-black border-none" {...props}>
+    <Sidebar className="w-72 border-none backdrop-blur-2xl" {...props}>
       <SidebarHeader className="bg-transparent p-6 px-2">
         <Image
           src={logoSrc}

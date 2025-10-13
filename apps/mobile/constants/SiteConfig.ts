@@ -1,6 +1,6 @@
 export const siteConfig = {
   name: "Iris",
-  url: "https://suna.so",
+  url: "https://irisvision.ai",
   description: "Iris is a fully open source AI assistant that helps you accomplish real-world tasks with ease. Through natural conversation, Iris becomes your digital companion for research, data analysis, and everyday challenges.",
   keywords: [
     'AI',
@@ -13,18 +13,18 @@ export const siteConfig = {
     'research',
     'data analysis',
   ],
-  authors: [{ name: 'Kortix Team', url: 'https://suna.so' }],
-  creator: 'Kortix Team - Adam Cohen Hillel, Marko Kraemer, Domenico Gagliardi, and Quoc Dat Le',
-  publisher: 'Kortix Team - Adam Cohen Hillel, Marko Kraemer, Domenico Gagliardi, and Quoc Dat Le',
+  authors: [{ name: 'Iris Team', url: 'https://irisvision.ai' }],
+  creator: 'Iris Team - Adam Cohen Hillel, Marko Kraemer, Domenico Gagliardi, and Quoc Dat Le',
+  publisher: 'Iris Team - Adam Cohen Hillel, Marko Kraemer, Domenico Gagliardi, and Quoc Dat Le',
   category: 'Technology',
   applicationName: 'Iris',
-  twitterHandle: '@kortixai',
-  githubUrl: 'https://github.com/kortix-ai/suna',
+  twitterHandle: '@irisvisionai',
+  githubUrl: 'https://github.com/irisvision-ai/iris',
   
   // Mobile-specific configurations
   bundleId: {
-    ios: 'com.kortix.suna',
-    android: 'com.kortix.suna'
+    ios: 'com.irisvision.iris',
+    android: 'com.irisvision.iris'
   },
   
   // Theme colors

@@ -194,7 +194,7 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
                     >
                         {onAgentSelect ? (
                             <div className="flex items-center gap-2 min-w-0 max-w-[180px]">
-                                {renderAgentIcon(displayAgent)}
+                                {/* {renderAgentIcon(displayAgent)} */}
                                 <span className="truncate text-sm font-medium">
                                     {displayAgent?.name || 'Iris'}
                                 </span>

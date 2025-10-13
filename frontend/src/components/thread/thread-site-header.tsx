@@ -138,7 +138,7 @@ export function SiteHeader({
   return (
     <>
       <header className={cn(
-        "bg-background sticky top-0 flex h-14 shrink-0 items-center gap-2 z-20 w-full",
+        "sticky top-0 flex h-14 shrink-0 items-center gap-2 z-20 w-full bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border-b-0 shadow-none",
         isMobile && "px-2"
       )}>
 

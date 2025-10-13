@@ -997,11 +997,35 @@ export function ToolCallSidePanel({
             overflow: 'hidden',
           }}
         >
-          <div className="flex-1 flex flex-col overflow-hidden bg-card">
-            {renderContent()}
+          <div className="flex-1 flex flex-col overflow-hidden relative rounded-3xl border border-white/10 bg-[rgba(7,10,17,0.95)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
+            {/* Gradient rim */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-3xl" style={{
+              background: 'linear-gradient(180deg, rgba(173,216,255,0.10), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.10) 85%, rgba(255,255,255,0.06))',
+              WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+              WebkitMaskComposite: 'xor',
+              maskComposite: 'exclude',
+              padding: '1px',
+              borderRadius: '24px'
+            }} />
+            {/* Specular streak */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-20" style={{
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+              filter: 'blur(6px)',
+              mixBlendMode: 'screen'
+            }} />
+            {/* Fine noise */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{
+              backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+              backgroundSize: '100px 100px',
+              mixBlendMode: 'overlay'
+            }} />
+
+            <div className="relative z-10 flex-1 flex flex-col overflow-hidden">
+              {renderContent()}
+            </div>
           </div>
           {(displayTotalCalls > 1 || (isCurrentToolStreaming && totalCompletedCalls > 0)) && (
-            <div className="border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-4 py-2.5">
+            <div className="border-t border-white/5 bg-white/10 backdrop-blur-sm px-4 py-2.5">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1">
                   <Button
