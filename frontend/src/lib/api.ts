@@ -616,6 +616,35 @@ export const addUserMessage = async (
   }
 };
 
+export const addAssistantMessage = async (
+  threadId: string,
+  content: string,
+  metadata?: any,
+): Promise<void> => {
+  const supabase = createClient();
+
+  // Format the message in the format the LLM expects
+  const message = {
+    role: 'assistant',
+    content: content,
+  };
+
+  // Insert the assistant message into the messages table
+  const { error } = await supabase.from('messages').insert({
+    thread_id: threadId,
+    type: 'assistant',
+    is_llm_message: true,
+    content: JSON.stringify(message),
+    metadata: metadata ? JSON.stringify(metadata) : null,
+  });
+
+  if (error) {
+    console.error('Error adding assistant message:', error);
+    handleApiError(error, { operation: 'add assistant message', resource: 'message' });
+    throw new Error(`Error adding assistant message: ${error.message}`);
+  }
+};
+
 export const getMessages = async (threadId: string): Promise<Message[]> => {
   const supabase = createClient();
 

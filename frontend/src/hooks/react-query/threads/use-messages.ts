@@ -1,6 +1,6 @@
 import { createMutationHook, createQueryHook } from "@/hooks/use-query";
 import { threadKeys } from "./keys";
-import { addUserMessage, getMessages } from "@/lib/api";
+import { addUserMessage, addAssistantMessage, getMessages } from "@/lib/api";
 
 export const useMessagesQuery = (threadId: string) =>
   createQueryHook(
@@ -24,4 +24,17 @@ export const useAddUserMessageMutation = () =>
       threadId: string;
       message: string;
     }) => addUserMessage(threadId, message)
+  )();
+
+export const useAddAssistantMessageMutation = () =>
+  createMutationHook(
+    ({
+      threadId,
+      content,
+      metadata,
+    }: {
+      threadId: string;
+      content: string;
+      metadata?: any;
+    }) => addAssistantMessage(threadId, content, metadata)
   )();

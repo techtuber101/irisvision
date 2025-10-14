@@ -17,7 +17,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { isLocalMode } from '@/lib/config';
 import { ThreadContent } from '@/components/thread/content/ThreadContent';
 import { ThreadSkeleton } from '@/components/thread/content/ThreadSkeleton';
-import { useAddUserMessageMutation } from '@/hooks/react-query/threads/use-messages';
+import { useAddUserMessageMutation, useAddAssistantMessageMutation } from '@/hooks/react-query/threads/use-messages';
 import {
   useStartAgentMutation,
   useStopAgentMutation,
@@ -164,6 +164,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   });
 
   const addUserMessageMutation = useAddUserMessageMutation();
+  const addAssistantMessageMutation = useAddAssistantMessageMutation();
   const startAgentMutation = useStartAgentMutation();
   const stopAgentMutation = useStopAgentMutation();
   const { data: threadAgentData } = useThreadAgent(threadId);
@@ -499,14 +500,25 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
           let displayedContent = '';
           let characterQueue: string[] = [];
           let isTyping = false;
+          let characterCount = 0;
           
-          // Typewriter effect: Display characters one by one with smooth animation
-          const typewriterInterval = 15; // milliseconds per character (blazing fast!)
+          // Dynamic typewriter effect: Start fast, then accelerate after paragraphs
+          const getTypewriterInterval = () => {
+            // First ~500 characters: 10ms (super fast start)
+            if (characterCount < 500) {
+              return 10;
+            }
+            // After ~500 characters: 1ms (blazing fast, almost instant)
+            else {
+              return 1;
+            }
+          };
           
           const typeNextCharacter = () => {
             if (characterQueue.length > 0) {
               const char = characterQueue.shift()!;
               displayedContent += char;
+              characterCount++;
               
               setMessages((prev) =>
                 prev.map((m) =>
@@ -521,7 +533,8 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
               );
               
               if (characterQueue.length > 0) {
-                setTimeout(typeNextCharacter, typewriterInterval);
+                const interval = getTypewriterInterval();
+                setTimeout(typeNextCharacter, interval);
               } else {
                 isTyping = false;
               }
@@ -556,18 +569,37 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
                 console.log(`Fast Gemini response completed in ${timeMs}ms`);
                 
                 // Wait for all characters to be typed before marking complete
-                const waitForTyping = () => {
+                const waitForTyping = async () => {
                   if (characterQueue.length > 0 || isTyping) {
                     setTimeout(waitForTyping, 50);
                   } else {
-                    // All characters typed, mark as complete
+                    // All characters typed, save to database and mark as complete
+                    const finalMetadata = { 
+                      is_streaming: false, 
+                      response_time_ms: timeMs,
+                      chat_mode: 'chat' // Mark as chat mode message
+                    };
+                    
+                    // Save assistant message to database
+                    try {
+                      await addAssistantMessageMutation.mutateAsync({
+                        threadId,
+                        content: streamedContent,
+                        metadata: finalMetadata,
+                      });
+                      console.log('Assistant message saved to database');
+                    } catch (error) {
+                      console.error('Failed to save assistant message:', error);
+                    }
+                    
+                    // Update local state
                     setMessages((prev) =>
                       prev.map((m) =>
                         m.message_id === assistantMessageId
                           ? {
                               ...m,
                               content: JSON.stringify({ content: streamedContent }),
-                              metadata: JSON.stringify({ is_streaming: false, response_time_ms: timeMs }),
+                              metadata: JSON.stringify(finalMetadata),
                             }
                           : m
                       )
@@ -576,10 +608,6 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
                 };
                 
                 waitForTyping();
-                
-                // Note: Assistant message is kept in local state for context.
-                // When switching to Execute mode, the full conversation history is available.
-                // The user message is already saved to the backend via messagePromise above.
               },
               onError: (error) => {
                 console.error('Fast Gemini stream error:', error);
