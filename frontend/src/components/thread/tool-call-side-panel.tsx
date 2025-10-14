@@ -212,14 +212,15 @@ const PanelHeader: React.FC<PanelHeaderProps> = memo(function PanelHeader({
   return (
     <div className="pt-4 pl-4 pr-4">
       <div className="flex items-center justify-between">
+        <div className="flex-1"></div>
         <div className="flex items-center gap-3">
           <div className="ml-2">
-            <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
+            <h2 className="text-lg font-medium text-white/90">
               {title}
             </h2>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex-1 flex items-center justify-end gap-2">
           {isStreaming && (
             <Badge variant="outline" className="gap-1.5 p-2 rounded-3xl">
               <CircleDashed className="h-3 w-3 animate-spin" />
@@ -583,7 +584,7 @@ export function ToolCallSidePanel({
   }, [latestIndex, internalNavigate]);
 
   const renderStatusButton = useCallback(() => {
-    const baseClasses = "flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-full w-[116px]";
+    const baseClasses = "flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-full w-[116px] border transition-colors cursor-pointer";
     const dotClasses = "w-1.5 h-1.5 rounded-full";
     const textClasses = "text-xs font-medium";
 
@@ -591,18 +592,19 @@ export function ToolCallSidePanel({
       if (agentStatus === 'running') {
         return (
           <div
-            className={`${baseClasses} bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors cursor-pointer`}
+            className={`${baseClasses} bg-white/10 border-white/20 hover:bg-white/15`}
             onClick={jumpToLive}
+            title="Follow live updates"
           >
-            <div className={`${dotClasses} bg-green-500 animate-pulse`} />
-            <span className={`${textClasses} text-green-700 dark:text-green-400`}>Live Updates</span>
+            <div className={`${dotClasses} bg-emerald-400 animate-pulse`} />
+            <span className={`${textClasses} text-white/80`}>Live Updates</span>
           </div>
         );
       } else {
         return (
-          <div className={`${baseClasses} bg-neutral-50 dark:bg-neutral-900/20 border border-neutral-200 dark:border-neutral-800`}>
-            <div className={`${dotClasses} bg-neutral-500`} />
-            <span className={`${textClasses} text-neutral-700 dark:text-neutral-400`}>Latest Tool</span>
+          <div className={`${baseClasses} bg-white/10 border-white/20`} title="Showing latest tool">
+            <div className={`${dotClasses} bg-white/60`} />
+            <span className={`${textClasses} text-white/80`}>Latest Tool</span>
           </div>
         );
       }
@@ -610,21 +612,23 @@ export function ToolCallSidePanel({
       if (agentStatus === 'running') {
         return (
           <div
-            className={`${baseClasses} bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors cursor-pointer`}
+            className={`${baseClasses} bg-white/10 border-white/20 hover:bg-white/15`}
             onClick={jumpToLive}
+            title="Jump to live"
           >
-            <div className={`${dotClasses} bg-green-500 animate-pulse`} />
-            <span className={`${textClasses} text-green-700 dark:text-green-400`}>Jump to Live</span>
+            <div className={`${dotClasses} bg-emerald-400 animate-pulse`} />
+            <span className={`${textClasses} text-white/80`}>Jump to Live</span>
           </div>
         );
       } else {
         return (
           <div
-            className={`${baseClasses} bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors cursor-pointer`}
+            className={`${baseClasses} bg-white/10 border-white/20 hover:bg-white/15`}
             onClick={jumpToLatest}
+            title="Jump to latest"
           >
-            <div className={`${dotClasses} bg-blue-500`} />
-            <span className={`${textClasses} text-blue-700 dark:text-blue-400`}>Jump to Latest</span>
+            <div className={`${dotClasses} bg-white/70`} />
+            <span className={`${textClasses} text-white/80`}>Hop to Latest</span>
           </div>
         );
       }
@@ -646,7 +650,7 @@ export function ToolCallSidePanel({
       // console.log('Side panel handler - document modal open:', isDocumentModalOpen, 'key:', event.key);
       if (isDocumentModalOpen) return;
       
-      if ((event.metaKey || event.ctrlKey) && event.key === 'i') {
+      if (event.key === 'Tab') {
         event.preventDefault();
         handleClose();
       }
@@ -874,7 +878,7 @@ export function ToolCallSidePanel({
           />
         )}
 
-        <div className={`flex-1 ${currentView === 'browser' ? 'overflow-hidden' : 'overflow-hidden'} scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-700 scrollbar-track-transparent`}>
+          <div className={`flex-1 ${currentView === 'browser' ? 'overflow-hidden' : 'overflow-hidden'} scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-700 scrollbar-track-transparent`}>
           {/* Always render VNC iframe to maintain connection when available */}
           {persistentVncIframe && (
             <div className={`${currentView === 'browser' ? 'h-full flex flex-col' : 'hidden'}`}>
@@ -929,43 +933,66 @@ export function ToolCallSidePanel({
           />
           
           <div className="flex-1 flex flex-col overflow-hidden">
-            {renderContent()}
-          </div>
-          
-          {(displayTotalCalls > 1 || (isCurrentToolStreaming && totalCompletedCalls > 0)) && (
-            <div className="border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-3">
-              <div className="flex items-center justify-between">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={navigateToPrevious}
-                  disabled={displayIndex <= 0}
-                  className="h-8 px-2.5 text-xs"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5 mr-1" />
-                  <span>Prev</span>
-                </Button>
-
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-zinc-600 dark:text-zinc-400 font-medium tabular-nums min-w-[44px]">
-                    {safeInternalIndex + 1}/{totalCalls}
-                  </span>
-                  {renderStatusButton()}
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={navigateToNext}
-                  disabled={displayIndex >= displayTotalCalls - 1}
-                  className="h-8 px-2.5 text-xs"
-                >
-                  <span>Next</span>
-                  <ChevronRight className="h-3.5 w-3.5 ml-1" />
-                </Button>
-              </div>
+            <div className="flex-1 min-h-0">
+              {renderContent()}
             </div>
-          )}
+            {(displayTotalCalls > 1 || (isCurrentToolStreaming && totalCompletedCalls > 0)) && (
+              <div className="p-3">
+                <div className="relative rounded-2xl border border-white/10 bg-white/10 backdrop-blur-sm px-3 py-2">
+                  <div aria-hidden className="pointer-events-none absolute inset-0 rounded-2xl" style={{
+                    background: 'linear-gradient(180deg, rgba(173,216,255,0.10), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.10) 85%, rgba(255,255,255,0.06))',
+                    WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                    WebkitMaskComposite: 'xor',
+                    maskComposite: 'exclude',
+                    padding: '1px',
+                    borderRadius: '16px'
+                  }} />
+                  <div className="relative flex items-center justify-between gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={navigateToPrevious}
+                      disabled={displayIndex <= 0}
+                      className="h-8 px-2.5 text-xs text-white/70 hover:text-white/90 disabled:opacity-40"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                      <span>Prev</span>
+                    </Button>
+
+                    <div className="flex-1 flex items-center gap-2">
+                      <span className="text-xs text-white/70 font-medium tabular-nums min-w-[44px] text-center">
+                        {safeInternalIndex + 1}/{totalCalls}
+                      </span>
+                      <div className="flex-1">
+                        <Slider
+                          min={0}
+                          max={Math.max(0, totalCalls - 1)}
+                          step={1}
+                          value={[safeInternalIndex]}
+                          onValueChange={handleSliderChange}
+                          className="w-full [&>span:first-child]:h-1.5 [&>span:first-child]:bg-white/15 [&>span:first-child>span]:bg-white/60 [&>span:first-child>span]:h-1.5"
+                        />
+                      </div>
+                      <div className="shrink-0">
+                        {renderStatusButton()}
+                      </div>
+                    </div>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={navigateToNext}
+                      disabled={displayIndex >= displayTotalCalls - 1}
+                      className="h-8 px-2.5 text-xs text-white/70 hover:text-white/90 disabled:opacity-40"
+                    >
+                      <span>Next</span>
+                      <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </DrawerContent>
       </Drawer>
     );
@@ -1020,54 +1047,70 @@ export function ToolCallSidePanel({
               mixBlendMode: 'overlay'
             }} />
 
-            <div className="relative z-10 flex-1 flex flex-col overflow-hidden">
-              {renderContent()}
+            <div className="relative z-10 flex-1 flex flex-col overflow-hidden pb-2">
+              <div className="flex-1 min-h-0">
+                {renderContent()}
+              </div>
+              {(displayTotalCalls > 1 || (isCurrentToolStreaming && totalCompletedCalls > 0)) && (
+                <div className="mt-auto px-4 py-2.5">
+                  <div className="relative rounded-2xl border border-white/10 bg-white/10 backdrop-blur-sm px-3 py-2">
+                    {/* subtle inner rim */}
+                    <div aria-hidden className="pointer-events-none absolute inset-0 rounded-2xl" style={{
+                      background: 'linear-gradient(180deg, rgba(173,216,255,0.10), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.10) 85%, rgba(255,255,255,0.06))',
+                      WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                      WebkitMaskComposite: 'xor',
+                      maskComposite: 'exclude',
+                      padding: '1px',
+                      borderRadius: '16px'
+                    }} />
+                    <div className="relative flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={navigateToPrevious}
+                          disabled={displayIndex <= 0}
+                          className="h-7 w-7 text-white/70 hover:text-white/90 disabled:opacity-40"
+                          title="Previous"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="text-xs text-white/70 font-medium tabular-nums px-1 min-w-[44px] text-center">
+                          {displayIndex + 1}/{displayTotalCalls}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={navigateToNext}
+                          disabled={safeInternalIndex >= latestIndex}
+                          className="h-7 w-7 text-white/70 hover:text-white/90 disabled:opacity-40"
+                          title="Next"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <div className="flex-1 relative">
+                        <Slider
+                          min={0}
+                          max={Math.max(0, totalCalls - 1)}
+                          step={1}
+                          value={[safeInternalIndex]}
+                          onValueChange={handleSliderChange}
+                          className="w-full [&>span:first-child]:h-1.5 [&>span:first-child]:bg-white/15 [&>span:first-child>span]:bg-white/60 [&>span:first-child>span]:h-1.5"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {renderStatusButton()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-          {(displayTotalCalls > 1 || (isCurrentToolStreaming && totalCompletedCalls > 0)) && (
-            <div className="border-t border-white/5 bg-white/10 backdrop-blur-sm px-4 py-2.5">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={navigateToPrevious}
-                    disabled={displayIndex <= 0}
-                    className="h-7 w-7 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <span className="text-xs text-zinc-600 dark:text-zinc-400 font-medium tabular-nums px-1 min-w-[44px] text-center">
-                    {displayIndex + 1}/{displayTotalCalls}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={navigateToNext}
-                    disabled={safeInternalIndex >= latestIndex}
-                    className="h-7 w-7 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <div className="flex-1 relative">
-                  <Slider
-                    min={0}
-                    max={Math.max(0, totalCalls - 1)}
-                    step={1}
-                    value={[safeInternalIndex]}
-                    onValueChange={handleSliderChange}
-                    className="w-full [&>span:first-child]:h-1.5 [&>span:first-child]:bg-zinc-200 dark:[&>span:first-child]:bg-zinc-800 [&>span:first-child>span]:bg-zinc-500 dark:[&>span:first-child>span]:bg-zinc-400 [&>span:first-child>span]:h-1.5"
-                  />
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  {renderStatusButton()}
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Footer timeline moved inside container above */}
         </motion.div>
       )}
     </AnimatePresence>

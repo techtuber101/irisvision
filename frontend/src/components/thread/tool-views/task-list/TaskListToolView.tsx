@@ -115,28 +115,32 @@ export const TaskListToolView: React.FC<ToolViewProps> = ({
             </div>
           </div>
 
-          {!isStreaming && (
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs font-normal">
-                {completedTasks} / {totalTasks} tasks
-              </Badge>
-              <Badge
-                variant="secondary"
-                className={
-                  isSuccess
-                    ? "bg-gradient-to-b from-emerald-200 to-emerald-100 text-emerald-700 dark:from-emerald-800/50 dark:to-emerald-900/60 dark:text-emerald-300"
-                    : "bg-gradient-to-b from-rose-200 to-rose-100 text-rose-700 dark:from-rose-800/50 dark:to-rose-900/60 dark:text-rose-300"
-                }
-              >
-                {isSuccess ? (
-                  <CheckCircle className="h-3.5 w-3.5" />
-                ) : (
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                )}
-                {isSuccess ? 'Tasks loaded' : 'Failed to load'}
-              </Badge>
+          <div className="flex-1 flex flex-col items-end gap-1.5">
+            <div className="relative rounded-xl border border-emerald-400/20 bg-emerald-400/10 backdrop-blur-sm px-2.5 py-1.5">
+              {/* Gradient rim */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-xl" style={{
+                background: 'linear-gradient(180deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05) 30%, rgba(16,185,129,0.10) 85%, rgba(16,185,129,0.08))',
+                WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                WebkitMaskComposite: 'xor',
+                maskComposite: 'exclude',
+                padding: '1px',
+                borderRadius: '12px'
+              }} />
+              {/* Specular streak */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-6" style={{
+                background: 'linear-gradient(180deg, rgba(16,185,129,0.25), rgba(16,185,129,0.08) 45%, rgba(16,185,129,0) 100%)',
+                filter: 'blur(3px)',
+                mixBlendMode: 'screen'
+              }} />
+              {/* Fine noise */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{
+                backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                backgroundSize: '100px 100px',
+                mixBlendMode: 'overlay'
+              }} />
+              <span className="relative z-10 text-xs font-medium text-emerald-300">{completedTasks}/{totalTasks} tasks accomplished</span>
             </div>
-          )}
+          </div>
         </div>
       </CardHeader>
 

@@ -48,6 +48,7 @@ import { useAgentSelection } from '@/lib/stores/agent-selection-store';
 import { useQueryClient } from '@tanstack/react-query';
 import { threadKeys } from '@/hooks/react-query/threads/keys';
 import { useProjectRealtime } from '@/hooks/useProjectRealtime';
+import { fastGeminiChatStream } from '@/lib/fast-gemini-chat';
 import { handleGoogleSlidesUpload } from './tool-views/utils/presentation-utils';
 
 interface ThreadComponentProps {
@@ -414,7 +415,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const handleSubmitMessage = useCallback(
     async (
       message: string,
-      options?: { model_name?: string },
+      options?: { model_name?: string; chat_mode?: 'chat' | 'execute' },
     ) => {
       if (!message.trim()) return;
       setIsSending(true);
@@ -463,11 +464,138 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
       }, 10000);
 
       try {
+        // Add user message first in both modes
         const messagePromise = addUserMessageMutation.mutateAsync({
           threadId,
           message,
         });
 
+        // Handle Chat Mode - Fast Gemini streaming
+        if (options?.chat_mode === 'chat') {
+          await messagePromise; // Wait for user message to be saved
+          
+          // Remove the "Hmm..." message immediately as we'll stream instead
+          setMessages((prev) => 
+            prev.filter((m) => m.message_id !== optimisticHmmMessage.message_id)
+          );
+          clearTimeout(hmmTimeout);
+          
+          // Create assistant message for streaming
+          const assistantMessageId = `assistant-${Date.now()}`;
+          const assistantMessage: UnifiedMessage = {
+            message_id: assistantMessageId,
+            thread_id: threadId,
+            type: 'assistant',
+            is_llm_message: true,
+            content: JSON.stringify({ content: '' }),
+            metadata: JSON.stringify({ is_streaming: true }),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          
+          setMessages((prev) => [...prev, assistantMessage]);
+          
+          let streamedContent = '';
+          let displayedContent = '';
+          let characterQueue: string[] = [];
+          let isTyping = false;
+          
+          // Typewriter effect: Display characters one by one with smooth animation
+          const typewriterInterval = 15; // milliseconds per character (blazing fast!)
+          
+          const typeNextCharacter = () => {
+            if (characterQueue.length > 0) {
+              const char = characterQueue.shift()!;
+              displayedContent += char;
+              
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.message_id === assistantMessageId
+                    ? {
+                        ...m,
+                        content: JSON.stringify({ content: displayedContent }),
+                        metadata: JSON.stringify({ is_streaming: true }),
+                      }
+                    : m
+                )
+              );
+              
+              if (characterQueue.length > 0) {
+                setTimeout(typeNextCharacter, typewriterInterval);
+              } else {
+                isTyping = false;
+              }
+            } else {
+              isTyping = false;
+            }
+          };
+          
+          const startTyping = () => {
+            if (!isTyping && characterQueue.length > 0) {
+              isTyping = true;
+              typeNextCharacter();
+            }
+          };
+          
+          // Stream response from Fast Gemini
+          await fastGeminiChatStream(
+            message,
+            {
+              onChunk: (content) => {
+                streamedContent += content;
+                
+                // Add each character to the queue for typewriter effect
+                for (const char of content) {
+                  characterQueue.push(char);
+                }
+                
+                // Start typing if not already typing
+                startTyping();
+              },
+              onDone: async (timeMs) => {
+                console.log(`Fast Gemini response completed in ${timeMs}ms`);
+                
+                // Wait for all characters to be typed before marking complete
+                const waitForTyping = () => {
+                  if (characterQueue.length > 0 || isTyping) {
+                    setTimeout(waitForTyping, 50);
+                  } else {
+                    // All characters typed, mark as complete
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.message_id === assistantMessageId
+                          ? {
+                              ...m,
+                              content: JSON.stringify({ content: streamedContent }),
+                              metadata: JSON.stringify({ is_streaming: false, response_time_ms: timeMs }),
+                            }
+                          : m
+                      )
+                    );
+                  }
+                };
+                
+                waitForTyping();
+                
+                // Note: Assistant message is kept in local state for context.
+                // When switching to Execute mode, the full conversation history is available.
+                // The user message is already saved to the backend via messagePromise above.
+              },
+              onError: (error) => {
+                console.error('Fast Gemini stream error:', error);
+                toast.error(`Chat error: ${error}`);
+                setMessages((prev) =>
+                  prev.filter((m) => m.message_id !== assistantMessageId)
+                );
+              },
+            }
+          );
+          
+          setIsSending(false);
+          return;
+        }
+
+        // Handle Execute Mode - Normal agent run
         const agentPromise = startAgentMutation.mutateAsync({
           threadId,
           options: {

@@ -17,7 +17,7 @@ export function useKeyboardShortcuts({
 }: UseKeyboardShortcutsProps) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === 'i') {
+      if (event.key === 'Tab') {
         event.preventDefault();
         if (isSidePanelOpen) {
           setIsSidePanelOpen(false);

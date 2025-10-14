@@ -189,6 +189,10 @@ api_router.include_router(google_slides_router)
 from core.google.google_docs_api import router as google_docs_router
 api_router.include_router(google_docs_router)
 
+# Fast Gemini Chat
+import fast_gemini_chat
+api_router.include_router(fast_gemini_chat.router, prefix="/chat", tags=["chat"])
+
 @api_router.get("/health", summary="Health Check", operation_id="health_check", tags=["system"])
 async def health_check():
     logger.debug("Health check endpoint called")

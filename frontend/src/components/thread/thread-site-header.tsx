@@ -241,7 +241,7 @@ export function SiteHeader({
                 </Button>
               </TooltipTrigger>
               <TooltipContent side={isMobile ? "bottom" : "bottom"}>
-                <p>Toggle Computer Preview (CMD+I)</p>
+                <p>Toggle Computer Preview (Tab)</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

@@ -18,7 +18,7 @@ import { handleFiles, FileUploadHandler } from './file-upload-handler';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Loader2, ArrowUp, X, Image as ImageIcon, Presentation, BarChart3, FileText, Search, Users, Code2, Sparkles, Brain as BrainIcon, MessageSquare } from 'lucide-react';
+import { Loader2, ArrowUp, X, Image as ImageIcon, Presentation, BarChart3, FileText, Search, Users, Code2, Sparkles, Brain as BrainIcon, MessageSquare, Zap as ZapIcon } from 'lucide-react';
 import { VoiceRecorder } from './voice-recorder';
 import { UnifiedConfigMenu } from './unified-config-menu';
 import { AttachmentGroup } from '../attachment-group';
@@ -71,12 +71,15 @@ export interface ChatInputHandles {
   clearPendingFiles: () => void;
 }
 
+export type ChatMode = 'chat' | 'execute';
+
 export interface ChatInputProps {
   onSubmit: (
     message: string,
     options?: {
       model_name?: string;
       agent_id?: string;
+      chat_mode?: ChatMode;
     },
   ) => void;
   placeholder?: string;
@@ -112,6 +115,8 @@ export interface ChatInputProps {
   animatePlaceholder?: boolean;
   selectedCharts?: string[];
   selectedOutputFormat?: string | null;
+  initialChatMode?: ChatMode;
+  onChatModeChange?: (mode: ChatMode) => void;
 }
 
 export interface UploadedFile {
@@ -161,6 +166,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
       animatePlaceholder = false,
       selectedCharts = [],
       selectedOutputFormat = null,
+      initialChatMode = 'execute',
+      onChatModeChange,
     },
     ref,
   ) => {
@@ -187,6 +194,25 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
     // Suna Agent Modes feature flag
     const ENABLE_SUNA_AGENT_MODES = false;
     const [sunaAgentModes, setSunaAgentModes] = useState<'adaptive' | 'autonomous' | 'chat'>('adaptive');
+    
+    // Chat Mode state - Chat vs Execute
+    const [chatMode, setChatMode] = useState<ChatMode>(initialChatMode);
+    
+    // Detect macOS for keyboard shortcut labels
+    const isMac = typeof window !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    
+    // Handle chat mode changes
+    const handleChatModeChange = useCallback((mode: ChatMode) => {
+      setChatMode(mode);
+      onChatModeChange?.(mode);
+    }, [onChatModeChange]);
+
+    // Sync chat mode with initialChatMode prop changes
+    useEffect(() => {
+      if (initialChatMode !== chatMode) {
+        setChatMode(initialChatMode);
+      }
+    }, [initialChatMode]); // Only sync when prop changes, not when internal state changes
 
     const {
       selectedModel,
@@ -290,6 +316,28 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
       setIsModeDismissing(false);
     }, [selectedMode]);
 
+    // Keyboard shortcuts for mode switching
+    useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        const isMod = isMac ? e.metaKey : e.ctrlKey;
+        
+        // Cmd/Ctrl + E for Execute mode
+        if (isMod && e.key === 'e') {
+          e.preventDefault();
+          handleChatModeChange('execute');
+        }
+        
+        // Cmd/Ctrl + A for Chat mode (Ask)
+        if (isMod && e.key === 'a') {
+          e.preventDefault();
+          handleChatModeChange('chat');
+        }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isMac, handleChatModeChange]);
+
     // Generate Markdown for selected data options
     const generateDataOptionsMarkdown = useCallback(() => {
       if (selectedMode !== 'data' || (selectedCharts.length === 0 && !selectedOutputFormat)) {
@@ -382,11 +430,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
 
       const baseModelName = getActualModelId(selectedModel);
 
-      posthog.capture("task_prompt_submitted", { message });
+      posthog.capture("task_prompt_submitted", { message, chat_mode: chatMode });
 
       onSubmit(message, {
         agent_id: selectedAgentId,
         model_name: baseModelName,
+        chat_mode: chatMode,
       });
 
       if (!isControlled) {
@@ -706,6 +755,62 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                         />
                       )}
                       
+                      {renderConfigDropdown}
+                      
+                      {/* Chat/Execute Mode Toggle - Glassy icon-only design */}
+                      <TooltipProvider>
+                        <div className="flex items-center gap-0 p-1 bg-white/5 rounded-xl border border-white/10 backdrop-blur-sm">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => handleChatModeChange('chat')}
+                                className={cn(
+                                  "p-1.5 rounded-lg transition-all duration-200 cursor-pointer",
+                                  chatMode === 'chat'
+                                    ? "opacity-100 text-white"
+                                    : "opacity-60 text-white/70 hover:opacity-80"
+                                )}
+                              >
+                                <ZapIcon className="w-4 h-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <div className="space-y-1">
+                                <p className="font-medium">Ask ({isMac ? '⌘' : 'Ctrl'}+A)</p>
+                                <p className="text-xs text-muted-foreground">Lightning-fast responses</p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+
+                          {/* Separator line */}
+                          <div className="w-px h-4 bg-white/20 mx-0.5" />
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => handleChatModeChange('execute')}
+                                className={cn(
+                                  "p-1.5 rounded-lg transition-all duration-200 cursor-pointer",
+                                  chatMode === 'execute'
+                                    ? "opacity-100 text-white"
+                                    : "opacity-60 text-white/70 hover:opacity-80"
+                                )}
+                              >
+                                <Wrench className="w-4 h-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <div className="space-y-1">
+                                <p className="font-medium">Execute ({isMac ? '⌘' : 'Ctrl'}+E)</p>
+                                <p className="text-xs text-muted-foreground">Full agent with tools</p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </TooltipProvider>
+                      
                       {/* Agent Mode Switcher - Only for Suna */}
                       {ENABLE_SUNA_AGENT_MODES && (isStagingMode() || isLocalMode()) && isSunaAgent && (
                         <TooltipProvider>
@@ -778,8 +883,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                           </div>
                         </TooltipProvider>
                       )}
-                      
-                      {renderConfigDropdown}
                       
                       {isLoggedIn && <VoiceRecorder
                         onTranscription={handleTranscription}
