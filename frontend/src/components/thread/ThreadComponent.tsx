@@ -501,8 +501,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
           let characterQueue: string[] = [];
           let isTyping = false;
           let characterCount = 0;
+          let useTypewriterEffect = true;
           
-          // Dynamic typewriter effect: Start fast, then accelerate after paragraphs
+          // Dynamic typewriter effect: Start with typewriter, then switch to raw streaming
           const getTypewriterInterval = () => {
             // First ~500 characters: 10ms (super fast start)
             if (characterCount < 500) {
@@ -550,6 +551,64 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
             }
           };
           
+          // Switch to raw streaming after 500 characters
+          const switchToRawStreaming = () => {
+            useTypewriterEffect = false;
+            // Flush any remaining characters in queue immediately
+            if (characterQueue.length > 0) {
+              const remainingContent = characterQueue.join('');
+              displayedContent += remainingContent;
+              characterQueue = [];
+              isTyping = false;
+              
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.message_id === assistantMessageId
+                    ? {
+                        ...m,
+                        content: JSON.stringify({ content: displayedContent }),
+                        metadata: JSON.stringify({ is_streaming: true }),
+                      }
+                    : m
+                )
+              );
+            }
+          };
+          
+          // Save message to database and mark as complete
+          const saveAndCompleteMessage = async (timeMs: number) => {
+            const finalMetadata = { 
+              is_streaming: false, 
+              response_time_ms: timeMs,
+              chat_mode: 'chat' // Mark as chat mode message
+            };
+            
+            // Save assistant message to database
+            try {
+              await addAssistantMessageMutation.mutateAsync({
+                threadId,
+                content: streamedContent,
+                metadata: finalMetadata,
+              });
+              console.log('Assistant message saved to database');
+            } catch (error) {
+              console.error('Failed to save assistant message:', error);
+            }
+            
+            // Update local state
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.message_id === assistantMessageId
+                  ? {
+                      ...m,
+                      content: JSON.stringify({ content: streamedContent }),
+                      metadata: JSON.stringify(finalMetadata),
+                    }
+                  : m
+              )
+            );
+          };
+          
           // Stream response from Fast Gemini
           await fastGeminiChatStream(
             message,
@@ -557,57 +616,55 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
               onChunk: (content) => {
                 streamedContent += content;
                 
-                // Add each character to the queue for typewriter effect
-                for (const char of content) {
-                  characterQueue.push(char);
+                if (useTypewriterEffect) {
+                  // Add each character to the queue for typewriter effect
+                  for (const char of content) {
+                    characterQueue.push(char);
+                  }
+                  
+                  // Check if we've reached 500 characters and should switch to raw streaming
+                  if (characterCount + characterQueue.length >= 500) {
+                    switchToRawStreaming();
+                  }
+                  
+                  // Start typing if not already typing
+                  startTyping();
+                } else {
+                  // Raw streaming mode - display content immediately in huge chunks
+                  displayedContent += content;
+                  
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.message_id === assistantMessageId
+                        ? {
+                            ...m,
+                            content: JSON.stringify({ content: displayedContent }),
+                            metadata: JSON.stringify({ is_streaming: true }),
+                          }
+                        : m
+                    )
+                  );
                 }
-                
-                // Start typing if not already typing
-                startTyping();
               },
               onDone: async (timeMs) => {
                 console.log(`Fast Gemini response completed in ${timeMs}ms`);
                 
-                // Wait for all characters to be typed before marking complete
-                const waitForTyping = async () => {
-                  if (characterQueue.length > 0 || isTyping) {
-                    setTimeout(waitForTyping, 50);
-                  } else {
-                    // All characters typed, save to database and mark as complete
-                    const finalMetadata = { 
-                      is_streaming: false, 
-                      response_time_ms: timeMs,
-                      chat_mode: 'chat' // Mark as chat mode message
-                    };
-                    
-                    // Save assistant message to database
-                    try {
-                      await addAssistantMessageMutation.mutateAsync({
-                        threadId,
-                        content: streamedContent,
-                        metadata: finalMetadata,
-                      });
-                      console.log('Assistant message saved to database');
-                    } catch (error) {
-                      console.error('Failed to save assistant message:', error);
+                if (useTypewriterEffect) {
+                  // Wait for all characters to be typed before marking complete
+                  const waitForTyping = () => {
+                    if (characterQueue.length > 0 || isTyping) {
+                      setTimeout(waitForTyping, 50);
+                    } else {
+                      // All characters typed, save to database and mark as complete
+                      saveAndCompleteMessage(timeMs);
                     }
-                    
-                    // Update local state
-                    setMessages((prev) =>
-                      prev.map((m) =>
-                        m.message_id === assistantMessageId
-                          ? {
-                              ...m,
-                              content: JSON.stringify({ content: streamedContent }),
-                              metadata: JSON.stringify(finalMetadata),
-                            }
-                          : m
-                      )
-                    );
-                  }
-                };
-                
-                waitForTyping();
+                  };
+                  
+                  waitForTyping();
+                } else {
+                  // Raw streaming mode - save immediately
+                  saveAndCompleteMessage(timeMs);
+                }
               },
               onError: (error) => {
                 console.error('Fast Gemini stream error:', error);
