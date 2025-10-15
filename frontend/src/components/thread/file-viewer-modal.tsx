@@ -1165,18 +1165,66 @@ export function FileViewerModal({
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[90vw] md:max-w-[1200px] w-[95vw] h-[90vh] max-h-[900px] flex flex-col p-0 gap-0 overflow-hidden">
+      <DialogContent 
+        className="sm:max-w-[90vw] md:max-w-[1200px] w-[95vw] h-[90vh] max-h-[900px] flex flex-col p-0 gap-0 overflow-hidden relative rounded-3xl border border-white/10 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+        style={{ 
+          position: 'fixed',
+          top: '1rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 9999
+        }}
+      >
+        {/* Gradient rim */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-3xl"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))",
+            WebkitMask: "linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)",
+            WebkitMaskComposite: "xor" as any,
+            maskComposite: "exclude",
+            padding: 1,
+            borderRadius: 24,
+          }}
+        />
+        
+        {/* Specular streak */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-24"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)",
+            filter: "blur(6px)",
+            mixBlendMode: "screen",
+          }}
+        />
+        
+        {/* Fine noise */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-30"
+          style={{
+            backgroundImage:
+              "url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'60\' height=\'60\'><filter id=\'n\'><feTurbulence type=\'fractalNoise\' baseFrequency=\'0.8\' numOctaves=\'4\'/><feColorMatrix type=\'saturate\' values=\'0\'/><feComponentTransfer><feFuncA type=\'table\' tableValues=\'0 0.03\'/></feComponentTransfer></filter><rect width=\'100%\' height=\'100%\' filter=\'url(%23n)\' /></svg>')",
+            backgroundSize: "100px 100px",
+            mixBlendMode: "overlay",
+          }}
+        />
+
         {/* Header */}
-        <DialogHeader className="px-4 py-3 flex-shrink-0 flex flex-row gap-4 items-center border-b">
-          <DialogTitle className="text-lg font-semibold">
+        <DialogHeader className="px-4 py-3 flex-shrink-0 flex flex-row gap-4 items-center border-b border-white/10 relative z-10">
+          <DialogTitle className="text-lg font-semibold text-white/90">
             Workspace Files
           </DialogTitle>
 
           {/* Download progress display */}
           {downloadProgress && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 text-sm text-white/70">
               <div className="flex items-center gap-1.5">
-                <Loader className="h-4 w-4 animate-spin" />
+                <Loader className="h-4 w-4 animate-spin text-white/60" />
                 <span>
                   {downloadProgress.total > 0
                     ? `${downloadProgress.current}/${downloadProgress.total}`
@@ -1201,12 +1249,12 @@ export function FileViewerModal({
                     size="sm"
                     onClick={navigatePrevious}
                     disabled={currentFileIndex <= 0}
-                    className="h-8 w-8 p-0"
+                    className="h-8 w-8 p-0 border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white/80"
                     title="Previous file (←)"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <div className="text-xs text-muted-foreground px-2">
+                  <div className="text-xs text-white/60 px-2">
                     {currentFileIndex + 1} / {(filePathList?.length || 0)}
                   </div>
                   <Button
@@ -1214,7 +1262,7 @@ export function FileViewerModal({
                     size="sm"
                     onClick={navigateNext}
                     disabled={currentFileIndex >= (filePathList?.length || 0) - 1}
-                    className="h-8 w-8 p-0"
+                    className="h-8 w-8 p-0 border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white/80"
                     title="Next file (→)"
                   >
                     <ChevronRight className="h-4 w-4" />
@@ -1225,12 +1273,12 @@ export function FileViewerModal({
         </DialogHeader>
 
         {/* Breadcrumb Navigation */}
-        <div className="px-4 py-2 flex items-center gap-2 border-b">
+        <div className="px-4 py-2 flex items-center gap-2 border-b border-white/10 relative z-10">
           <Button
             variant="ghost"
             size="icon"
             onClick={navigateHome}
-            className="h-8 w-8"
+            className="h-8 w-8 text-white/70 hover:text-white/90 hover:bg-white/10"
             title="Go to home directory"
           >
             <Home className="h-4 w-4" />
@@ -1240,7 +1288,7 @@ export function FileViewerModal({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-sm font-medium min-w-fit flex-shrink-0"
+              className="h-7 px-2 text-sm font-medium min-w-fit flex-shrink-0 text-white/70 hover:text-white/90 hover:bg-white/10"
               onClick={navigateHome}
             >
               home
@@ -1250,11 +1298,11 @@ export function FileViewerModal({
               <>
                 {getBreadcrumbSegments(currentPath).map((segment) => (
                   <Fragment key={segment.path}>
-                    <ChevronRight className="h-4 w-4 mx-1 text-muted-foreground flex-shrink-0" />
+                    <ChevronRight className="h-4 w-4 mx-1 text-white/40 flex-shrink-0" />
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 px-2 text-sm font-medium truncate max-w-[200px]"
+                      className="h-7 px-2 text-sm font-medium truncate max-w-[200px] text-white/70 hover:text-white/90 hover:bg-white/10"
                       onClick={() => navigateToBreadcrumb(segment.path)}
                     >
                       {segment.name}
@@ -1266,9 +1314,9 @@ export function FileViewerModal({
 
             {selectedFilePath && (
               <>
-                <ChevronRight className="h-4 w-4 mx-1 text-muted-foreground flex-shrink-0" />
+                <ChevronRight className="h-4 w-4 mx-1 text-white/40 flex-shrink-0" />
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium truncate">
+                  <span className="text-sm font-medium truncate text-white/90">
                     {selectedFilePath.split('/').pop()}
                   </span>
                 </div>
@@ -1286,7 +1334,7 @@ export function FileViewerModal({
                     size="sm"
                     onClick={handleCopyContent}
                     disabled={isCopyingContent || isCachedFileLoading}
-                    className="h-8 gap-1"
+                    className="h-8 gap-1 border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white/80"
                   >
                     {isCopyingContent ? (
                       <Check className="h-4 w-4" />
@@ -1304,7 +1352,7 @@ export function FileViewerModal({
                     size="sm"
                     onClick={handleOpenEditor}
                     disabled={isCachedFileLoading}
-                    className="h-8 gap-1"
+                    className="h-8 gap-1 border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white/80"
                   >
                     <Edit className="h-4 w-4" />
                     <span className="hidden sm:inline">Edit</span>
@@ -1316,7 +1364,7 @@ export function FileViewerModal({
                   size="sm"
                   onClick={handleDownload}
                   disabled={isDownloading || isCachedFileLoading}
-                  className="h-8 gap-1"
+                  className="h-8 gap-1 border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white/80"
                 >
                   {isDownloading ? (
                     <Loader className="h-4 w-4 animate-spin" />
@@ -1337,7 +1385,7 @@ export function FileViewerModal({
                           isCachedFileLoading ||
                           contentError !== null
                         }
-                        className="h-8 gap-1"
+                        className="h-8 gap-1 border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white/80"
                       >
                         {isExportingPdf ? (
                           <Loader className="h-4 w-4 animate-spin" />
@@ -1348,16 +1396,16 @@ export function FileViewerModal({
                         <ChevronDown className="h-3 w-3 ml-1" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" className="bg-[rgba(10,14,22,0.95)] border-white/10 backdrop-blur-2xl">
                       <DropdownMenuItem
                         onClick={() => handleExportPdf('portrait')}
-                        className="flex items-center gap-2 cursor-pointer"
+                        className="flex items-center gap-2 cursor-pointer text-white/80 hover:bg-white/10"
                       >
                         <span className="rotate-90">⬌</span> Portrait
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => handleExportPdf('landscape')}
-                        className="flex items-center gap-2 cursor-pointer"
+                        className="flex items-center gap-2 cursor-pointer text-white/80 hover:bg-white/10"
                       >
                         <span>⬌</span> Landscape
                       </DropdownMenuItem>
@@ -1376,7 +1424,7 @@ export function FileViewerModal({
                     size="sm"
                     onClick={handleDownloadAll}
                     disabled={isDownloadingAll || isLoadingFiles}
-                    className="h-8 gap-1"
+                    className="h-8 gap-1 border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white/80"
                   >
                     {isDownloadingAll ? (
                       <Loader className="h-4 w-4 animate-spin" />
@@ -1392,7 +1440,7 @@ export function FileViewerModal({
                   size="sm"
                   onClick={handleUpload}
                   disabled={isUploading}
-                  className="h-8 gap-1"
+                  className="h-8 gap-1 border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white/80"
                 >
                   {isUploading ? (
                     <Loader className="h-4 w-4 animate-spin" />
@@ -1415,17 +1463,17 @@ export function FileViewerModal({
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden relative z-10">
           {selectedFilePath ? (
             /* File Viewer */
             <div className="h-full w-full overflow-auto">
               {isCachedFileLoading ? (
                 <div className="h-full w-full flex flex-col items-center justify-center">
-                  <Loader className="h-8 w-8 animate-spin text-primary mb-3" />
-                  <p className="text-sm text-muted-foreground">
+                  <Loader className="h-8 w-8 animate-spin text-white/60 mb-3" />
+                  <p className="text-sm text-white/70">
                     Loading {selectedFilePath ? selectedFilePath.split('/').pop() : 'file'}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-white/50 mt-1">
                         {(() => {
                           // Normalize the path for consistent cache checks
                           if (!selectedFilePath) return "Preparing...";
@@ -1449,12 +1497,12 @@ export function FileViewerModal({
                 </div>
               ) : contentError ? (
                 <div className="h-full w-full flex items-center justify-center p-4">
-                  <div className="max-w-md p-6 text-center border rounded-lg bg-muted/10">
-                    <AlertTriangle className="h-10 w-10 text-orange-500 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium mb-2">
+                  <div className="max-w-md p-6 text-center border border-white/10 rounded-2xl bg-[rgba(10,14,22,0.8)] backdrop-blur-xl">
+                    <AlertTriangle className="h-10 w-10 text-orange-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2 text-white/90">
                       Error Loading File
                     </h3>
-                    <p className="text-sm text-muted-foreground mb-4">
+                    <p className="text-sm text-white/60 mb-4">
                       {contentError}
                     </p>
                     <div className="flex justify-center gap-3">
@@ -1469,6 +1517,7 @@ export function FileViewerModal({
                             mod_time: new Date().toISOString(),
                           } as FileInfo);
                         }}
+                        className="bg-white/10 hover:bg-white/20 text-white/90 border-white/20"
                       >
                         Retry
                       </Button>
@@ -1477,6 +1526,7 @@ export function FileViewerModal({
                         onClick={() => {
                           clearSelectedFile();
                         }}
+                        className="border-white/20 bg-white/5 hover:bg-white/10 text-white/80"
                       >
                         Back to Files
                       </Button>
@@ -1497,7 +1547,7 @@ export function FileViewerModal({
                     if (isBinaryFile && !blobUrlForRenderer) {
                       return (
                         <div className="h-full w-full flex items-center justify-center">
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-sm text-white/60">
                             Loading {isPdfFile ? 'PDF' : isImageFile ? 'image' : 'file'}...
                           </div>
                         </div>
@@ -1529,12 +1579,12 @@ export function FileViewerModal({
             <div className="h-full w-full">
               {isLoadingFiles ? (
                 <div className="h-full w-full flex items-center justify-center">
-                  <Loader className="h-6 w-6 animate-spin text-primary" />
+                  <Loader className="h-6 w-6 animate-spin text-white/60" />
                 </div>
               ) : files.length === 0 ? (
                 <div className="h-full w-full flex flex-col items-center justify-center">
-                  <Folder className="h-12 w-12 mb-2 text-muted-foreground opacity-30" />
-                  <p className="text-sm text-muted-foreground">
+                  <Folder className="h-12 w-12 mb-2 text-white/30 opacity-30" />
+                  <p className="text-sm text-white/50">
                     Directory is empty
                   </p>
                 </div>
@@ -1544,8 +1594,8 @@ export function FileViewerModal({
                     {files.map((file) => (
                       <button
                         key={file.path}
-                        className={`flex flex-col items-center p-3 rounded-2xl border hover:bg-muted/50 transition-colors ${selectedFilePath === file.path
-                          ? 'bg-muted border-primary/20'
+                        className={`group flex flex-col items-center p-3 rounded-2xl border border-white/10 bg-[rgba(10,14,22,0.4)] backdrop-blur-sm hover:bg-[rgba(10,14,22,0.6)] hover:border-white/20 hover:scale-[1.02] transition-all duration-300 ${selectedFilePath === file.path
+                          ? 'bg-[rgba(10,14,22,0.8)] border-white/30 ring-1 ring-white/20'
                           : ''
                           }`}
                         onClick={() => {
@@ -1558,12 +1608,12 @@ export function FileViewerModal({
                       >
                         <div className="w-12 h-12 flex items-center justify-center mb-1">
                           {file.is_dir ? (
-                            <Folder className="h-9 w-9 text-blue-500" />
+                            <Folder className="h-9 w-9 text-blue-400 group-hover:text-blue-300 transition-colors" />
                           ) : (
-                            <File className="h-8 w-8 text-muted-foreground" />
+                            <File className="h-8 w-8 text-white/50 group-hover:text-white/70 transition-colors" />
                           )}
                         </div>
-                        <span className="text-xs text-center font-medium truncate max-w-full">
+                        <span className="text-xs text-center font-medium truncate max-w-full text-white/80 group-hover:text-white/90 transition-colors">
                           {file.name}
                         </span>
                       </button>

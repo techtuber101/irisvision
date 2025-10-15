@@ -35,8 +35,12 @@ import { toast } from 'sonner';
 import { ReleaseBadge } from '../auth/release-badge';
 import { Calendar, MessageSquare, Plus, Sparkles, Zap } from 'lucide-react';
 import { AgentConfigurationDialog } from '@/components/agents/agent-configuration-dialog';
+import { fastGeminiChat } from '@/lib/fast-gemini-chat';
+import { addAssistantMessage } from '@/lib/api';
+import { simpleChat } from '@/lib/simple-chat';
 
 const PENDING_PROMPT_KEY = 'pendingAgentPrompt';
+
 
 
 export function DashboardContent() {
@@ -51,6 +55,7 @@ export function DashboardContent() {
   const [selectedCharts, setSelectedCharts] = useState<string[]>([]);
   const [selectedOutputFormat, setSelectedOutputFormat] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [chatMode, setChatMode] = useState<'chat' | 'execute'>('execute');
   
   // Update time every minute
   React.useEffect(() => {
@@ -103,6 +108,8 @@ export function DashboardContent() {
   });
 
   const agents = agentsResponse?.agents || [];
+  
+  // Get the selected agent's configuration for system prompt
   const selectedAgent = selectedAgentId
     ? agents.find(agent => agent.agent_id === selectedAgentId)
     : null;
@@ -147,6 +154,7 @@ export function DashboardContent() {
     options?: {
       model_name?: string;
       enable_context_manager?: boolean;
+      chat_mode?: 'chat' | 'execute';
     },
   ) => {
     if (
@@ -162,6 +170,22 @@ export function DashboardContent() {
       const files = chatInputRef.current?.getPendingFiles() || [];
       localStorage.removeItem(PENDING_PROMPT_KEY);
 
+      // Handle Chat Mode - Use new simple chat endpoint
+      if (options?.chat_mode === 'chat') {
+        // Ultra-simple chat mode - direct API call, no complexity
+        const result = await simpleChat(message);
+
+        if (result.thread_id && result.project_id) {
+          // Direct redirect to the created thread
+          router.push(`/projects/${result.project_id}/thread/${result.thread_id}`);
+        } else {
+          throw new Error('Simple chat did not return thread_id and project_id.');
+        }
+        chatInputRef.current?.clearPendingFiles();
+        return;
+      }
+
+      // Handle Execute Mode - Normal agent execution
       const formData = new FormData();
       formData.append('prompt', message);
 
@@ -305,6 +329,8 @@ export function DashboardContent() {
                           animatePlaceholder={true}
                           selectedCharts={selectedCharts}
                           selectedOutputFormat={selectedOutputFormat}
+                          initialChatMode={chatMode}
+                          onChatModeChange={setChatMode}
                         />
                       </div>
                     </div>

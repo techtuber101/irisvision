@@ -561,6 +561,7 @@ async def initiate_agent_with_files(
     model_name: Optional[str] = Form(None),  # Default to None to use default model
     agent_id: Optional[str] = Form(None),  # Add agent_id parameter
     files: List[UploadFile] = File(default=[]),
+    chat_mode: Optional[str] = Form(None),  # Add chat_mode parameter
     user_id: str = Depends(verify_and_get_user_id_from_jwt)
 ):
     """
@@ -741,6 +742,10 @@ async def initiate_agent_with_files(
             "account_id": account_id,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
+        
+        # Add chat_mode to thread metadata if specified
+        if chat_mode:
+            thread_data["metadata"] = {"chat_mode": chat_mode}
 
         structlog.contextvars.bind_contextvars(
             thread_id=thread_data["thread_id"],
@@ -760,8 +765,16 @@ async def initiate_agent_with_files(
         thread_id = thread.data[0]['thread_id']
         logger.debug(f"Created new thread: {thread_id}")
 
-        # Trigger Background Naming Task
-        asyncio.create_task(generate_and_update_project_name(project_id=project_id, prompt=prompt))
+        # Set a temporary default name for instant response
+        # For chat mode, use "Quick Chat" as default. For execute mode, use prompt-based name
+        if chat_mode == 'chat':
+            simple_name = "Quick Chat"
+        else:
+            # Title generation will happen after the LLM response is complete (for execute mode only)
+            simple_name = prompt[:30].strip() + "..." if len(prompt) > 30 else prompt.strip()
+            if not simple_name:
+                simple_name = "New Chat"
+        await client.table('projects').update({"name": simple_name}).eq("project_id", project_id).execute()
 
         # 4. Upload Files to Sandbox (if any)
         message_content = prompt
@@ -825,7 +838,12 @@ async def initiate_agent_with_files(
             "created_at": datetime.now(timezone.utc).isoformat()
         }).execute()
 
+        # Handle Chat Mode - Return thread_id without starting agent
+        if chat_mode == 'chat':
+            logger.info(f"Chat mode initiated for thread {thread_id} - returning without starting agent")
+            return {"thread_id": thread_id, "agent_run_id": None}
 
+        # Handle Execute Mode - Start agent as normal
         effective_model = model_name
         if not model_name and agent_config and agent_config.get('model'):
             effective_model = agent_config['model']

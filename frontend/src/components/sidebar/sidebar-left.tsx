@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Bot, Menu, Plus, ChevronRight } from 'lucide-react';
+import { Sparkles, Menu, Plus, ChevronRight } from 'lucide-react';
 
 import { NavAgents } from '@/components/sidebar/nav-agents';
 import { NavUserWithTeams } from '@/components/sidebar/nav-user-with-teams';
@@ -213,7 +213,7 @@ export function SidebarLeft({
             >
               <Plus className="h-4 w-4 mr-1" />
               <span className="flex items-center justify-between w-full">
-                New Task
+                New Mission
               </span>
             </SidebarMenuButton>
           </Link>
@@ -226,15 +226,15 @@ export function SidebarLeft({
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton
-                      tooltip="Agents"
+                      tooltip="Personalities"
                       onClick={() => {
                         if (state === 'collapsed') {
                           setOpen(true);
                         }
                       }}
                     >
-                      <Bot className="h-4 w-4 mr-1" />
-                      <span>Agents</span>
+                      <Sparkles className="h-4 w-4 mr-1" />
+                      <span>Personalities</span>
                       <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
@@ -254,7 +254,7 @@ export function SidebarLeft({
                           'bg-accent text-accent-foreground font-medium': pathname === '/agents' && (searchParams.get('tab') === 'my-agents' || searchParams.get('tab') === null),
                         })} asChild>
                           <Link href="/agents?tab=my-agents" onClick={() => isMobile && setOpenMobile(false)}>
-                            <span>My Agents</span>
+                            <span>Added personalities</span>
                           </Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
@@ -266,7 +266,7 @@ export function SidebarLeft({
                           }}
                           className="cursor-pointer pl-3 touch-manipulation"
                         >
-                          <span>New Agent</span>
+                          <span>New personality</span>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>

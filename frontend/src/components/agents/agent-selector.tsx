@@ -270,7 +270,7 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
                   onClick={handleCreateAgent}
                 >
                   <Plus className="h-4 w-4" />
-                  <span className="font-medium">Create new agent</span>
+                  <span className="font-medium">Create new personality</span>
                 </DropdownMenuItem>
               </div>
             </>

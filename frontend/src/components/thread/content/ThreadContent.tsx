@@ -14,6 +14,7 @@ import {
 } from '@/components/thread/utils';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 import { AgentLoader } from './loader';
+import { SimpleChatLoader } from './simple-chat-loader';
 import { AgentAvatar, AgentName } from './agent-avatar';
 import { parseXmlToolCalls, isNewXmlFormat } from '@/components/thread/tool-views/xml-parser';
 import { ShowToolStream } from './ShowToolStream';
@@ -484,6 +485,7 @@ export interface ThreadContentProps {
     scrollContainerRef?: React.RefObject<HTMLDivElement>; // Add scroll container ref prop
     agentMetadata?: any; // Add agent metadata prop
     agentData?: any; // Add full agent data prop
+    isSimpleChatLoading?: boolean; // Add simple chat loading state prop
 }
 
 export const ThreadContent: React.FC<ThreadContentProps> = ({
@@ -510,6 +512,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
     scrollContainerRef,
     agentMetadata,
     agentData,
+    isSimpleChatLoading = false,
 }) => {
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const latestMessageRef = useRef<HTMLDivElement>(null);
@@ -1294,6 +1297,28 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                             {/* Loader content */}
                                             <div className="space-y-2 w-full h-12">
                                                 <AgentLoader />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            {/* Simple Chat Loading Indicator */}
+                            {isSimpleChatLoading && !readOnly &&
+                                (messages.length === 0 || messages[messages.length - 1].type === 'user') && (
+                                    <div ref={latestMessageRef} className='w-full h-22 rounded'>
+                                        <div className="flex flex-col gap-2">
+                                            {/* Logo positioned above the loader */}
+                                            <div className="flex items-center">
+                                                <div className="rounded-md flex items-center justify-center">
+                                                    {getAgentInfo().avatar}
+                                                </div>
+                                                <p className='ml-2 text-sm text-muted-foreground'>
+                                                    {getAgentInfo().name}
+                                                </p>
+                                            </div>
+
+                                            {/* Simple Chat Loader content */}
+                                            <div className="space-y-2 w-full h-12">
+                                                <SimpleChatLoader />
                                             </div>
                                         </div>
                                     </div>

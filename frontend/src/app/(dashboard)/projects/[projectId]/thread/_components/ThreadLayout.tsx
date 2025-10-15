@@ -42,6 +42,13 @@ interface ThreadLayoutProps {
   agentName?: string;
   disableInitialAnimation?: boolean;
   compact?: boolean;
+  onSubmit?: (message: string, options?: { model_name?: string; agent_id?: string; chat_mode?: 'chat' | 'execute' }) => void;
+  isAgentRunning?: boolean;
+  selectedModel?: string;
+  getActualModelId?: (modelId: string) => string;
+  selectedAgentId?: string;
+  chatMode?: 'chat' | 'execute';
+  onPopulateChatInput?: (message: string) => void;
 }
 
 export function ThreadLayout({
@@ -77,7 +84,14 @@ export function ThreadLayout({
   initialLoadCompleted,
   agentName,
   disableInitialAnimation = false,
-  compact = false
+  compact = false,
+  onSubmit,
+  isAgentRunning = false,
+  selectedModel,
+  getActualModelId,
+  selectedAgentId,
+  chatMode = 'execute',
+  onPopulateChatInput,
 }: ThreadLayoutProps) {
   const isActuallyMobile = useIsMobile();
   
@@ -117,6 +131,13 @@ export function ThreadLayout({
                 agentName={agentName}
                 disableInitialAnimation={disableInitialAnimation}
                 compact={true}
+                onSubmit={onSubmit}
+                isAgentRunning={isAgentRunning}
+                selectedModel={selectedModel}
+                getActualModelId={getActualModelId}
+                selectedAgentId={selectedAgentId}
+                chatMode={chatMode}
+                onPopulateChatInput={onPopulateChatInput}
               />
             </div>
           )}
@@ -191,6 +212,13 @@ export function ThreadLayout({
         onFileClick={onViewFiles}
         agentName={agentName}
         disableInitialAnimation={disableInitialAnimation}
+        onSubmit={onSubmit}
+        isAgentRunning={isAgentRunning}
+        selectedModel={selectedModel}
+        getActualModelId={getActualModelId}
+        selectedAgentId={selectedAgentId}
+        chatMode={chatMode}
+        onPopulateChatInput={onPopulateChatInput}
       />
 
       {sandboxId && (

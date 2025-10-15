@@ -414,3 +414,35 @@ async def delete_message(
     except Exception as e:
         logger.error(f"Error deleting message {message_id} from thread {thread_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to delete message: {str(e)}")
+
+@router.post("/threads/generate-title", summary="Generate Project Title", operation_id="generate_project_title")
+async def generate_project_title(
+    project_id: str = Form(...),
+    prompt: str = Form(...),
+    user_id: str = Depends(verify_and_get_user_id_from_jwt)
+):
+    """Generate a project title in the background after LLM response is complete."""
+    logger.debug(f"Generating title for project: {project_id}")
+    client = await utils.db.client
+    
+    try:
+        # Verify user has access to the project
+        project_result = await client.table('projects').select('project_id, account_id').eq('project_id', project_id).execute()
+        
+        if not project_result.data:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        project = project_result.data[0]
+        if project['account_id'] != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Trigger background title generation
+        from core.utils.project_helpers import generate_and_update_project_name
+        import asyncio
+        asyncio.create_task(generate_and_update_project_name(project_id=project_id, prompt=prompt))
+        
+        return {"message": "Title generation started"}
+        
+    except Exception as e:
+        logger.error(f"Error generating title for project {project_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate title: {str(e)}")

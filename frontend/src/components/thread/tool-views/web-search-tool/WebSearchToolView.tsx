@@ -10,6 +10,7 @@ import {
   Clock,
   BookOpen,
   CalendarDays,
+  Sparkles,
 } from 'lucide-react';
 import { ToolViewProps } from '../types';
 import { cleanUrl, formatTimestamp, getToolTitle } from '../utils';
@@ -29,6 +30,13 @@ export function WebSearchToolView({
   toolTimestamp,
   isSuccess = true,
   isStreaming = false,
+  onSubmit,
+  isAgentRunning = false,
+  selectedModel,
+  getActualModelId,
+  selectedAgentId,
+  chatMode = 'execute',
+  onPopulateChatInput,
 }: ToolViewProps) {
   const [expandedResults, setExpandedResults] = useState<Record<number, boolean>>({});
 
@@ -74,15 +82,36 @@ export function WebSearchToolView({
   };
 
   return (
-    <Card className="gap-0 flex border shadow-none border-t border-b-0 border-x-0 p-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+    <Card className="gap-0 flex border shadow-none border-b-0 border-x-0 p-0 rounded-none flex-col h-full overflow-hidden bg-transparent relative">
+      <CardHeader className="h-14 bg-transparent p-2 px-4 space-y-2 relative z-10 border-t-0">
         <div className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="relative p-2 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/20">
-              <Search className="w-5 h-5 text-blue-500 dark:text-blue-400" />
+            <div className="relative p-2 rounded-xl bg-blue-500/10 border border-blue-500/20">
+              {/* Gradient rim */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-xl" style={{
+                background: 'linear-gradient(180deg, rgba(59,130,246,0.15), rgba(59,130,246,0.05) 30%, rgba(59,130,246,0.10) 85%, rgba(59,130,246,0.08))',
+                WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                WebkitMaskComposite: 'xor',
+                maskComposite: 'exclude',
+                padding: '1px',
+                borderRadius: '12px'
+              }} />
+              {/* Specular streak */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-6" style={{
+                background: 'linear-gradient(180deg, rgba(59,130,246,0.25), rgba(59,130,246,0.08) 45%, rgba(59,130,246,0) 100%)',
+                filter: 'blur(3px)',
+                mixBlendMode: 'screen'
+              }} />
+              {/* Fine noise */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{
+                backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                backgroundSize: '100px 100px',
+                mixBlendMode: 'overlay'
+              }} />
+              <Search className="w-5 h-5 text-blue-400 relative z-10" />
             </div>
             <div>
-              <CardTitle className="text-base font-medium text-zinc-900 dark:text-zinc-100">
+              <CardTitle className="text-base font-medium text-white/90">
                 {toolTitle}
               </CardTitle>
             </div>
@@ -108,12 +137,12 @@ export function WebSearchToolView({
         </div>
       </CardHeader>
 
-      <CardContent className="p-0 h-full flex-1 overflow-hidden relative">
+      <CardContent className="p-0 h-full flex-1 overflow-hidden relative z-10">
         {isStreaming && searchResults.length === 0 && !answer ? (
           <LoadingState
             icon={Search}
-            iconColor="text-blue-500 dark:text-blue-400"
-            bgColor="bg-gradient-to-b from-blue-100 to-blue-50 shadow-inner dark:from-blue-800/40 dark:to-blue-900/60 dark:shadow-blue-950/20"
+            iconColor="text-blue-400"
+            bgColor="bg-gradient-to-b from-blue-500/20 to-blue-600/10 border border-blue-500/20 backdrop-blur-sm"
             title="Searching the web"
             filePath={query}
             showProgress={true}
@@ -121,218 +150,349 @@ export function WebSearchToolView({
         ) : searchResults.length > 0 || answer ? (
           <ScrollArea className="h-full w-full">
             <div className="p-4 py-0 my-4">
-              {images.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3 flex items-center">
-                    <ImageIcon className="h-4 w-4 mr-2 opacity-70" />
-                    Images {name === 'image-search' && `(${images.length})`}
-                  </h3>
-                  <div className={`grid gap-3 mb-1 ${name === 'image-search' ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3'}`}>
-                    {(name === 'image-search' ? images : images.slice(0, 6)).map((image, idx) => {
-                      const imageUrl = typeof image === 'string' ? image : (image as any).imageUrl;
-                      
+              {/* Dynamic Mixed Layout */}
+              <div className="space-y-6">
+                {(() => {
+                  const limitedImages = images.slice(0, 20); // Allow more images
+                  const maxResults = Math.min(searchResults.length, 10); // Limit results for better layout
+                  
+                  const layoutItems: Array<{ type: 'result', data: any, index: number } | { type: 'images', data: any[], startIndex: number }> = [];
+                  
+                  // Create pattern: result, then 2 images, then result, then 2 images, etc.
+                  for (let i = 0; i < maxResults; i++) {
+                    // Add search result
+                    if (i < searchResults.length) {
+                      layoutItems.push({ type: 'result', data: searchResults[i], index: i });
+                    }
+                    
+                    // Add 2 images after each result
+                    const imageStartIdx = i * 2;
+                    const imageEndIdx = Math.min(imageStartIdx + 2, limitedImages.length);
+                    const imagesForThisRow = limitedImages.slice(imageStartIdx, imageEndIdx);
+                    
+                    if (imagesForThisRow.length > 0) {
+                      layoutItems.push({ type: 'images', data: imagesForThisRow, startIndex: imageStartIdx });
+                    }
+                  }
+                  
+                  return layoutItems.map((item, globalIdx) => {
+                    if (item.type === 'result') {
+                      const result = item.data;
+                      const { icon: ResultTypeIcon, label: resultTypeLabel } = getResultType(result);
+                      const isExpanded = expandedResults[item.index] || false;
+                      const favicon = getFavicon(result.url);
+
                       return (
-                        <a
-                          key={idx}
-                          href={imageUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="group relative overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900 hover:border-blue-300 dark:hover:border-blue-700 transition-colors shadow-sm hover:shadow-md"
+                        <div
+                          key={`result-${item.index}`}
+                          className="relative bg-white/5 border border-white/10 rounded-2xl backdrop-blur-sm hover:bg-white/10 transition-colors overflow-hidden"
                         >
-                          <img
-                            src={imageUrl}
-                            alt={`Search result ${idx + 1}`}
-                            className="object-cover w-full h-32 group-hover:opacity-90 transition-opacity"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'%3E%3C/circle%3E%3Cpolyline points='21 15 16 10 5 21'%3E%3C/polyline%3E%3C/svg%3E";
-                              target.classList.add("p-4");
-                            }}
-                          />
-                          <div className="absolute top-0 right-0 p-1">
-                            <Badge variant="secondary" className="bg-black/60 hover:bg-black/70 text-white border-none shadow-md">
-                              <ExternalLink className="h-3 w-3" />
-                            </Badge>
-                          </div>
-                        </a>
-                      );
-                    })}
-                  </div>
-                  {name !== 'image-search' && images.length > 6 && (
-                    <Button variant="outline" size="sm" className="mt-2 text-xs">
-                      View {images.length - 6} more images
-                    </Button>
-                  )}
-                </div>
-              )}
-
-              {searchResults.length > 0 && name !== 'image-search' && (
-                <div className="text-sm font-medium text-zinc-800 dark:text-zinc-200 mb-4 flex items-center justify-between">
-                  <span>Search Results ({searchResults.length})</span>
-                  <Badge variant="outline" className="text-xs font-normal">
-                    <Clock className="h-3 w-3 mr-1.5 opacity-70" />
-                    {new Date().toLocaleDateString()}
-                  </Badge>
-                </div>
-              )}
-
-              {name !== 'image-search' && (
-                <div className="space-y-4">
-                  {searchResults.map((result, idx) => {
-                  const { icon: ResultTypeIcon, label: resultTypeLabel } = getResultType(result);
-                  const isExpanded = expandedResults[idx] || false;
-                  const favicon = getFavicon(result.url);
-
-                  return (
-                    <div
-                      key={idx}
-                      className="bg-card border rounded-lg shadow-sm hover:shadow transition-shadow"
-                    >
-                      <div className="p-4">
-                        <div className="flex items-start gap-3 mb-2">
-                          {favicon && (
-                            <img
-                              src={favicon}
-                              alt=""
-                              className="w-5 h-5 mt-1 rounded"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge variant="outline" className="text-xs px-2 py-0 h-5 font-normal bg-zinc-50 dark:bg-zinc-800">
-                                <ResultTypeIcon className="h-3 w-3 mr-1 opacity-70" />
-                                {resultTypeLabel}
-                              </Badge>
-                            </div>
-                            <a
-                              href={result.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-md font-medium text-blue-600 dark:text-blue-400 hover:underline line-clamp-1 mb-1"
-                            >
-                              {truncateString(cleanUrl(result.title), 50)}
-                            </a>
-                            <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 flex items-center">
-                              <Globe className="h-3 w-3 mr-1.5 flex-shrink-0 opacity-70" />
-                              {truncateString(cleanUrl(result.url), 70)}
-                            </div>
-                          </div>
-                          {/* <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0 rounded-full"
-                                  onClick={() => toggleExpand(idx)}
+                          {/* Gradient rim */}
+                          <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl" style={{
+                            background: 'linear-gradient(180deg, rgba(173,216,255,0.08), rgba(255,255,255,0.02) 30%, rgba(150,160,255,0.06) 85%, rgba(255,255,255,0.03))',
+                            WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                            WebkitMaskComposite: 'xor',
+                            maskComposite: 'exclude',
+                            padding: '1px',
+                            borderRadius: '16px'
+                          }} />
+                          
+                          {/* Specular streak */}
+                          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-8" style={{
+                            background: 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03) 45%, rgba(255,255,255,0) 100%)',
+                            filter: 'blur(3px)',
+                            mixBlendMode: 'screen'
+                          }} />
+                          
+                          {/* Fine noise */}
+                          <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-10" style={{
+                            backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                            backgroundSize: '100px 100px',
+                            mixBlendMode: 'overlay'
+                          }} />
+                          
+                          <div className="p-4 relative z-10">
+                            <div className="flex items-start gap-3">
+                              {favicon && (
+                                <img
+                                  src={favicon}
+                                  alt=""
+                                  className="w-5 h-5 mt-1 rounded"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Badge variant="outline" className="text-xs px-2 py-0 h-5 font-normal bg-white/10 border-white/20 text-white/80">
+                                    <ResultTypeIcon className="h-3 w-3 mr-1 opacity-70" />
+                                    {resultTypeLabel}
+                                  </Badge>
+                                </div>
+                                <a
+                                  href={result.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-md font-medium text-blue-400 hover:text-blue-300 hover:underline line-clamp-1 mb-1"
                                 >
-                                  {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{isExpanded ? 'Show less' : 'Show more'}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider> */}
-                        </div>
-
-                        {/* {result.snippet && (
-                          <div className={cn(
-                            "text-sm text-zinc-600 dark:text-zinc-400",
-                            isExpanded ? "whitespace-pre-wrap break-words max-h-96 overflow-y-auto" : "line-clamp-2"
-                          )}>
-                            {isExpanded ? (
-                              // When expanded, preserve line breaks and show full content
-                              result.snippet
-                                ?.replace(/\\\\\n/g, '\n')
-                                ?.replace(/\\\\n/g, '\n')
-                                ?.replace(/\\n/g, '\n')
-                                ?.replace(/\\\\\t/g, '\t')
-                                ?.replace(/\\\\t/g, '\t')
-                                ?.replace(/\\t/g, '\t')
-                                ?.replace(/\\\\\r/g, '\r')
-                                ?.replace(/\\\\r/g, '\r')
-                                ?.replace(/\\r/g, '\r')
-                                ?.trim()
-                            ) : (
-                              // When collapsed, convert to single line
-                              result.snippet
-                                ?.replace(/\\\\\n/g, ' ')
-                                ?.replace(/\\\\n/g, ' ')
-                                ?.replace(/\\n/g, ' ')
-                                ?.replace(/\\\\\t/g, ' ')
-                                ?.replace(/\\\\t/g, ' ')
-                                ?.replace(/\\t/g, ' ')
-                                ?.replace(/\\\\\r/g, ' ')
-                                ?.replace(/\\\\r/g, ' ')
-                                ?.replace(/\\r/g, ' ')
-                                ?.replace(/\s+/g, ' ')
-                                ?.trim()
-                            )}
+                                  {truncateString(cleanUrl(result.title), 50)}
+                                </a>
+                                <div className="text-xs text-white/60 mb-2 flex items-center">
+                                  <Globe className="h-3 w-3 mr-1.5 flex-shrink-0 opacity-70" />
+                                  {truncateString(cleanUrl(result.url), 70)}
+                                </div>
+                              </div>
+                              
+                              {/* Circular Action Buttons */}
+                              <div className="flex flex-col gap-2 ml-3">
+                                {/* Ask Iris Button */}
+                                <div className="group relative">
+                                  <button
+                                    className="w-8 h-8 rounded-full bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 transition-all duration-200 relative overflow-hidden flex items-center justify-center"
+                                    onClick={() => {
+                                      if (onSubmit) {
+                                        const message = `Iris, analyze this web search you just did and tell me what you found in it and it's significance - ${result.url}`;
+                                        
+                                        // If agent is running, populate the input but don't send
+                                        if (isAgentRunning) {
+                                          if (onPopulateChatInput) {
+                                            onPopulateChatInput(message);
+                                          }
+                                        } else {
+                                          // Agent is not running, send directly with proper model selection
+                                          const baseModelName = getActualModelId ? getActualModelId(selectedModel || '') : selectedModel;
+                                          onSubmit(message, {
+                                            agent_id: selectedAgentId,
+                                            model_name: baseModelName,
+                                            chat_mode: chatMode,
+                                          });
+                                        }
+                                      }
+                                    }}
+                                  >
+                                    {/* Gradient rim */}
+                                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full" style={{
+                                      background: 'linear-gradient(180deg, rgba(173,216,255,0.08), rgba(255,255,255,0.02) 30%, rgba(150,160,255,0.06) 85%, rgba(255,255,255,0.03))',
+                                      WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                                      WebkitMaskComposite: 'xor',
+                                      maskComposite: 'exclude',
+                                      padding: '1px',
+                                      borderRadius: '50%'
+                                    }} />
+                                    
+                                    {/* Specular streak */}
+                                    <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-4" style={{
+                                      background: 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03) 45%, rgba(255,255,255,0) 100%)',
+                                      filter: 'blur(2px)',
+                                      mixBlendMode: 'screen'
+                                    }} />
+                                    
+                                    {/* Fine noise */}
+                                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-10" style={{
+                                      backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                                      backgroundSize: '100px 100px',
+                                      mixBlendMode: 'overlay'
+                                    }} />
+                                    
+                                    <Sparkles className="h-4 w-4 relative z-10" />
+                                  </button>
+                                  
+                                  {/* Hover Tooltip */}
+                                  <div className="absolute right-full mr-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                                    <div className="bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                                      Ask Iris
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {/* Visit Site Button */}
+                                <div className="group relative">
+                                  <a
+                                    href={result.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-8 h-8 rounded-full bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 transition-all duration-200 relative overflow-hidden flex items-center justify-center block"
+                                  >
+                                    {/* Gradient rim */}
+                                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full" style={{
+                                      background: 'linear-gradient(180deg, rgba(173,216,255,0.08), rgba(255,255,255,0.02) 30%, rgba(150,160,255,0.06) 85%, rgba(255,255,255,0.03))',
+                                      WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                                      WebkitMaskComposite: 'xor',
+                                      maskComposite: 'exclude',
+                                      padding: '1px',
+                                      borderRadius: '50%'
+                                    }} />
+                                    
+                                    {/* Specular streak */}
+                                    <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-4" style={{
+                                      background: 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03) 45%, rgba(255,255,255,0) 100%)',
+                                      filter: 'blur(2px)',
+                                      mixBlendMode: 'screen'
+                                    }} />
+                                    
+                                    {/* Fine noise */}
+                                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-10" style={{
+                                      backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                                      backgroundSize: '100px 100px',
+                                      mixBlendMode: 'overlay'
+                                    }} />
+                                    
+                                    <ExternalLink className="h-4 w-4 relative z-10" />
+                                  </a>
+                                  
+                                  {/* Hover Tooltip */}
+                                  <div className="absolute right-full mr-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                                    <div className="bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                                      Visit Site
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        )} */}
-                      </div>
 
-                      {isExpanded && (
-                        <div className="bg-zinc-50 px-4 dark:bg-zinc-800/50 border-t border-zinc-200 dark:border-zinc-800 p-3 flex justify-between items-center">
-                          <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                            Source: {cleanUrl(result.url)}
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs bg-white dark:bg-zinc-900"
-                            asChild
-                          >
-                            <a href={result.url} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="h-3 w-3" />
-                              Visit Site
-                            </a>
-                          </Button>
+                          {isExpanded && (
+                            <div className="relative bg-white/5 px-4 border-t border-white/10 p-3 flex justify-between items-center overflow-hidden">
+                              {/* Gradient rim */}
+                              <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{
+                                background: 'linear-gradient(180deg, rgba(173,216,255,0.08), rgba(255,255,255,0.02) 30%, rgba(150,160,255,0.06) 85%, rgba(255,255,255,0.03))',
+                                WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                                WebkitMaskComposite: 'xor',
+                                maskComposite: 'exclude',
+                                padding: '1px',
+                                borderRadius: '0 0 16px 16px'
+                              }} />
+                              
+                              {/* Specular streak */}
+                              <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-6" style={{
+                                background: 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03) 45%, rgba(255,255,255,0) 100%)',
+                                filter: 'blur(2px)',
+                                mixBlendMode: 'screen'
+                              }} />
+                              
+                              {/* Fine noise */}
+                              <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-10" style={{
+                                backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                                backgroundSize: '100px 100px',
+                                mixBlendMode: 'overlay'
+                              }} />
+                              
+                              <div className="text-xs text-white/60 relative z-10">
+                                Source: {cleanUrl(result.url)}
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs bg-white/10 border-white/20 text-white/80 hover:bg-white/20 relative z-10"
+                                asChild
+                              >
+                                <a href={result.url} target="_blank" rel="noopener noreferrer">
+                                  <ExternalLink className="h-3 w-3" />
+                                  Visit Site
+                                </a>
+                              </Button>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    );
-                  })}
-                </div>
-              )}
+                      );
+                    } else {
+                      // Images row - render 2 images side by side
+                      return (
+                        <div key={`images-${item.startIndex}`} className="grid grid-cols-2 gap-3">
+                          {item.data.map((image, idx) => {
+                            const imageUrl = typeof image === 'string' ? image : (image as any).imageUrl;
+                            
+                            return (
+                              <a
+                                key={`image-${item.startIndex + idx}`}
+                                href={imageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 transition-all duration-200 h-32"
+                              >
+                                {/* Gradient rim */}
+                                <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl" style={{
+                                  background: 'linear-gradient(180deg, rgba(173,216,255,0.08), rgba(255,255,255,0.02) 30%, rgba(150,160,255,0.06) 85%, rgba(255,255,255,0.03))',
+                                  WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                                  WebkitMaskComposite: 'xor',
+                                  maskComposite: 'exclude',
+                                  padding: '1px',
+                                  borderRadius: '16px'
+                                }} />
+                                
+                                {/* Specular streak */}
+                                <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-8" style={{
+                                  background: 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03) 45%, rgba(255,255,255,0) 100%)',
+                                  filter: 'blur(3px)',
+                                  mixBlendMode: 'screen'
+                                }} />
+                                
+                                {/* Fine noise */}
+                                <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-10" style={{
+                                  backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                                  backgroundSize: '100px 100px',
+                                  mixBlendMode: 'overlay'
+                                }} />
+                                
+                                <img
+                                  src={imageUrl}
+                                  alt={`Search result ${item.startIndex + idx + 1}`}
+                                  className="object-cover w-full h-full group-hover:opacity-90 transition-opacity relative z-10"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'%3E%3C/circle%3E%3Cpolyline points='21 15 16 10 5 21'%3E%3C/polyline%3E%3C/svg%3E";
+                                    target.classList.add("p-4");
+                                  }}
+                                />
+                                <div className="absolute top-0 right-0 p-1 z-30">
+                                  <Badge variant="secondary" className="bg-black/60 hover:bg-black/70 text-white border-none shadow-md">
+                                    <ExternalLink className="h-3 w-3" />
+                                  </Badge>
+                                </div>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      );
+                    }
+                  });
+                })()}
+              </div>
             </div>
           </ScrollArea>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full py-12 px-6 bg-gradient-to-b from-white to-zinc-50 dark:from-zinc-950 dark:to-zinc-900">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-gradient-to-b from-zinc-100 to-zinc-50 shadow-inner dark:from-zinc-800/40 dark:to-zinc-900/60">
-              <Search className="h-10 w-10 text-zinc-400 dark:text-zinc-600" />
+          <div className="flex flex-col items-center justify-center h-full py-12 px-6 bg-gradient-to-b from-transparent to-white/5">
+            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-gradient-to-b from-white/10 to-white/5 border border-white/10 backdrop-blur-sm">
+              <Search className="h-10 w-10 text-white/40" />
             </div>
-            <h3 className="text-xl font-semibold mb-2 text-zinc-900 dark:text-zinc-100">
+            <h3 className="text-xl font-semibold mb-2 text-white/90">
               No Results Found
             </h3>
-            <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 w-full max-w-md text-center mb-4 shadow-sm">
-              <code className="text-sm font-mono text-zinc-700 dark:text-zinc-300 break-all">
+            <div className="bg-white/10 border border-white/20 rounded-lg p-4 w-full max-w-md text-center mb-4 backdrop-blur-sm">
+              <code className="text-sm font-mono text-white/70 break-all">
                 {query || 'Unknown query'}
               </code>
             </div>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="text-sm text-white/60">
               Try refining your search query for better results
             </p>
           </div>
         )}
       </CardContent>
 
-      <div className="px-4 py-2 h-10 bg-gradient-to-r from-zinc-50/90 to-zinc-100/90 dark:from-zinc-900/90 dark:to-zinc-800/90 backdrop-blur-sm border-t border-zinc-200 dark:border-zinc-800 flex justify-between items-center gap-4">
-        <div className="h-full flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+      <div className="px-4 py-2 h-10 bg-white/5 backdrop-blur-sm border-t border-white/10 flex justify-between items-center gap-4 relative z-10">
+        <div className="h-full flex items-center gap-2 text-sm text-white/60">
           {!isStreaming && (
             <>
               {name === 'image-search' && images.length > 0 && (
-                <Badge variant="outline" className="h-6 py-0.5">
+                <Badge variant="outline" className="h-6 py-0.5 bg-white/10 border-white/20 text-white/80">
                   <ImageIcon className="h-3 w-3" />
                   {images.length} images
                 </Badge>
               )}
               {name !== 'image-search' && searchResults.length > 0 && (
-                <Badge variant="outline" className="h-6 py-0.5">
+                <Badge variant="outline" className="h-6 py-0.5 bg-white/10 border-white/20 text-white/80">
                   <Globe className="h-3 w-3" />
                   {searchResults.length} results
                 </Badge>
@@ -341,7 +501,7 @@ export function WebSearchToolView({
           )}
         </div>
 
-        <div className="text-xs text-zinc-500 dark:text-zinc-400">
+        <div className="text-xs text-white/60">
           {actualToolTimestamp && !isStreaming
             ? formatTimestamp(actualToolTimestamp)
             : actualAssistantTimestamp

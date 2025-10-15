@@ -18,7 +18,7 @@ import { handleFiles, FileUploadHandler } from './file-upload-handler';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Loader2, ArrowUp, X, Image as ImageIcon, Presentation, BarChart3, FileText, Search, Users, Code2, Sparkles, Brain as BrainIcon, MessageSquare, Zap as ZapIcon } from 'lucide-react';
+import { Loader2, ArrowUp, X, Image as ImageIcon, Presentation, BarChart3, FileText, Search, Users, Code2, Sparkles, Sparkle, Brain as BrainIcon, MessageSquare, Zap as ZapIcon } from 'lucide-react';
 import { VoiceRecorder } from './voice-recorder';
 import { UnifiedConfigMenu } from './unified-config-menu';
 import { AttachmentGroup } from '../attachment-group';
@@ -321,14 +321,14 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
       const handleKeyDown = (e: KeyboardEvent) => {
         const isMod = isMac ? e.metaKey : e.ctrlKey;
         
-        // Cmd/Ctrl + E for Execute mode
-        if (isMod && e.key === 'e') {
+        // Cmd/Ctrl + 1 for Execute mode (Iris Intelligence)
+        if (isMod && e.key === '1') {
           e.preventDefault();
           handleChatModeChange('execute');
         }
         
-        // Cmd/Ctrl + A for Chat mode (Ask)
-        if (isMod && e.key === 'a') {
+        // Cmd/Ctrl + 2 for Chat mode (Quick Chat)
+        if (isMod && e.key === '2') {
           e.preventDefault();
           handleChatModeChange('chat');
         }
@@ -757,9 +757,38 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                       
                       {renderConfigDropdown}
                       
-                      {/* Chat/Execute Mode Toggle - Glassy icon-only design */}
+                      {/* Iris Intelligence/Quick Chat Mode Toggle - Glassy icon-only design */}
                       <TooltipProvider>
-                        <div className="flex items-center gap-0 p-1 bg-white/5 rounded-xl border border-white/10 backdrop-blur-sm">
+                        <div className="flex items-center gap-0 p-1 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => handleChatModeChange('execute')}
+                                className={cn(
+                                  "p-1.5 rounded-lg transition-all duration-200 cursor-pointer",
+                                  chatMode === 'execute'
+                                    ? "opacity-100 text-white"
+                                    : "opacity-60 text-white/70 hover:opacity-80"
+                                )}
+                              >
+                                <Sparkle className="w-4 h-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <div className="space-y-1">
+                                <p className="font-medium flex items-center gap-1.5">
+                                  <Sparkle className="w-3 h-3" />
+                                  Iris Intelligence ({isMac ? '⌘' : 'Ctrl'}+1)
+                                </p>
+                                <p className="text-xs text-muted-foreground">Next-gen intelligence with agentic power</p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+
+                          {/* Separator line */}
+                          <div className="w-px h-4 bg-white/20 mx-0.5" />
+
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <button
@@ -777,34 +806,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                             </TooltipTrigger>
                             <TooltipContent side="top">
                               <div className="space-y-1">
-                                <p className="font-medium">Ask ({isMac ? '⌘' : 'Ctrl'}+A)</p>
+                                <p className="font-medium flex items-center gap-1.5">
+                                  <ZapIcon className="w-3 h-3" />
+                                  Quick Chat ({isMac ? '⌘' : 'Ctrl'}+2)
+                                </p>
                                 <p className="text-xs text-muted-foreground">Lightning-fast responses</p>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-
-                          {/* Separator line */}
-                          <div className="w-px h-4 bg-white/20 mx-0.5" />
-
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={() => handleChatModeChange('execute')}
-                                className={cn(
-                                  "p-1.5 rounded-lg transition-all duration-200 cursor-pointer",
-                                  chatMode === 'execute'
-                                    ? "opacity-100 text-white"
-                                    : "opacity-60 text-white/70 hover:opacity-80"
-                                )}
-                              >
-                                <Wrench className="w-4 h-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              <div className="space-y-1">
-                                <p className="font-medium">Execute ({isMac ? '⌘' : 'Ctrl'}+E)</p>
-                                <p className="text-xs text-muted-foreground">Full agent with tools</p>
                               </div>
                             </TooltipContent>
                           </Tooltip>
@@ -883,14 +889,15 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                           </div>
                         </TooltipProvider>
                       )}
-                      
+                    </div>
+
+                    <div className="flex items-center gap-2">
                       {isLoggedIn && <VoiceRecorder
                         onTranscription={handleTranscription}
                         disabled={loading || (disabled && !isAgentRunning)}
                       />}
-                    </div>
 
-                    <Button
+                      <Button
                       type="submit"
                       onClick={isAgentRunning && onStopAgent ? onStopAgent : handleSubmit}
                       disabled={
@@ -915,6 +922,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                         <span>Send</span>
                       )}
                     </Button>
+                    </div>
                   </div>
                 </form>
               </div>

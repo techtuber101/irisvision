@@ -45,11 +45,14 @@ import {
 } from '@/hooks/react-query/agents/use-agents';
 import { AgentRunLimitDialog } from '@/components/thread/agent-run-limit-dialog';
 import { useAgentSelection } from '@/lib/stores/agent-selection-store';
+import { useModelSelection } from '@/hooks/use-model-selection';
 import { useQueryClient } from '@tanstack/react-query';
 import { threadKeys } from '@/hooks/react-query/threads/keys';
 import { useProjectRealtime } from '@/hooks/useProjectRealtime';
 import { fastGeminiChatStream } from '@/lib/fast-gemini-chat';
+import { continueSimpleChat } from '@/lib/simple-chat';
 import { handleGoogleSlidesUpload } from './tool-views/utils/presentation-utils';
+
 
 interface ThreadComponentProps {
   projectId: string;
@@ -66,6 +69,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   // State
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isSimpleChatLoading, setIsSimpleChatLoading] = useState(false);
   const [fileViewerOpen, setFileViewerOpen] = useState(false);
   const [fileToView, setFileToView] = useState<string | null>(null);
   const [filePathList, setFilePathList] = useState<string[] | undefined>(
@@ -84,6 +88,12 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     isSunaAgent,
   } = useAgentSelection();
 
+  // Model selection
+  const {
+    selectedModel,
+    getActualModelId,
+  } = useModelSelection();
+
   const { data: agentsResponse } = useAgents();
   const agents = agentsResponse?.agents || [];
   const [isSidePanelAnimating, setIsSidePanelAnimating] = useState(false);
@@ -94,12 +104,26 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     runningCount: number;
     runningThreadIds: string[];
   } | null>(null);
+  
+  // Track initial chat mode from localStorage
+  const [initialChatMode, setInitialChatMode] = useState<'chat' | 'execute'>('execute');
+  
+  // Handle chat mode changes from user interaction
+  const handleChatModeChange = useCallback((mode: 'chat' | 'execute') => {
+    setInitialChatMode(mode);
+  }, []);
+
+  // Handle populating chat input when agent is running
+  const handlePopulateChatInput = useCallback((message: string) => {
+    setNewMessage(message);
+  }, []);
 
   // Refs - simplified for flex-column-reverse
   const latestMessageRef = useRef<HTMLDivElement>(null);
   const initialLayoutAppliedRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const lastStreamStartedRef = useRef<string | null>(null); // Track last runId we started streaming for
+  const titleGenerationTriggeredRef = useRef<boolean>(false); // Track if title generation has been triggered
 
   // Sidebar
   const { state: leftSidebarState, setOpen: setLeftSidebarOpen } = useSidebar();
@@ -123,6 +147,33 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     projectQuery,
     agentRunsQuery,
   } = useThreadData(threadId, projectId);
+
+  // Track if we've already set the initial mode for this thread
+  const [hasSetInitialMode, setHasSetInitialMode] = useState(false);
+  
+  // Reset hasSetInitialMode when threadId changes
+  useEffect(() => {
+    setHasSetInitialMode(false);
+  }, [threadId]);
+  
+  // Reset title generation trigger when threadId changes
+  useEffect(() => {
+    titleGenerationTriggeredRef.current = false;
+  }, [threadId]);
+  
+  // Detect if this is a simple chat thread and set initial mode (only once per thread)
+  useEffect(() => {
+    if (threadQuery.data && !hasSetInitialMode) {
+      const threadMetadata = threadQuery.data.metadata;
+      if (threadMetadata && typeof threadMetadata === 'object' && threadMetadata.chat_mode === 'simple') {
+        setInitialChatMode('chat');
+      } else {
+        // Default to execute mode for all other threads
+        setInitialChatMode('execute');
+      }
+      setHasSetInitialMode(true);
+    }
+  }, [threadQuery.data, hasSetInitialMode]);
 
   const {
     toolCalls,
@@ -471,213 +522,59 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
           message,
         });
 
-        // Handle Chat Mode - Fast Gemini streaming
+        // Handle Chat Mode - Only use simple chat for threads that were originally created as simple chat
         if (options?.chat_mode === 'chat') {
-          await messagePromise; // Wait for user message to be saved
+          // Check if this thread was originally created as a simple chat thread
+          const threadMetadata = threadQuery.data?.metadata;
+          const isSimpleChatThread = threadMetadata && typeof threadMetadata === 'object' && threadMetadata.chat_mode === 'simple';
           
-          // Remove the "Hmm..." message immediately as we'll stream instead
-          setMessages((prev) => 
-            prev.filter((m) => m.message_id !== optimisticHmmMessage.message_id)
-          );
-          clearTimeout(hmmTimeout);
-          
-          // Create assistant message for streaming
-          const assistantMessageId = `assistant-${Date.now()}`;
-          const assistantMessage: UnifiedMessage = {
-            message_id: assistantMessageId,
-            thread_id: threadId,
-            type: 'assistant',
-            is_llm_message: true,
-            content: JSON.stringify({ content: '' }),
-            metadata: JSON.stringify({ is_streaming: true }),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-          
-          setMessages((prev) => [...prev, assistantMessage]);
-          
-          let streamedContent = '';
-          let displayedContent = '';
-          let characterQueue: string[] = [];
-          let isTyping = false;
-          let characterCount = 0;
-          let useTypewriterEffect = true;
-          
-          // Dynamic typewriter effect: Start with typewriter, then switch to raw streaming
-          const getTypewriterInterval = () => {
-            // First ~500 characters: 10ms (super fast start)
-            if (characterCount < 500) {
-              return 10;
-            }
-            // After ~500 characters: 1ms (blazing fast, almost instant)
-            else {
-              return 1;
-            }
-          };
-          
-          const typeNextCharacter = () => {
-            if (characterQueue.length > 0) {
-              const char = characterQueue.shift()!;
-              displayedContent += char;
-              characterCount++;
+          if (isSimpleChatThread) {
+            // Remove the "Hmm..." message immediately
+            setMessages((prev) => 
+              prev.filter((m) => m.message_id !== optimisticHmmMessage.message_id)
+            );
+            clearTimeout(hmmTimeout);
+            
+            // Set simple chat loading state
+            setIsSimpleChatLoading(true);
+            
+            try {
+              // Use the new simple chat continue endpoint
+              const result = await continueSimpleChat(threadId, message);
               
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.message_id === assistantMessageId
-                    ? {
-                        ...m,
-                        content: JSON.stringify({ content: displayedContent }),
-                        metadata: JSON.stringify({ is_streaming: true }),
-                      }
-                    : m
-                )
-              );
-              
-              if (characterQueue.length > 0) {
-                const interval = getTypewriterInterval();
-                setTimeout(typeNextCharacter, interval);
-              } else {
-                isTyping = false;
-              }
-            } else {
-              isTyping = false;
-            }
-          };
-          
-          const startTyping = () => {
-            if (!isTyping && characterQueue.length > 0) {
-              isTyping = true;
-              typeNextCharacter();
-            }
-          };
-          
-          // Switch to raw streaming after 500 characters
-          const switchToRawStreaming = () => {
-            useTypewriterEffect = false;
-            // Flush any remaining characters in queue immediately
-            if (characterQueue.length > 0) {
-              const remainingContent = characterQueue.join('');
-              displayedContent += remainingContent;
-              characterQueue = [];
-              isTyping = false;
-              
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.message_id === assistantMessageId
-                    ? {
-                        ...m,
-                        content: JSON.stringify({ content: displayedContent }),
-                        metadata: JSON.stringify({ is_streaming: true }),
-                      }
-                    : m
-                )
-              );
-            }
-          };
-          
-          // Save message to database and mark as complete
-          const saveAndCompleteMessage = async (timeMs: number) => {
-            const finalMetadata = { 
-              is_streaming: false, 
-              response_time_ms: timeMs,
-              chat_mode: 'chat' // Mark as chat mode message
+              // Add the assistant response to the UI
+            const assistantMessage: UnifiedMessage = {
+                message_id: `assistant-${Date.now()}`,
+              thread_id: threadId,
+              type: 'assistant',
+              is_llm_message: true,
+                content: JSON.stringify({ content: result.response }),
+                metadata: JSON.stringify({ 
+                  response_time_ms: result.time_ms,
+                  chat_mode: 'chat'
+                }),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
             };
             
-            // Save assistant message to database
-            try {
-              await addAssistantMessageMutation.mutateAsync({
-                threadId,
-                content: streamedContent,
-                metadata: finalMetadata,
-              });
-              console.log('Assistant message saved to database');
-            } catch (error) {
-              console.error('Failed to save assistant message:', error);
+            setMessages((prev) => [...prev, assistantMessage]);
+            
+              console.log(`Simple chat response completed in ${result.time_ms}ms`);
+              
+              } catch (error) {
+              console.error('Simple chat error:', error);
+              toast.error(`Chat error: ${error}`);
+            } finally {
+              // Always clear loading state
+              setIsSimpleChatLoading(false);
             }
             
-            // Update local state
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.message_id === assistantMessageId
-                  ? {
-                      ...m,
-                      content: JSON.stringify({ content: streamedContent }),
-                      metadata: JSON.stringify(finalMetadata),
-                    }
-                  : m
-              )
-            );
-          };
-          
-          // Stream response from Fast Gemini
-          await fastGeminiChatStream(
-            message,
-            {
-              onChunk: (content) => {
-                streamedContent += content;
-                
-                if (useTypewriterEffect) {
-                  // Add each character to the queue for typewriter effect
-                  for (const char of content) {
-                    characterQueue.push(char);
-                  }
-                  
-                  // Check if we've reached 500 characters and should switch to raw streaming
-                  if (characterCount + characterQueue.length >= 500) {
-                    switchToRawStreaming();
-                  }
-                  
-                  // Start typing if not already typing
-                  startTyping();
-                } else {
-                  // Raw streaming mode - display content immediately in huge chunks
-                  displayedContent += content;
-                  
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.message_id === assistantMessageId
-                        ? {
-                            ...m,
-                            content: JSON.stringify({ content: displayedContent }),
-                            metadata: JSON.stringify({ is_streaming: true }),
-                          }
-                        : m
-                    )
-                  );
-                }
-              },
-              onDone: async (timeMs) => {
-                console.log(`Fast Gemini response completed in ${timeMs}ms`);
-                
-                if (useTypewriterEffect) {
-                  // Wait for all characters to be typed before marking complete
-                  const waitForTyping = () => {
-                    if (characterQueue.length > 0 || isTyping) {
-                      setTimeout(waitForTyping, 50);
-                    } else {
-                      // All characters typed, save to database and mark as complete
-                      saveAndCompleteMessage(timeMs);
-                    }
-                  };
-                  
-                  waitForTyping();
-                } else {
-                  // Raw streaming mode - save immediately
-                  saveAndCompleteMessage(timeMs);
-                }
-              },
-              onError: (error) => {
-                console.error('Fast Gemini stream error:', error);
-                toast.error(`Chat error: ${error}`);
-                setMessages((prev) =>
-                  prev.filter((m) => m.message_id !== assistantMessageId)
-                );
-              },
-            }
-          );
-          
-          setIsSending(false);
-          return;
+            setIsSending(false);
+            return;
+          } else {
+            // For non-simple chat threads, fall through to execute mode
+            console.log('Chat mode requested but thread is not a simple chat thread, using execute mode instead');
+          }
         }
 
         // Handle Execute Mode - Normal agent run
@@ -770,6 +667,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         const agentResult = results[1].value;
         setUserInitiatedRun(true);
         setAgentRunId(agentResult.agent_run_id);
+        
+        // Trigger title generation for agent mode only
+        triggerTitleGeneration();
         
         // Clear the Hmm timeout since we got a successful response
         clearTimeout(hmmTimeout);
@@ -1031,6 +931,48 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     setDebugMode(debugParam === 'true');
   }, [searchParams]);
 
+  // Trigger title generation after LLM response is complete
+  const triggerTitleGeneration = useCallback(async () => {
+    try {
+      // Only trigger once per thread and if we have a project
+      if (project?.project_id && !titleGenerationTriggeredRef.current) {
+        titleGenerationTriggeredRef.current = true;
+        
+        // Get the first user message to use for title generation
+        const firstUserMessage = messages.find(msg => msg.type === 'user');
+        if (firstUserMessage) {
+          let prompt = '';
+          if (typeof firstUserMessage.content === 'string') {
+            try {
+              const parsed = JSON.parse(firstUserMessage.content);
+              prompt = parsed.content || parsed;
+            } catch {
+              prompt = firstUserMessage.content;
+            }
+          }
+          
+          if (prompt) {
+            // Call the backend to generate title in background
+            const formData = new FormData();
+            formData.append('project_id', project.project_id);
+            formData.append('prompt', prompt);
+            
+            await fetch('/api/threads/generate-title', {
+              method: 'POST',
+              body: formData
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to trigger title generation:', error);
+      // Don't show error to user as this is a background process
+    }
+  }, [project, messages]);
+
+
+  // Simple chat mode - no special handling needed since conversation is already complete
+
   const hasCheckedUpgradeDialog = useRef(false);
 
   useEffect(() => {
@@ -1137,6 +1079,13 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         isMobile={isMobile}
         initialLoadCompleted={initialLoadCompleted}
         agentName={agent && agent.name}
+        onSubmit={handleSubmitMessage}
+        isAgentRunning={agentStatus === 'running' || agentStatus === 'connecting'}
+        selectedModel={selectedModel}
+        getActualModelId={getActualModelId}
+        selectedAgentId={selectedAgentId}
+        chatMode={initialChatMode}
+        onPopulateChatInput={handlePopulateChatInput}
       >
         <ThreadError error={error} />
       </ThreadLayout>
@@ -1183,6 +1132,13 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
           agentName={agent && agent.name}
           disableInitialAnimation={!initialLoadCompleted && toolCalls.length > 0}
           compact={true}
+          onSubmit={handleSubmitMessage}
+          isAgentRunning={agentStatus === 'running' || agentStatus === 'connecting'}
+          selectedModel={selectedModel}
+          getActualModelId={getActualModelId}
+          selectedAgentId={selectedAgentId}
+          chatMode={initialChatMode}
+          onPopulateChatInput={handlePopulateChatInput}
         >
           {/* Thread Content - Scrollable */}
           <div 
@@ -1208,6 +1164,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
                 agentData={agent}
                 scrollContainerRef={scrollContainerRef}
                 isPreviewMode={true}
+                isSimpleChatLoading={isSimpleChatLoading}
               />
             </div>
           </div>
@@ -1248,6 +1205,8 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
               defaultShowSnackbar="tokens"
               showScrollToBottomIndicator={showScrollToBottom}
               onScrollToBottom={scrollToBottom}
+              initialChatMode={initialChatMode}
+              onChatModeChange={handleChatModeChange}
             />
           </div>
         </ThreadLayout>
@@ -1310,6 +1269,13 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         initialLoadCompleted={initialLoadCompleted}
         agentName={agent && agent.name}
         disableInitialAnimation={!initialLoadCompleted && toolCalls.length > 0}
+        onSubmit={handleSubmitMessage}
+        isAgentRunning={agentStatus === 'running' || agentStatus === 'connecting'}
+        selectedModel={selectedModel}
+        getActualModelId={getActualModelId}
+        selectedAgentId={selectedAgentId}
+        chatMode={initialChatMode}
+        onPopulateChatInput={handlePopulateChatInput}
       >
         <ThreadContent
           messages={messages}
@@ -1328,6 +1294,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
           agentMetadata={agent?.metadata}
           agentData={agent}
           scrollContainerRef={scrollContainerRef}
+          isSimpleChatLoading={isSimpleChatLoading}
         />
 
         <div
@@ -1380,6 +1347,8 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
               defaultShowSnackbar="tokens"
               showScrollToBottomIndicator={showScrollToBottom}
               onScrollToBottom={scrollToBottom}
+              initialChatMode={initialChatMode}
+              onChatModeChange={handleChatModeChange}
             />
           </div>
         </div>

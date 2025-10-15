@@ -8,6 +8,8 @@ const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000/ap
 export interface FastGeminiChatRequest {
   message: string;
   model?: string;
+  system_instructions?: string;
+  chat_context?: Array<{ role: string; content: string }>;
 }
 
 export interface FastGeminiChatResponse {
@@ -35,14 +37,26 @@ export interface FastGeminiStreamCallbacks {
  */
 export async function fastGeminiChat(
   message: string,
-  model: string = 'gemini-2.0-flash-exp'
+  model: string = 'gemini-2.5-flash',
+  systemInstructions?: string,
+  chatContext?: Array<{ role: string; content: string }>
 ): Promise<FastGeminiChatResponse> {
+  const requestBody: FastGeminiChatRequest = { message, model };
+  
+  if (systemInstructions) {
+    requestBody.system_instructions = systemInstructions;
+  }
+  
+  if (chatContext && chatContext.length > 0) {
+    requestBody.chat_context = chatContext;
+  }
+
   const response = await fetch(`${API_URL}/chat/fast-gemini-chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ message, model }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
@@ -59,14 +73,26 @@ export async function fastGeminiChat(
 export async function fastGeminiChatStream(
   message: string,
   callbacks: FastGeminiStreamCallbacks,
-  model: string = 'gemini-2.0-flash-exp'
+  model: string = 'gemini-2.5-flash',
+  systemInstructions?: string,
+  chatContext?: Array<{ role: string; content: string }>
 ): Promise<void> {
+  const requestBody: FastGeminiChatRequest = { message, model };
+  
+  if (systemInstructions) {
+    requestBody.system_instructions = systemInstructions;
+  }
+  
+  if (chatContext && chatContext.length > 0) {
+    requestBody.chat_context = chatContext;
+  }
+
   const response = await fetch(`${API_URL}/chat/fast-gemini-chat/stream`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ message, model }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {

@@ -1,0 +1,7 @@
+{
+  "data-root": "/Volumes/DOODLE/docker",
+  "storage-driver": "overlay2",
+  "features": {
+    "buildkit": true
+  }
+}

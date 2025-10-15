@@ -62,6 +62,13 @@ interface ToolCallSidePanelProps {
   onFileClick?: (filePath: string) => void;
   disableInitialAnimation?: boolean;
   compact?: boolean;
+  onSubmit?: (message: string, options?: { model_name?: string; agent_id?: string; chat_mode?: 'chat' | 'execute' }) => void;
+  isAgentRunning?: boolean;
+  selectedModel?: string;
+  getActualModelId?: (modelId: string) => string;
+  selectedAgentId?: string;
+  chatMode?: 'chat' | 'execute';
+  onPopulateChatInput?: (message: string) => void;
 }
 
 interface ToolCallSnapshot {
@@ -257,6 +264,13 @@ export function ToolCallSidePanel({
   onFileClick,
   disableInitialAnimation,
   compact = false,
+  onSubmit,
+  isAgentRunning = false,
+  selectedModel,
+  getActualModelId,
+  selectedAgentId,
+  chatMode = 'execute',
+  onPopulateChatInput,
 }: ToolCallSidePanelProps) {
   const [dots, setDots] = React.useState('');
   const [internalIndex, setInternalIndex] = React.useState(0);
@@ -862,7 +876,14 @@ export function ToolCallSidePanel({
         currentIndex={displayIndex}
         totalCalls={displayTotalCalls}
         onFileClick={onFileClick}
-        viewToggle={<ViewToggle currentView={currentView} onViewChange={setCurrentView} />}  
+        viewToggle={<ViewToggle currentView={currentView} onViewChange={setCurrentView} />}
+        onSubmit={onSubmit}
+        isAgentRunning={isAgentRunning}
+        selectedModel={selectedModel}
+        getActualModelId={getActualModelId}
+        selectedAgentId={selectedAgentId}
+        chatMode={chatMode}
+        onPopulateChatInput={onPopulateChatInput}
       />
     );
 

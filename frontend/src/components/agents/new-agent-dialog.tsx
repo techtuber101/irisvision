@@ -95,9 +95,9 @@ export function NewAgentDialog({ open, onOpenChange, onSuccess }: NewAgentDialog
     <AlertDialog open={open} onOpenChange={handleDialogClose}>
       <AlertDialogContent className="max-w-lg">
         <AlertDialogHeader className="space-y-3">
-          <AlertDialogTitle className="text-xl">Create New Agent</AlertDialogTitle>
+          <AlertDialogTitle className="text-xl">Create New Personality</AlertDialogTitle>
           <AlertDialogDescription className="text-base leading-relaxed">
-            Create a new agent with default settings that you can customize later, or{' '}
+            Create a new personality with default settings that you can customize later, or{' '}
             <button
               onClick={handleFileImport}
               className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4 disabled:cursor-not-allowed disabled:opacity-50"
@@ -140,7 +140,7 @@ export function NewAgentDialog({ open, onOpenChange, onSuccess }: NewAgentDialog
             ) : (
               <>
                 <Plus className="h-4 w-4" />
-                Create Agent
+                Create Personality
               </>
             )}
           </AlertDialogAction>

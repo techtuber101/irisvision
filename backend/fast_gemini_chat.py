@@ -5,7 +5,7 @@ Super simple, super fast streaming chat with Gemini
 import os
 import json
 import time
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional, List, Dict
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -20,7 +20,9 @@ genai.configure(api_key=config.GEMINI_API_KEY)
 
 class ChatRequest(BaseModel):
     message: str
-    model: str = "gemini-2.0-flash-exp"  # Default to fastest model
+    model: str = "gemini-2.5-flash"  # Default to stable Gemini model
+    system_instructions: Optional[str] = None
+    chat_context: Optional[List[Dict[str, str]]] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -34,8 +36,44 @@ async def fast_gemini_chat_non_streaming(request: ChatRequest):
     try:
         start_time = time.time()
         
+        # Build the conversation history
+        conversation_history = []
+        
+        # Add system instructions if provided
+        if request.system_instructions:
+            conversation_history.append({
+                "role": "user",
+                "parts": [f"System Instructions: {request.system_instructions}"]
+            })
+            conversation_history.append({
+                "role": "model", 
+                "parts": ["I understand. I'll follow these system instructions."]
+            })
+        
+        # Add chat context if provided
+        if request.chat_context:
+            for msg in request.chat_context:
+                if msg.get("role") == "user":
+                    conversation_history.append({
+                        "role": "user",
+                        "parts": [msg.get("content", "")]
+                    })
+                elif msg.get("role") == "assistant":
+                    conversation_history.append({
+                        "role": "model",
+                        "parts": [msg.get("content", "")]
+                    })
+        
+        # Add the current message
+        conversation_history.append({
+            "role": "user",
+            "parts": [request.message]
+        })
+        
+        # Create model and generate response
         model = genai.GenerativeModel(request.model)
-        response = model.generate_content(request.message)
+        chat = model.start_chat(history=conversation_history[:-1])  # Exclude current message from history
+        response = chat.send_message(request.message)
         
         elapsed_ms = (time.time() - start_time) * 1000
         
@@ -60,12 +98,40 @@ async def fast_gemini_chat_streaming(request: ChatRequest):
             # Send metadata first
             yield f"data: {json.dumps({'type': 'start', 'time': start_time})}\n\n"
             
-            # Create model and stream response
+            # Build the conversation history
+            conversation_history = []
+            
+            # Add system instructions if provided
+            if request.system_instructions:
+                conversation_history.append({
+                    "role": "user",
+                    "parts": [f"System Instructions: {request.system_instructions}"]
+                })
+                conversation_history.append({
+                    "role": "model", 
+                    "parts": ["I understand. I'll follow these system instructions."]
+                })
+            
+            # Add chat context if provided
+            if request.chat_context:
+                for msg in request.chat_context:
+                    if msg.get("role") == "user":
+                        conversation_history.append({
+                            "role": "user",
+                            "parts": [msg.get("content", "")]
+                        })
+                    elif msg.get("role") == "assistant":
+                        conversation_history.append({
+                            "role": "model",
+                            "parts": [msg.get("content", "")]
+                        })
+            
+            # Create model and start chat with history
             model = genai.GenerativeModel(request.model)
-            response = model.generate_content(
-                request.message,
-                stream=True
-            )
+            chat = model.start_chat(history=conversation_history)
+            
+            # Stream response
+            response = chat.send_message(request.message, stream=True)
             
             # Stream each token chunk as it arrives from Gemini
             # This gives the true letter-by-letter typewriter effect
@@ -110,7 +176,7 @@ async def health_check():
     """Quick health check"""
     return {
         "status": "ok",
-        "model": "gemini-2.0-flash-exp",
+        "model": "gemini-2.5-flash",
         "api_key_configured": bool(config.GEMINI_API_KEY)
     }
 
