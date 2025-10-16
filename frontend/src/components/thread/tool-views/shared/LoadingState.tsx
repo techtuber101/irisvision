@@ -48,7 +48,7 @@ export function LoadingState({
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[400px] overflow-hidden scrollbar-hide py-12 px-6">
       <div className="text-center w-full max-w-sm">
-        <div className="w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] relative overflow-hidden">
+        <div className="w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center bg-white/80 backdrop-blur-2xl border border-black/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.1),inset_0_1px_0_0_rgba(0,0,0,0.06)] dark:bg-[rgba(10,14,22,0.55)] dark:border-white/10 dark:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] relative overflow-hidden">
           {/* Gradient rim */}
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full" style={{
             background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
@@ -73,15 +73,15 @@ export function LoadingState({
             mixBlendMode: 'overlay'
           }}></div>
           
-          <Icon className={cn("h-8 w-8 text-white/90 relative z-10", Icon === Loader2 && "animate-spin")} />
+          <Icon className={cn("h-8 w-8 text-black/80 dark:text-white/90 relative z-10", Icon === Loader2 && "animate-spin")} />
         </div>
         
-        <h3 className="text-xl font-semibold mb-4 text-white/90">
+        <h3 className="text-xl font-semibold mb-4 text-black/90 dark:text-white/90">
           {title}
         </h3>
         
         {filePath && (
-          <div className="bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] rounded-lg p-4 w-full text-center mb-6 relative overflow-hidden">
+          <div className="bg-white/80 backdrop-blur-2xl border border-black/10 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(0,0,0,0.1)] dark:bg-[rgba(10,14,22,0.55)] dark:border-white/10 dark:shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] rounded-lg p-4 w-full text-center mb-6 relative overflow-hidden">
             {/* Gradient rim */}
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg" style={{
               background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
@@ -106,7 +106,7 @@ export function LoadingState({
               mixBlendMode: 'overlay'
             }}></div>
             
-            <code className="text-sm font-mono text-white/90 break-all relative z-10">
+            <code className="text-sm font-mono text-black/90 dark:text-white/90 break-all relative z-10">
               {filePath}
             </code>
           </div>
@@ -115,7 +115,7 @@ export function LoadingState({
         {showProgress && (
           <div className="space-y-3">
             <Progress value={Math.min(progress, 100)} className="w-full h-1" />
-            <div className="flex justify-between items-center text-xs text-white/70">
+            <div className="flex justify-between items-center text-xs text-black/70 dark:text-white/70">
               <span>{progressText || 'Processing...'}</span>
               <span className="font-mono">{Math.round(Math.min(progress, 100))}%</span>
             </div>
@@ -123,7 +123,7 @@ export function LoadingState({
         )}
         
         {subtitle && (
-          <p className="text-sm text-white/70 mt-4">
+          <p className="text-sm text-black/70 dark:text-white/70 mt-4">
             {subtitle}
           </p>
         )}

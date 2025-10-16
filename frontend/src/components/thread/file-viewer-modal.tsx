@@ -1217,7 +1217,7 @@ export function FileViewerModal({
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent 
-        className="sm:max-w-[90vw] md:max-w-[1200px] w-[95vw] h-[90vh] max-h-[900px] flex flex-col p-0 gap-0 overflow-hidden rounded-3xl border border-blue-500/10 bg-[rgba(15,23,42,0.12)] backdrop-blur-md shadow-[0_20px_60px_-10px_rgba(0,0,0,0.1),inset_0_1px_0_0_rgba(59,130,246,0.05)] !top-[50%] !left-[50%] !translate-x-[-50%] !translate-y-[-50%]"
+        className="sm:max-w-[90vw] md:max-w-[1200px] w-[95vw] h-[90vh] max-h-[900px] flex flex-col p-0 gap-0 overflow-hidden rounded-3xl border border-blue-500/10 bg-[rgba(15,23,42,0.12)] backdrop-blur-md shadow-[0_20px_60px_-10px_rgba(0,0,0,0.1),inset_0_1px_0_0_rgba(59,130,246,0.05)] !top-[50%] !left-[50%] !translate-x-[-50%] !translate-y-[-50%] light:bg-[rgba(255,255,255,0.4)] light:backdrop-blur-2xl"
       >
         {/* Gradient rim */}
         <div

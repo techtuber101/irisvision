@@ -4,6 +4,7 @@
 @plugin 'tailwind-scrollbar-hide';
 
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant light (&:where(.light, .light *));
 
 @theme inline {
   --color-background: var(--background);
@@ -561,14 +562,20 @@
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.625rem;
-  --sidebar: oklch(98.46% 0.002 247.84);
+  --sidebar: rgba(255, 255, 255, 0.7);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent: rgba(255, 255, 255, 0.1);
   --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-border: rgba(255, 255, 255, 0.2);
   --sidebar-ring: oklch(0.708 0 0);
+  --light-shadow: 0 0 35px rgba(0, 0, 0, 0.1), 0 0 70px rgba(0, 0, 0, 0.05);
+  --dark-shadow: 0 0 35px rgba(255, 255, 255, 0.25), 0 0 70px rgba(255, 255, 255, 0.12);
+  --light-gradient: linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02) 30%, rgba(0,0,0,0.05) 85%, rgba(0,0,0,0.03));
+  --dark-gradient: linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06));
+  --light-streak: linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.03) 45%, rgba(0,0,0,0) 100%);
+  --dark-streak: linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%);
 }
 
 .dark {
@@ -618,6 +625,45 @@
   * {
     @apply border-border outline-ring/50;
     font-family: inherit;
+  }
+  
+  /* Dynamic text shadow for theme switching */
+  [data-light-shadow][data-dark-shadow] {
+    transition: text-shadow 0.3s ease;
+  }
+  
+  .light [data-light-shadow][data-dark-shadow] {
+    text-shadow: var(--light-shadow);
+  }
+  
+  .dark [data-light-shadow][data-dark-shadow] {
+    text-shadow: var(--dark-shadow);
+  }
+  
+  /* Dynamic gradient for chat input */
+  [data-light-gradient][data-dark-gradient] {
+    transition: background 0.3s ease;
+  }
+  
+  .light [data-light-gradient][data-dark-gradient] {
+    background: var(--light-gradient) !important;
+  }
+  
+  .dark [data-light-gradient][data-dark-gradient] {
+    background: var(--dark-gradient) !important;
+  }
+  
+  /* Dynamic specular streak for chat input */
+  [data-light-streak][data-dark-streak] {
+    transition: background 0.3s ease;
+  }
+  
+  .light [data-light-streak][data-dark-streak] {
+    background: var(--light-streak) !important;
+  }
+  
+  .dark [data-light-streak][data-dark-streak] {
+    background: var(--dark-streak) !important;
   }
   html {
     font-family: var(--font-sans);

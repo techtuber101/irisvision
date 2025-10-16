@@ -111,7 +111,7 @@ export function WebSearchToolView({
               <Search className="w-5 h-5 text-blue-400 relative z-10" />
             </div>
             <div>
-              <CardTitle className="text-base font-medium text-white/90">
+              <CardTitle className="text-base font-medium text-white/90 light:text-zinc-800">
                 {toolTitle}
               </CardTitle>
             </div>
@@ -185,7 +185,7 @@ export function WebSearchToolView({
                       return (
                         <div
                           key={`result-${item.index}`}
-                          className="relative bg-white/5 border border-white/10 rounded-2xl backdrop-blur-sm hover:bg-white/10 transition-colors overflow-hidden"
+                          className="relative bg-white/5 border border-white/10 rounded-2xl backdrop-blur-sm hover:bg-white/10 transition-all duration-300 overflow-hidden light:bg-white/10 light:border-white/20 light:backdrop-blur-2xl light:hover:bg-white/15"
                         >
                           {/* Gradient rim */}
                           <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl" style={{
@@ -195,14 +195,20 @@ export function WebSearchToolView({
                             maskComposite: 'exclude',
                             padding: '1px',
                             borderRadius: '16px'
-                          }} />
+                          }} 
+                          data-light-gradient="linear-gradient(180deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05) 30%, rgba(255,255,255,0.10) 85%, rgba(255,255,255,0.08))"
+                          data-dark-gradient="linear-gradient(180deg, rgba(173,216,255,0.08), rgba(255,255,255,0.02) 30%, rgba(150,160,255,0.06) 85%, rgba(255,255,255,0.03))"
+                          />
                           
                           {/* Specular streak */}
                           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-8" style={{
                             background: 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03) 45%, rgba(255,255,255,0) 100%)',
                             filter: 'blur(3px)',
                             mixBlendMode: 'screen'
-                          }} />
+                          }} 
+                          data-light-streak="linear-gradient(180deg, rgba(255,255,255,0.20), rgba(255,255,255,0.08) 45%, rgba(255,255,255,0) 100%)"
+                          data-dark-streak="linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03) 45%, rgba(255,255,255,0) 100%)"
+                          />
                           
                           {/* Fine noise */}
                           <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-10" style={{
@@ -225,7 +231,7 @@ export function WebSearchToolView({
                               )}
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <Badge variant="outline" className="text-xs px-2 py-0 h-5 font-normal bg-white/10 border-white/20 text-white/80">
+                                  <Badge variant="outline" className="text-xs px-2 py-0 h-5 font-normal bg-white/10 border-white/20 text-white/80 light:bg-white/20 light:border-white/30 light:text-zinc-800">
                                     <ResultTypeIcon className="h-3 w-3 mr-1 opacity-70" />
                                     {resultTypeLabel}
                                   </Badge>
@@ -238,7 +244,7 @@ export function WebSearchToolView({
                                 >
                                   {truncateString(cleanUrl(result.title), 50)}
                                 </a>
-                                <div className="text-xs text-white/60 mb-2 flex items-center">
+                                <div className="text-xs text-white/60 light:text-zinc-600 mb-2 flex items-center">
                                   <Globe className="h-3 w-3 mr-1.5 flex-shrink-0 opacity-70" />
                                   {truncateString(cleanUrl(result.url), 70)}
                                 </div>
@@ -249,7 +255,7 @@ export function WebSearchToolView({
                                 {/* Ask Iris Button */}
                                 <div className="group relative">
                                   <button
-                                    className="w-8 h-8 rounded-full bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 transition-all duration-200 relative overflow-hidden flex items-center justify-center"
+                                    className="w-8 h-8 rounded-full bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 transition-all duration-200 relative overflow-hidden flex items-center justify-center light:bg-white/20 light:border-white/30 light:text-zinc-800 light:hover:bg-white/30"
                                     onClick={() => {
                                       if (onSubmit) {
                                         const message = `Iris, analyze this web search you just did and tell me what you found in it and it's significance - ${result.url}`;
@@ -312,7 +318,7 @@ export function WebSearchToolView({
                                     href={result.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="w-8 h-8 rounded-full bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 transition-all duration-200 relative overflow-hidden flex items-center justify-center block"
+                                    className="w-8 h-8 rounded-full bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 transition-all duration-200 relative overflow-hidden flex items-center justify-center block light:bg-white/20 light:border-white/30 light:text-zinc-800 light:hover:bg-white/30"
                                   >
                                     {/* Gradient rim */}
                                     <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full" style={{
@@ -378,13 +384,13 @@ export function WebSearchToolView({
                                 mixBlendMode: 'overlay'
                               }} />
                               
-                              <div className="text-xs text-white/60 relative z-10">
+                              <div className="text-xs text-white/60 light:text-zinc-600 relative z-10">
                                 Source: {cleanUrl(result.url)}
                               </div>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-7 text-xs bg-white/10 border-white/20 text-white/80 hover:bg-white/20 relative z-10"
+                                className="h-7 text-xs bg-white/10 border-white/20 text-white/80 hover:bg-white/20 relative z-10 light:bg-white/20 light:border-white/30 light:text-zinc-800 light:hover:bg-white/30"
                                 asChild
                               >
                                 <a href={result.url} target="_blank" rel="noopener noreferrer">
@@ -409,7 +415,7 @@ export function WebSearchToolView({
                                 href={imageUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 transition-all duration-200 h-32"
+                                className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 transition-all duration-300 h-32 light:bg-white/10 light:border-white/20 light:backdrop-blur-2xl light:hover:bg-white/15"
                               >
                                 {/* Gradient rim */}
                                 <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl" style={{
@@ -419,14 +425,20 @@ export function WebSearchToolView({
                                   maskComposite: 'exclude',
                                   padding: '1px',
                                   borderRadius: '16px'
-                                }} />
+                                }} 
+                                data-light-gradient="linear-gradient(180deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05) 30%, rgba(255,255,255,0.10) 85%, rgba(255,255,255,0.08))"
+                                data-dark-gradient="linear-gradient(180deg, rgba(173,216,255,0.08), rgba(255,255,255,0.02) 30%, rgba(150,160,255,0.06) 85%, rgba(255,255,255,0.03))"
+                                />
                                 
                                 {/* Specular streak */}
                                 <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-8" style={{
                                   background: 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03) 45%, rgba(255,255,255,0) 100%)',
                                   filter: 'blur(3px)',
                                   mixBlendMode: 'screen'
-                                }} />
+                                }} 
+                                data-light-streak="linear-gradient(180deg, rgba(255,255,255,0.20), rgba(255,255,255,0.08) 45%, rgba(255,255,255,0) 100%)"
+                                data-dark-streak="linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03) 45%, rgba(255,255,255,0) 100%)"
+                                />
                                 
                                 {/* Fine noise */}
                                 <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-10" style={{
@@ -466,15 +478,15 @@ export function WebSearchToolView({
             <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-gradient-to-b from-white/10 to-white/5 border border-white/10 backdrop-blur-sm">
               <Search className="h-10 w-10 text-white/40" />
             </div>
-            <h3 className="text-xl font-semibold mb-2 text-white/90">
+            <h3 className="text-xl font-semibold mb-2 text-white/90 light:text-zinc-800">
               No Results Found
             </h3>
             <div className="bg-white/10 border border-white/20 rounded-lg p-4 w-full max-w-md text-center mb-4 backdrop-blur-sm">
-              <code className="text-sm font-mono text-white/70 break-all">
+              <code className="text-sm font-mono text-white/70 light:text-zinc-700 break-all">
                 {query || 'Unknown query'}
               </code>
             </div>
-            <p className="text-sm text-white/60">
+            <p className="text-sm text-white/60 light:text-zinc-600">
               Try refining your search query for better results
             </p>
           </div>
@@ -482,17 +494,17 @@ export function WebSearchToolView({
       </CardContent>
 
       <div className="px-4 py-2 h-10 bg-white/5 backdrop-blur-sm border-t border-white/10 flex justify-between items-center gap-4 relative z-10">
-        <div className="h-full flex items-center gap-2 text-sm text-white/60">
+        <div className="h-full flex items-center gap-2 text-sm text-white/60 light:text-zinc-600">
           {!isStreaming && (
             <>
               {name === 'image-search' && images.length > 0 && (
-                <Badge variant="outline" className="h-6 py-0.5 bg-white/10 border-white/20 text-white/80">
+                <Badge variant="outline" className="h-6 py-0.5 bg-white/10 border-white/20 text-white/80 light:bg-black/5 light:border-black/10 light:text-zinc-700">
                   <ImageIcon className="h-3 w-3" />
                   {images.length} images
                 </Badge>
               )}
               {name !== 'image-search' && searchResults.length > 0 && (
-                <Badge variant="outline" className="h-6 py-0.5 bg-white/10 border-white/20 text-white/80">
+                <Badge variant="outline" className="h-6 py-0.5 bg-white/10 border-white/20 text-white/80 light:bg-black/5 light:border-black/10 light:text-zinc-700">
                   <Globe className="h-3 w-3" />
                   {searchResults.length} results
                 </Badge>
@@ -501,7 +513,7 @@ export function WebSearchToolView({
           )}
         </div>
 
-        <div className="text-xs text-white/60">
+        <div className="text-xs text-white/60 light:text-zinc-600">
           {actualToolTimestamp && !isStreaming
             ? formatTimestamp(actualToolTimestamp)
             : actualAssistantTimestamp

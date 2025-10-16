@@ -404,7 +404,7 @@ export function BrowserToolView({
       </CardHeader>
 
       <CardContent className="p-0 flex-1 overflow-hidden relative" style={{ height: 'calc(100vh - 150px)'}}>
-        <div className="flex-1 flex h-full items-center overflow-scroll bg-white dark:bg-black">
+        <div className="flex-1 flex h-full items-center overflow-scroll bg-white dark:bg-black light:bg-white/50 light:backdrop-blur-sm light:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.05)]">
           {showContext && (result || parameters) ? (
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {parameters && <JsonViewer
@@ -422,7 +422,7 @@ export function BrowserToolView({
           :(screenshotUrl || screenshotBase64) ? (
             renderScreenshot()
           ) : (
-            <div className="p-8 flex flex-col items-center justify-center w-full bg-gradient-to-b from-white to-zinc-50 dark:from-zinc-950 dark:to-zinc-900 text-zinc-700 dark:text-zinc-400 min-h-600">
+            <div className="p-8 flex flex-col items-center justify-center w-full bg-gradient-to-b from-white to-zinc-50 dark:from-zinc-950 dark:to-zinc-900 light:from-white/80 light:to-zinc-50/80 light:backdrop-blur-sm text-zinc-700 dark:text-zinc-400 light:text-zinc-800 min-h-600">
               <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-gradient-to-b from-purple-100 to-purple-50 shadow-inner dark:from-purple-800/40 dark:to-purple-900/60">
                 <MonitorPlay className="h-10 w-10 text-purple-400 dark:text-purple-600" />
               </div>

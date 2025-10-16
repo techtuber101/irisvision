@@ -203,176 +203,136 @@ export function NavUserWithTeams({
               </SidebarMenuButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-(--radix-dropdown-menu-trigger-width) min-w-56"
+              className="w-56 p-5 rounded-2xl border border-black/10 bg-white/95 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 shadow-[0_10px_20px_-10px_rgba(0,0,0,0.1)] dark:border-white/10 dark:bg-[rgba(7,10,17,0.95)] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] dark:shadow-[0_10px_20px_-10px_rgba(0,0,0,0.6)]"
               side={isMobile ? 'bottom' : 'top'}
-              align="start"
-              sideOffset={4}
+              align="center"
+              sideOffset={8}
             >
-              <DropdownMenuLabel className="p-0 font-normal">
-                <div className="flex items-center gap-2 px-1.5 py-1.5 text-left text-sm">
-                  <Avatar className="h-8 w-8 rounded-lg">
-                    <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback className="rounded-lg">
-                      {getInitials(user.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">{user.name}</span>
-                    <span className="truncate text-xs">{user.email}</span>
+              {/* Iris Header */}
+              <header className="mb-4 flex items-center gap-2">
+                <div className="h-6 w-6 rounded-full bg-black/10 ring-1 ring-black/20 flex items-center justify-center dark:bg-white/10 dark:ring-white/20">
+                  <img src="/irissymbolwhite.png" alt="Iris Logo" className="h-4 w-4 brightness-0 dark:invert" />
+                </div>
+                <h3 className="text-sm font-medium text-black/80 dark:text-white/80">Iris</h3>
+              </header>
+              
+              {/* User Info Section */}
+              <div className="relative">
+                <div className="relative rounded-2xl border border-black/10 bg-black/5 p-3 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)] transition-all duration-300 dark:border-white/10 dark:bg-white/5 dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10 rounded-xl ring-1 ring-black/10 dark:ring-white/10">
+                      <AvatarImage src={user.avatar} alt={user.name} />
+                      <AvatarFallback className="rounded-xl bg-black/10 text-black/80 dark:bg-white/10 dark:text-white/80">
+                        {getInitials(user.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-black/90 truncate dark:text-white/90">{user.name}</div>
+                      <div className="text-xs text-black/60 truncate dark:text-white/60">{user.email}</div>
+                    </div>
                   </div>
                 </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
+              </div>
 
               {/* Teams Section */}
-              {personalAccount && (
-                <>
-                  <DropdownMenuLabel className="text-muted-foreground text-xs">
-                    Personal Account
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem
-                    key={personalAccount.account_id}
-                    onClick={() =>
-                      handleTeamSelect({
-                        name: personalAccount.name,
-                        logo: Command,
-                        plan: 'Personal',
-                        account_id: personalAccount.account_id,
-                        slug: personalAccount.slug,
-                        personal_account: true,
-                      })
-                    }
-                    className="gap-2 p-2"
-                  >
-                    <div className="flex size-6 items-center justify-center rounded-xs border">
-                      <Command className="size-4 shrink-0" />
-                    </div>
-                    {personalAccount.name}
-                    <DropdownMenuShortcut>⌘1</DropdownMenuShortcut>
-                  </DropdownMenuItem>
-                </>
-              )}
-
               {teamAccounts?.length > 0 && (
-                <>
-                  <DropdownMenuLabel className="text-muted-foreground text-xs mt-2">
-                    Teams
-                  </DropdownMenuLabel>
-                  {teamAccounts.map((team, index) => (
-                    <DropdownMenuItem
-                      key={team.account_id}
-                      onClick={() =>
-                        handleTeamSelect({
-                          name: team.name,
-                          logo: AudioWaveform,
-                          plan: 'Team',
-                          account_id: team.account_id,
-                          slug: team.slug,
-                          personal_account: false,
-                        })
-                      }
-                      className="gap-2 p-2"
-                    >
-                      <div className="flex size-6 items-center justify-center rounded-xs border">
-                        <AudioWaveform className="size-4 shrink-0" />
-                      </div>
-                      {team.name}
-                      <DropdownMenuShortcut>⌘{index + 2}</DropdownMenuShortcut>
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-
-              {/* <DropdownMenuSeparator />
-              <DialogTrigger asChild>
-                <DropdownMenuItem 
-                  className="gap-2 p-2"
-                  onClick={() => {
-                    setShowNewTeamDialog(true)
-                  }}
-                >
-                  <div className="bg-background flex size-6 items-center justify-center rounded-md border">
-                    <Plus className="size-4" />
+                <div className="mt-4 space-y-2">
+                  <div className="rounded-2xl border border-black/10 bg-black/5 p-2 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)] transition-all duration-300 hover:bg-black/8 hover:border-black/15 dark:border-white/10 dark:bg-white/5 dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] dark:hover:bg-white/8 dark:hover:border-white/15">
+                    <div className="text-xs text-black/50 mb-2 px-1 dark:text-white/50">Teams</div>
+                    <div className="space-y-1">
+                      {teamAccounts.map((team, index) => (
+                        <DropdownMenuItem
+                          key={team.account_id}
+                          onClick={() =>
+                            handleTeamSelect({
+                              name: team.name,
+                              logo: AudioWaveform,
+                              plan: 'Team',
+                              account_id: team.account_id,
+                              slug: team.slug,
+                              personal_account: false,
+                            })
+                          }
+                          className="h-auto p-3 rounded-xl bg-black/5 border border-black/10 text-black/80 hover:bg-black/10 hover:border-black/20 transition-all duration-200 focus:bg-black/10 focus:border-black/20 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:border-white/20 dark:focus:bg-white/10 dark:focus:border-white/20 flex items-center"
+                        >
+                          <div className="flex size-6 items-center justify-center rounded-xs border border-black/20 bg-black/10 dark:border-white/20 dark:bg-white/10 flex-shrink-0 mr-3">
+                            <AudioWaveform className="size-4 shrink-0 text-black/80 dark:text-white/80" />
+                          </div>
+                          <span className="text-sm flex-1">{team.name}</span>
+                          <DropdownMenuShortcut className="text-black/50 dark:text-white/50">⌘{index + 1}</DropdownMenuShortcut>
+                        </DropdownMenuItem>
+                      ))}
+                    </div>
                   </div>
-                  <div className="text-muted-foreground font-medium">Add team</div>
-                </DropdownMenuItem>
-              </DialogTrigger> */}
-              <DropdownMenuSeparator />
+                </div>
+              )}
 
               {/* User Settings Section */}
-              <DropdownMenuGroup>
+              <div className="mt-4 space-y-2">
+                {/* Admin Section */}
                 {user.isAdmin && (
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
-                      <Shield className="h-4 w-4 mr-2" />
-                      <span>Admin</span>
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuPortal>
-                      <DropdownMenuSubContent>
-                        <DropdownMenuItem asChild>
-                          <Link href="/admin/billing">
-                            <DollarSign className="h-4 w-4" />
-                            Billing Management
-                          </Link>
-                        </DropdownMenuItem>
-                      </DropdownMenuSubContent>
-                    </DropdownMenuPortal>
-                  </DropdownMenuSub>
+                  <div className="rounded-2xl border border-black/10 bg-black/5 p-2 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)] transition-all duration-300 hover:bg-black/8 hover:border-black/15 dark:border-white/10 dark:bg-white/5 dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] dark:hover:bg-white/8 dark:hover:border-white/15">
+                    <div className="text-xs text-black/50 mb-2 px-1 dark:text-white/50">Admin</div>
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger className="h-auto p-3 rounded-xl bg-black/5 border border-black/10 text-black/80 hover:bg-black/10 hover:border-black/20 transition-all duration-200 focus:bg-black/10 focus:border-black/20 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:border-white/20 dark:focus:bg-white/10 dark:focus:border-white/20 flex items-center">
+                        <Shield className="h-4 w-4 mr-3 flex-shrink-0" />
+                        <span className="text-sm">Admin Panel</span>
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuSubContent className="rounded-2xl border border-black/10 bg-white/95 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)] backdrop-blur-xl dark:border-white/10 dark:bg-[rgba(7,10,17,0.95)] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
+                          <DropdownMenuItem asChild className="h-auto p-3 rounded-xl bg-black/5 border border-black/10 text-black/80 hover:bg-black/10 hover:border-black/20 transition-all duration-200 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:border-white/20 flex items-center">
+                            <Link href="/admin/billing" className="flex items-center">
+                              <DollarSign className="h-4 w-4 mr-3 flex-shrink-0" />
+                              <span className="text-sm">Billing Management</span>
+                            </Link>
+                          </DropdownMenuItem>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenuSub>
+                  </div>
                 )}
                 
-                <DropdownMenuItem onClick={() => setShowBillingModal(true)}>
-                  <Zap className="h-4 w-4" />
-                  Upgrade
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/settings/billing">
-                    <CreditCard className="h-4 w-4" />
-                    Billing
-                  </Link>
-                </DropdownMenuItem>
-                {(
-                  <DropdownMenuItem asChild>
-                    <Link href="/settings/credentials">
-                      <Plug className="h-4 w-4" />
-                      Integrations
-                    </Link>
-                  </DropdownMenuItem>
-                )}
-                {(
-                  <DropdownMenuItem asChild>
-                    <Link href="/settings/api-keys">
-                      <Key className="h-4 w-4" />
-                      API Keys (Admin)
-                    </Link>
-                  </DropdownMenuItem>
-                )}
-                {isLocalMode() && <DropdownMenuItem asChild>
-                  <Link href="/settings/env-manager">
-                    <KeyRound className="h-4 w-4" />
-                    Local .Env Manager
-                  </Link>
-                </DropdownMenuItem>}
-                {/* <DropdownMenuItem asChild>
-                  <Link href="/settings">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Settings
-                  </Link>
-                </DropdownMenuItem> */}
-                <DropdownMenuItem
-                  onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                >
-                  <div className="flex items-center gap-2">
-                    <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                    <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                    <span>Theme</span>
+                {/* Settings Section */}
+                <div className="rounded-2xl border border-black/10 bg-black/5 p-2 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)] transition-all duration-300 hover:bg-black/8 hover:border-black/15 dark:border-white/10 dark:bg-white/5 dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] dark:hover:bg-white/8 dark:hover:border-white/15">
+                  <div className="text-xs text-black/50 mb-2 px-1 dark:text-white/50">Settings</div>
+                  <div className="space-y-1">
+                    <DropdownMenuItem onClick={() => setShowBillingModal(true)} className="h-auto p-3 rounded-xl bg-black/5 border border-black/10 text-black/80 hover:bg-black/10 hover:border-black/20 transition-all duration-200 focus:bg-black/10 focus:border-black/20 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:border-white/20 dark:focus:bg-white/10 dark:focus:border-white/20 flex items-center">
+                      <Zap className="h-4 w-4 mr-3 flex-shrink-0" />
+                      <span className="text-sm">Upgrade</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="h-auto p-3 rounded-xl bg-black/5 border border-black/10 text-black/80 hover:bg-black/10 hover:border-black/20 transition-all duration-200 focus:bg-black/10 focus:border-black/20 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:border-white/20 dark:focus:bg-white/10 dark:focus:border-white/20 flex items-center">
+                      <Link href="/settings/billing" className="flex items-center">
+                        <CreditCard className="h-4 w-4 mr-3 flex-shrink-0" />
+                        <span className="text-sm">Billing</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="h-auto p-3 rounded-xl bg-black/5 border border-black/10 text-black/80 hover:bg-black/10 hover:border-black/20 transition-all duration-200 focus:bg-black/10 focus:border-black/20 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:border-white/20 dark:focus:bg-white/10 dark:focus:border-white/20 flex items-center">
+                      <Link href="/settings/credentials" className="flex items-center">
+                        <Plug className="h-4 w-4 mr-3 flex-shrink-0" />
+                        <span className="text-sm">Integrations</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                      className="h-auto p-3 rounded-xl bg-black/5 border border-black/10 text-black/80 hover:bg-black/10 hover:border-black/20 transition-all duration-200 focus:bg-black/10 focus:border-black/20 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:border-white/20 dark:focus:bg-white/10 dark:focus:border-white/20 flex items-center"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                        <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                        <span className="text-sm ml-2">Theme</span>
+                      </div>
+                    </DropdownMenuItem>
                   </div>
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className='text-destructive focus:text-destructive focus:bg-destructive/10' onClick={handleLogout}>
-                <LogOut className="h-4 w-4 text-destructive" />
-                Log out
-              </DropdownMenuItem>
+                </div>
+
+                {/* Logout Section */}
+                <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-2 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)] transition-all duration-300 hover:bg-red-500/15 hover:border-red-500/30 dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
+                  <DropdownMenuItem className="h-auto p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 hover:bg-red-500/20 hover:border-red-500/30 transition-all duration-200 focus:bg-red-500/20 focus:border-red-500/30 dark:text-red-400 flex items-center" onClick={handleLogout}>
+                    <LogOut className="h-4 w-4 mr-3 flex-shrink-0" />
+                    <span className="text-sm">Log out</span>
+                  </DropdownMenuItem>
+                </div>
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
         </SidebarMenuItem>

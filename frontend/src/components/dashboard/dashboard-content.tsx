@@ -284,12 +284,28 @@ export function DashboardContent() {
         showUsageLimitAlert={true}
       />
 
-      <div className="flex flex-col h-screen w-full overflow-hidden relative bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl">
-        {/* White checkered pattern background */}
-        <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{
+      <div className="flex flex-col h-screen w-full overflow-hidden relative bg-[rgba(255,255,255,0.7)] backdrop-blur-2xl dark:bg-[rgba(10,14,22,0.55)] light:bg-[rgba(255,255,255,0.7)]">
+        {/* Dark mode checkered pattern background */}
+        <div className="absolute inset-0 opacity-[0.04] pointer-events-none dark:opacity-[0.04]" style={{
           backgroundImage: `
             linear-gradient(to right, rgba(255, 255, 255, 0.5) 1px, transparent 1px),
             linear-gradient(to bottom, rgba(255, 255, 255, 0.5) 1px, transparent 1px)
+          `,
+          backgroundSize: '40px 40px'
+        }}></div>
+        
+        {/* Light mode glassmorphism background */}
+        <div className="absolute inset-0 opacity-0 dark:opacity-0 light:opacity-100 pointer-events-none" style={{
+          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+        }}></div>
+        
+        {/* Light mode checkered pattern background */}
+        <div className="absolute inset-0 opacity-0 dark:opacity-0 light:opacity-[0.12] pointer-events-none" style={{
+          backgroundImage: `
+            linear-gradient(to right, rgba(0, 0, 0, 0.2) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(0, 0, 0, 0.2) 1px, transparent 1px)
           `,
           backgroundSize: '40px 40px'
         }}></div>
@@ -317,9 +333,10 @@ export function DashboardContent() {
                           className="tracking-tight text-2xl md:text-3xl font-normal text-foreground/90 text-center relative z-10"
                           style={{ 
                             fontFamily: 'Geist, -apple-system, BlinkMacSystemFont, sans-serif', 
-                            fontWeight: 400,
-                            textShadow: '0 0 35px rgba(255, 255, 255, 0.25), 0 0 70px rgba(255, 255, 255, 0.12)'
+                            fontWeight: 400
                           }}
+                          data-light-shadow
+                          data-dark-shadow
                         >
                           Iris is ready, are you?
                         </p>

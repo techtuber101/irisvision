@@ -147,7 +147,7 @@ export function ExecuteDataProviderCallToolView({
         {isStreaming ? (
           <div className="flex flex-col items-center justify-center h-full py-8 px-6">
             <div className="text-center w-full max-w-xs">
-              <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] relative overflow-hidden">
+              <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-white/80 backdrop-blur-2xl border border-black/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.1),inset_0_1px_0_0_rgba(0,0,0,0.06)] dark:bg-[rgba(10,14,22,0.55)] dark:border-white/10 dark:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] relative overflow-hidden">
                 {/* Gradient rim */}
                 <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full" style={{
                   background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
@@ -172,12 +172,12 @@ export function ExecuteDataProviderCallToolView({
                   mixBlendMode: 'overlay'
                 }}></div>
                 
-                <Loader2 className="h-8 w-8 animate-spin text-white/90 relative z-10" />
+                <Loader2 className="h-8 w-8 animate-spin text-black/80 dark:text-white/90 relative z-10" />
               </div>
-              <h3 className="text-base font-medium text-white/90 mb-2">
+              <h3 className="text-base font-medium text-black/90 dark:text-white/90 mb-2">
                 Executing call...
               </h3>
-              <p className="text-sm text-white/70">
+              <p className="text-sm text-black/70 dark:text-white/70">
                 Calling {serviceName || 'data provider'}
               </p>
             </div>

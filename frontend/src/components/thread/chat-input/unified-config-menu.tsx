@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Cpu, Search, Check, ChevronDown, Plus, ExternalLink, Loader2 } from 'lucide-react';
+import { Cpu, Search, Check, ChevronDown, Plus, ExternalLink, Loader2, WandSparkles } from 'lucide-react';
 import { useAgents } from '@/hooks/react-query/agents/use-agents';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 import type { ModelOption } from '@/hooks/use-model-selection';
@@ -30,6 +30,7 @@ import { NewAgentDialog } from '@/components/agents/new-agent-dialog';
 import { AgentAvatar } from '@/components/thread/content/agent-avatar';
 import { AgentModelSelector } from '@/components/agents/config/model-selector';
 import { AgentConfigurationDialog } from '@/components/agents/agent-configuration-dialog';
+import { simpleChatStream } from '@/lib/simple-chat';
 
 type UnifiedConfigMenuProps = {
     isLoggedIn?: boolean;
@@ -46,6 +47,10 @@ type UnifiedConfigMenuProps = {
     canAccessModel: (modelId: string) => boolean;
     refreshCustomModels?: () => void;
     onUpgradeRequest?: () => void;
+    
+    // Enhance Vision
+    currentInputValue?: string;
+    onInputChange?: (value: string) => void;
 };
 
 const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMenu({
@@ -58,13 +63,54 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
     canAccessModel,
     subscriptionStatus,
     onUpgradeRequest,
+    currentInputValue = '',
+    onInputChange,
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [allAgents, setAllAgents] = useState<any[]>([]);
+    const [isEnhancing, setIsEnhancing] = useState(false);
     const searchContainerRef = useRef<HTMLDivElement>(null);
+
+    const handleEnhanceVision = useCallback(async () => {
+        if (!currentInputValue.trim() || !onInputChange) {
+            return;
+        }
+
+        setIsEnhancing(true);
+        let enhancedContent = '';
+
+        try {
+            const enhancementPrompt = `please generate an enhanced prompt of the following prompt, answer directly only the prompt, make prompt 10 lines. After the initial paragraph, write in bullet points.\n\n${currentInputValue}`;
+
+            await simpleChatStream(enhancementPrompt, {
+                onContent: (content: string) => {
+                    enhancedContent += content;
+                    // Stream the enhanced content back to the input
+                    onInputChange(enhancedContent);
+                },
+                onDone: () => {
+                    setIsEnhancing(false);
+                    // Keep the popup open - don't close it automatically
+                },
+                onError: (error: string) => {
+                    console.error('Enhancement error:', error);
+                    setIsEnhancing(false);
+                    // Reset to original content on error
+                    onInputChange(currentInputValue);
+                    // Keep the popup open even on error
+                }
+            });
+        } catch (error) {
+            console.error('Enhancement failed:', error);
+            setIsEnhancing(false);
+            // Reset to original content on error
+            onInputChange(currentInputValue);
+            // Keep the popup open even on error
+        }
+    }, [currentInputValue, onInputChange]);
     const [integrationsOpen, setIntegrationsOpen] = useState(false);
     const [showNewAgentDialog, setShowNewAgentDialog] = useState(false);
     const searchInputRef = useRef<HTMLInputElement>(null);
@@ -209,10 +255,49 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
                     </Button>
                 </DropdownMenuTrigger>
 
-                <DropdownMenuContent align="end" className="w-80 p-0" sideOffset={6}>
-                    <div className="p-2" ref={searchContainerRef}>
+                <DropdownMenuContent align="end" className="w-80 p-0 rounded-2xl border border-black/20 bg-gradient-to-br from-white/20 via-white/10 to-white/20 backdrop-blur-2xl shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.2),inset_0_0_0_1px_rgba(0,0,0,0.1)] dark:border-white/10 dark:bg-gradient-to-br dark:from-white/5 dark:via-white/2 dark:to-white/5 dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.1),inset_0_0_0_1px_rgba(255,255,255,0.1)] transition-all duration-300 relative overflow-hidden" sideOffset={6}>
+                    {/* Advanced Glassmorphism Effects */}
+                    <div className="absolute inset-0 rounded-2xl pointer-events-none">
+                        {/* Light mode gradient overlay */}
+                        <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/30 via-white/15 to-white/25 dark:from-white/10 dark:via-transparent dark:to-white/5" />
+                        
+                        {/* Light mode specular highlight */}
+                        <div className="absolute inset-x-0 top-0 h-16 rounded-t-2xl bg-gradient-to-b from-white/40 via-white/20 to-transparent dark:from-white/20 dark:via-white/5 dark:to-transparent" />
+                        
+                        {/* Fine noise texture - different for light/dark */}
+                        <div 
+                            className="absolute inset-0 rounded-2xl opacity-30 dark:opacity-20"
+                            style={{
+                                backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                                backgroundSize: '50px 50px',
+                                mixBlendMode: 'overlay'
+                            }}
+                        />
+                        
+                        {/* Light mode rim lighting */}
+                        <div className="absolute inset-0 rounded-2xl" style={{
+                            background: 'linear-gradient(180deg, rgba(255,255,255,0.25), rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.2) 85%, rgba(255,255,255,0.15))',
+                            WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                            WebkitMaskComposite: 'xor',
+                            maskComposite: 'exclude',
+                            padding: '1px',
+                            borderRadius: '16px'
+                        }} />
+                        
+                        {/* Dark mode rim lighting */}
+                        <div className="absolute inset-0 rounded-2xl dark:block hidden" style={{
+                            background: 'linear-gradient(180deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05) 30%, rgba(255,255,255,0.1) 85%, rgba(255,255,255,0.08))',
+                            WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                            WebkitMaskComposite: 'xor',
+                            maskComposite: 'exclude',
+                            padding: '1px',
+                            borderRadius: '16px'
+                        }} />
+                    </div>
+                    
+                    <div className="p-3 relative z-10" ref={searchContainerRef}>
                         <div className="relative">
-                            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-black/60 dark:text-white/60" />
                             <input
                                 ref={searchInputRef}
                                 type="text"
@@ -220,29 +305,29 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 onKeyDown={handleSearchInputKeyDown}
-                                className="w-full h-8 pl-8 pr-2 rounded-lg text-sm bg-muted focus:outline-none"
+                                className="w-full h-10 pl-9 pr-3 rounded-xl text-sm bg-gradient-to-r from-white/25 via-white/15 to-white/25 dark:from-white/5 dark:via-white/2 dark:to-white/5 border border-black/20 dark:border-white/10 text-black/90 dark:text-white/90 placeholder:text-black/50 dark:placeholder:text-white/50 focus:outline-none focus:border-black/30 dark:focus:border-white/20 focus:bg-gradient-to-r focus:from-white/30 focus:via-white/20 focus:to-white/30 dark:focus:from-white/8 dark:focus:via-white/4 dark:focus:to-white/8 backdrop-blur-sm transition-all duration-200 relative overflow-hidden"
                             />
                         </div>
                     </div>
 
                     {/* Agents */}
                     {onAgentSelect && (
-                        <div className="px-1.5">
-                            <div className="px-3 py-1 text-[11px] font-medium text-muted-foreground flex items-center justify-between">
-                                <span>Agents</span>
+                        <div className="px-3">
+                            <div className="px-3 py-2 text-[11px] font-medium text-black/60 dark:text-white/60 flex items-center justify-between">
+                                <span>Personalities</span>
                                 <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                                    className="h-6 w-6 p-0 text-black/60 dark:text-white/60 hover:text-black/80 dark:hover:text-white/80 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-all duration-200"
                                     onClick={() => { setIsOpen(false); setShowNewAgentDialog(true); }}
                                 >
                                     <Plus className="h-3.5 w-3.5" />
                                 </Button>
                             </div>
                             {isLoading && orderedAgents.length === 0 ? (
-                                <div className="px-3 py-2 text-xs text-muted-foreground">Loading agents...</div>
+                                <div className="px-3 py-2 text-xs text-black/60 dark:text-white/60">Loading agents...</div>
                             ) : orderedAgents.length === 0 ? (
-                                <div className="px-3 py-2 text-xs text-muted-foreground">
+                                <div className="px-3 py-2 text-xs text-black/60 dark:text-white/60">
                                     {debouncedSearchQuery ? 'No agents found' : 'No agents'}
                                 </div>
                             ) : (
@@ -251,12 +336,12 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
                                         {orderedAgents.map((agent) => (
                                             <DropdownMenuItem
                                                 key={agent.agent_id}
-                                                className="text-sm px-3 py-2 mx-0 my-0.5 flex items-center justify-between cursor-pointer rounded-lg"
+                                                className="text-sm px-3 py-2 mx-0 my-0.5 flex items-center justify-between cursor-pointer rounded-xl bg-gradient-to-r from-white/20 via-white/10 to-white/20 dark:from-white/5 dark:via-white/2 dark:to-white/5 border border-black/20 dark:border-white/10 hover:bg-gradient-to-r hover:from-white/25 hover:via-white/15 hover:to-white/25 dark:hover:from-white/8 dark:hover:via-white/4 dark:hover:to-white/8 hover:border-black/30 dark:hover:border-white/20 backdrop-blur-sm transition-all duration-200 relative overflow-hidden"
                                                 onClick={() => handleAgentClick(agent.agent_id)}
                                             >
                                                 <div className="flex items-center gap-3 min-w-0 flex-1">
                                                     {renderAgentIcon(agent)}
-                                                    <span className="truncate font-medium">{agent.name}</span>
+                                                    <span className="truncate font-medium text-black/90 dark:text-white/90">{agent.name}</span>
                                                 </div>
                                                 {selectedAgentId === agent.agent_id && (
                                                     <Check className="h-4 w-4 text-blue-500 flex-shrink-0" />
@@ -265,11 +350,11 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
                                         ))}
                                     </div>
                                     {canLoadMore && (
-                                        <div className="px-1.5 pb-1">
+                                        <div className="px-3 pb-2">
                                             <Button
                                                 size="sm"
                                                 variant="ghost"
-                                                className="w-full h-8 text-xs text-muted-foreground hover:text-foreground"
+                                                className="w-full h-8 text-xs text-black/60 dark:text-white/60 hover:text-black/80 dark:hover:text-white/80 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-all duration-200"
                                                 onClick={handleLoadMore}
                                                 disabled={isFetching}
                                             >
@@ -294,50 +379,98 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
                     {onAgentSelect && <DropdownMenuSeparator className="!mt-0" />}
 
                     {/* Models */}
-                    <div className="px-1.5">
-                        <div className="px-3 py-1 text-[11px] font-medium text-muted-foreground">Models</div>
-                        <AgentModelSelector
-                            value={selectedModel}
-                            onChange={onModelChange}
-                            disabled={false}
-                            variant="menu-item"
-                        />
+                    <div className="px-3">
+                        <div className="px-3 py-2 text-[11px] font-medium text-black/60 dark:text-white/60">Models</div>
+                        <div className="px-3 pb-2">
+                            <AgentModelSelector
+                                value={selectedModel}
+                                onChange={onModelChange}
+                                disabled={false}
+                                variant="menu-item"
+                            />
+                        </div>
                     </div>
-                    <DropdownMenuSeparator />
+                    
+                    {/* Special Capabilities */}
+                    <div className="px-3">
+                        <div className="px-3 py-2 text-[11px] font-medium text-black/60 dark:text-white/60">Special Capabilities</div>
+                        <div className="px-3 pb-2">
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div>
+                                            <DropdownMenuItem
+                                                className={cn(
+                                                    "text-sm px-3 py-2 mx-0 my-0.5 flex items-center gap-2 cursor-pointer rounded-xl bg-gradient-to-r from-white/20 via-white/10 to-white/20 dark:from-white/5 dark:via-white/2 dark:to-white/5 border border-black/20 dark:border-white/10 hover:bg-gradient-to-r hover:from-white/25 hover:via-white/15 hover:to-white/25 dark:hover:from-white/8 dark:hover:via-white/4 dark:hover:to-white/8 hover:border-black/30 dark:hover:border-white/20 backdrop-blur-sm transition-all duration-200 relative overflow-hidden",
+                                                    (!currentInputValue.trim() || !onInputChange) && "opacity-50 cursor-not-allowed",
+                                                    isEnhancing && "cursor-wait"
+                                                )}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handleEnhanceVision();
+                                                }}
+                                                disabled={!currentInputValue.trim() || !onInputChange || isEnhancing}
+                                            >
+                                                {isEnhancing ? (
+                                                    <>
+                                                        <Loader2 className="h-4 w-4 text-black/80 dark:text-white/80 flex-shrink-0 animate-spin" />
+                                                        <span className="font-medium text-black/90 dark:text-white/90">Enhancing Your Vision...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <WandSparkles className="h-4 w-4 text-black/80 dark:text-white/80 flex-shrink-0" />
+                                                        <span className="font-medium text-black/90 dark:text-white/90">Enhance Your Vision</span>
+                                                    </>
+                                                )}
+                                            </DropdownMenuItem>
+                                        </div>
+                                    </TooltipTrigger>
+                                    {(!currentInputValue.trim() || !onInputChange) && (
+                                        <TooltipContent side="top" className="text-xs max-w-xs">
+                                            <p>Write some text in the chat input to enhance your prompt</p>
+                                        </TooltipContent>
+                                    )}
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
+                    </div>
+                    
+                    <DropdownMenuSeparator className="mx-3" />
                     {onAgentSelect && (selectedAgentId || displayAgent?.agent_id) && (
-                        <div className="px-1.5">
+                        <div className="px-3">
                             <DropdownMenuItem
-                                className="text-sm px-3 py-2 mx-0 my-0.5 flex items-center gap-2 cursor-pointer rounded-lg"
+                                className="text-sm px-3 py-2 mx-0 my-0.5 flex items-center gap-2 cursor-pointer rounded-xl bg-gradient-to-r from-white/20 via-white/10 to-white/20 dark:from-white/5 dark:via-white/2 dark:to-white/5 border border-black/20 dark:border-white/10 hover:bg-gradient-to-r hover:from-white/25 hover:via-white/15 hover:to-white/25 dark:hover:from-white/8 dark:hover:via-white/4 dark:hover:to-white/8 hover:border-black/30 dark:hover:border-white/20 backdrop-blur-sm transition-all duration-200 relative overflow-hidden"
                                 onClick={() => handleQuickAction('instructions')}
                             >
-                                <span className="font-medium">Instructions</span>
+                                <span className="font-medium text-black/90 dark:text-white/90">Instructions</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                                className="text-sm px-3 py-2 mx-0 my-0.5 flex items-center gap-2 cursor-pointer rounded-lg"
+                                className="text-sm px-3 py-2 mx-0 my-0.5 flex items-center gap-2 cursor-pointer rounded-xl bg-gradient-to-r from-white/20 via-white/10 to-white/20 dark:from-white/5 dark:via-white/2 dark:to-white/5 border border-black/20 dark:border-white/10 hover:bg-gradient-to-r hover:from-white/25 hover:via-white/15 hover:to-white/25 dark:hover:from-white/8 dark:hover:via-white/4 dark:hover:to-white/8 hover:border-black/30 dark:hover:border-white/20 backdrop-blur-sm transition-all duration-200 relative overflow-hidden"
                                 onClick={() => handleQuickAction('tools')}
                             >
-                                <span className="font-medium">Tools</span>
+                                <span className="font-medium text-black/90 dark:text-white/90">Tools</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                                className="text-sm px-3 py-2 mx-0 my-0.5 flex items-center gap-2 cursor-pointer rounded-lg"
+                                className="text-sm px-3 py-2 mx-0 my-0.5 flex items-center gap-2 cursor-pointer rounded-xl bg-gradient-to-r from-white/20 via-white/10 to-white/20 dark:from-white/5 dark:via-white/2 dark:to-white/5 border border-black/20 dark:border-white/10 hover:bg-gradient-to-r hover:from-white/25 hover:via-white/15 hover:to-white/25 dark:hover:from-white/8 dark:hover:via-white/4 dark:hover:to-white/8 hover:border-black/30 dark:hover:border-white/20 backdrop-blur-sm transition-all duration-200 relative overflow-hidden"
                                 onClick={() => handleQuickAction('knowledge')}
                             >
-                                <span className="font-medium">Knowledge</span>
+                                <span className="font-medium text-black/90 dark:text-white/90">Knowledge</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                                className="text-sm px-3 py-2 mx-0 my-0.5 flex items-center gap-2 cursor-pointer rounded-lg"
+                                className="text-sm px-3 py-2 mx-0 my-0.5 flex items-center gap-2 cursor-pointer rounded-xl bg-gradient-to-r from-white/20 via-white/10 to-white/20 dark:from-white/5 dark:via-white/2 dark:to-white/5 border border-black/20 dark:border-white/10 hover:bg-gradient-to-r hover:from-white/25 hover:via-white/15 hover:to-white/25 dark:hover:from-white/8 dark:hover:via-white/4 dark:hover:to-white/8 hover:border-black/30 dark:hover:border-white/20 backdrop-blur-sm transition-all duration-200 relative overflow-hidden"
                                 onClick={() => handleQuickAction('triggers')}
                             >
-                                <span className="font-medium">Triggers</span>
+                                <span className="font-medium text-black/90 dark:text-white/90">Triggers</span>
                             </DropdownMenuItem>
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <DropdownMenuItem
-                                            className="text-sm px-3 py-2 mx-0 my-0.5 flex items-center justify-between cursor-pointer rounded-lg"
+                                            className="text-sm px-3 py-2 mx-0 my-0.5 flex items-center justify-between cursor-pointer rounded-xl bg-gradient-to-r from-white/20 via-white/10 to-white/20 dark:from-white/5 dark:via-white/2 dark:to-white/5 border border-black/20 dark:border-white/10 hover:bg-gradient-to-r hover:from-white/25 hover:via-white/15 hover:to-white/25 dark:hover:from-white/8 dark:hover:via-white/4 dark:hover:to-white/8 hover:border-black/30 dark:hover:border-white/20 backdrop-blur-sm transition-all duration-200 relative overflow-hidden"
                                             onClick={() => setIntegrationsOpen(true)}
                                         >
-                                            <span className="font-medium">Integrations</span>
+                                            <span className="font-medium text-black/90 dark:text-white/90">Integrations</span>
                                             <div className="flex items-center gap-1.5">
                                                 {googleDriveIcon?.icon_url && slackIcon?.icon_url && notionIcon?.icon_url ? (
                                                     <>
@@ -439,6 +572,9 @@ export const UnifiedConfigMenu: React.FC<UnifiedConfigMenuProps> = (props) => {
     }
     return <GuestMenu {...props} />;
 };
+
+// Export the props type for use in other components
+export type { UnifiedConfigMenuProps };
 
 export default UnifiedConfigMenu;
 

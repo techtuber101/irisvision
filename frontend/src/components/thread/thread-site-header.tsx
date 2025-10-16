@@ -138,16 +138,16 @@ export function SiteHeader({
   return (
     <>
       <header className={cn(
-        "sticky top-0 flex h-14 shrink-0 items-center gap-2 z-20 w-full bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border-b-0 shadow-none",
+        "sticky top-0 flex h-14 shrink-0 items-center gap-2 z-20 w-full bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border-b-0 shadow-none light:bg-[rgba(255,255,255,0.25)] light:backdrop-blur-2xl",
         isMobile && "px-2"
       )}>
 
 
         <div className="flex flex-1 items-center gap-2 px-3">
           {variant === 'shared' ? (
-            <div className="text-base font-medium text-muted-foreground flex items-center gap-2">
+            <div className="text-base font-medium text-muted-foreground light:text-zinc-800 flex items-center gap-2">
               {projectName}
-              <span className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 px-2 py-0.5 rounded-full">
+              <span className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 light:bg-blue-100 light:text-blue-700 px-2 py-0.5 rounded-full">
                 Shared
               </span>
             </div>
@@ -165,7 +165,7 @@ export function SiteHeader({
             <Skeleton className="h-5 w-32" />
           ) : (
             <div
-              className="text-base font-medium text-muted-foreground hover:text-foreground cursor-pointer flex items-center"
+              className="text-base font-medium text-muted-foreground hover:text-foreground light:text-zinc-800 light:hover:text-zinc-900 cursor-pointer flex items-center"
               onClick={startEditing}
               title="Click to rename project"
             >

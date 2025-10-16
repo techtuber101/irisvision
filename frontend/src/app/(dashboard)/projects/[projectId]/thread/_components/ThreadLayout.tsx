@@ -169,7 +169,7 @@ export function ThreadLayout({
 
   // Full layout mode
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen light:bg-gradient-to-br light:from-slate-50 light:via-white light:to-blue-50/30">
       {debugMode && (
         <div className="fixed top-16 right-4 bg-amber-500 text-black text-xs px-2 py-1 rounded-md shadow-md z-50">
           Debug Mode

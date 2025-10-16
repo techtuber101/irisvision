@@ -14,12 +14,12 @@ const TaskItem: React.FC<{ task: Task; index: number }> = ({ task, index }) => {
   const isPending = !isCompleted && !isCancelled
 
   return (
-    <div className="flex items-center gap-3 py-3 px-4 hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0">
+    <div className="flex items-center gap-3 py-3 px-4 hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0 light:hover:bg-white/10 light:border-black/5">
       {/* Status Icon */}
       <div className="flex-shrink-0">
-        {isCompleted && <CircleCheck className="h-4 w-4 text-green-400" />}
+        {isCompleted && <CircleCheck className="h-4 w-4 text-green-400 light:text-green-600" />}
         {isCancelled && <X className="h-4 w-4 text-red-400" />}
-        {isPending && <Circle className="h-4 w-4 text-white/40" />}
+        {isPending && <Circle className="h-4 w-4 text-white/40 light:text-zinc-400" />}
       </div>
 
       {/* Task Content */}
@@ -27,9 +27,9 @@ const TaskItem: React.FC<{ task: Task; index: number }> = ({ task, index }) => {
         <p
           className={cn(
             "text-sm leading-relaxed",
-            isCompleted && "text-white/90",
-            isCancelled && "text-white/50 line-through",
-            isPending && "text-white/70",
+            isCompleted && "text-white/90 light:text-zinc-800",
+            isCancelled && "text-white/50 light:text-zinc-500 line-through",
+            isPending && "text-white/70 light:text-zinc-700",
           )}
         >
           {task.content}
@@ -44,14 +44,14 @@ const SectionHeader: React.FC<{ section: Section }> = ({ section }) => {
   const completedTasks = section.tasks.filter((t) => t.status === "completed").length
 
   return (
-    <div className="flex items-center justify-between py-3 px-4 bg-white/5 backdrop-blur-sm border-b border-white/10">
-      <h3 className="text-sm font-medium text-white/80">{section.title}</h3>
+    <div className="flex items-center justify-between py-3 px-4 bg-white/5 backdrop-blur-sm border-b border-white/10 light:bg-[#fbfbfb] light:border-black/10">
+      <h3 className="text-sm font-medium text-white/80 light:text-zinc-800">{section.title}</h3>
       <div className="flex items-center gap-2">
-        <Badge variant="outline" className="text-xs h-5 px-2 py-0 font-normal bg-white/10 border-white/20 text-white/80">
+        <Badge variant="outline" className="text-xs h-5 px-2 py-0 font-normal bg-white/10 border-white/20 text-white/80 light:bg-black/5 light:border-black/10 light:text-zinc-700">
           {completedTasks}/{totalTasks}
         </Badge>
         {completedTasks === totalTasks && totalTasks > 0 && (
-          <Badge variant="outline" className="text-xs h-5 px-2 py-0 bg-green-500/20 text-green-400 border-green-500/30">
+          <Badge variant="outline" className="text-xs h-5 px-2 py-0 bg-green-500/20 text-green-400 border-green-500/30 light:bg-green-700/30 light:text-green-800 light:border-green-700/50">
             <Check className="h-3 w-3" />
           </Badge>
         )}
@@ -62,7 +62,7 @@ const SectionHeader: React.FC<{ section: Section }> = ({ section }) => {
 
 const SectionView: React.FC<{ section: Section }> = ({ section }) => {
   return (
-    <div className="border-b border-white/5 last:border-b-0">
+    <div className="border-b border-white/5 last:border-b-0 light:border-black/5">
       <SectionHeader section={section} />
       <div className="bg-transparent">
         {section.tasks.map((task, index) => (
@@ -70,7 +70,7 @@ const SectionView: React.FC<{ section: Section }> = ({ section }) => {
         ))}
         {section.tasks.length === 0 && (
           <div className="py-6 px-4 text-center">
-            <p className="text-xs text-white/50">No tasks in this section</p>
+            <p className="text-xs text-white/50 light:text-zinc-500">No tasks in this section</p>
           </div>
         )}
       </div>
@@ -130,7 +130,7 @@ export const TaskListToolView: React.FC<ToolViewProps> = ({
               <ListTodo className="w-5 h-5 text-emerald-300 relative z-10" />
             </div>
             <div>
-              <CardTitle className="text-base font-medium text-white/90">
+              <CardTitle className="text-base font-medium text-white/90 light:text-zinc-800">
                 {toolTitle}
               </CardTitle>
             </div>
@@ -169,12 +169,12 @@ export const TaskListToolView: React.FC<ToolViewProps> = ({
         {isStreaming && !hasData ? (
           <div className="flex flex-col items-center justify-center h-full py-12 px-6 bg-gradient-to-b from-transparent to-white/5">
             <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-gradient-to-b from-green-500/20 to-green-600/10 border border-green-500/20 backdrop-blur-sm">
-              <Clock className="h-10 w-10 text-green-400 animate-spin" />
+              <Clock className="h-10 w-10 text-green-400 animate-spin light:text-green-600" />
             </div>
-            <h3 className="text-xl font-semibold mb-2 text-white/90">
+            <h3 className="text-xl font-semibold mb-2 text-white/90 light:text-zinc-800">
               Loading Tasks
             </h3>
-            <p className="text-sm text-white/60">
+            <p className="text-sm text-white/60 light:text-zinc-600">
               Preparing your task list...
             </p>
           </div>
@@ -189,25 +189,25 @@ export const TaskListToolView: React.FC<ToolViewProps> = ({
             <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-gradient-to-b from-white/10 to-white/5 border border-white/10 backdrop-blur-sm">
               <ListTodo className="h-10 w-10 text-white/40" />
             </div>
-            <h3 className="text-xl font-semibold mb-2 text-white/90">
+            <h3 className="text-xl font-semibold mb-2 text-white/90 light:text-zinc-800">
               No Tasks Yet
             </h3>
-            <p className="text-sm text-white/60">
+            <p className="text-sm text-white/60 light:text-zinc-600">
               Your task list will appear here once created
             </p>
           </div>
         )}
       </CardContent>
       <div className="px-4 py-2 h-10 bg-white/5 backdrop-blur-sm border-t border-white/10 flex justify-between items-center gap-4 relative z-10">
-        <div className="h-full flex items-center gap-2 text-sm text-white/60">
+        <div className="h-full flex items-center gap-2 text-sm text-white/60 light:text-zinc-600">
           {!isStreaming && hasData && (
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="h-6 py-0.5 bg-white/10 border-white/20 text-white/80">
+              <Badge variant="outline" className="h-6 py-0.5 bg-white/10 border-white/20 text-white/80 light:bg-black/5 light:border-black/10 light:text-zinc-700">
                 <ListTodo className="h-3 w-3" />
                 {sections.length} sections
               </Badge>
               {completedTasks === totalTasks && totalTasks > 0 && (
-                <Badge variant="outline" className="h-6 py-0.5 bg-green-500/20 text-green-400 border-green-500/30">
+                <Badge variant="outline" className="h-6 py-0.5 bg-green-500/20 text-green-400 border-green-500/30 light:bg-green-700/30 light:text-green-800 light:border-green-700/50">
                   <Check className="h-3 w-3" />
                   All complete
                 </Badge>
@@ -215,7 +215,7 @@ export const TaskListToolView: React.FC<ToolViewProps> = ({
             </div>
           )}
         </div>
-        <div className="text-xs text-white/60">
+        <div className="text-xs text-white/60 light:text-zinc-600">
           {toolTimestamp && !isStreaming
             ? new Date(toolTimestamp).toLocaleTimeString()
             : assistantTimestamp

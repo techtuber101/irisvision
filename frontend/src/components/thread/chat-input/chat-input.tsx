@@ -567,9 +567,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
           subscriptionStatus={subscriptionStatus}
           canAccessModel={canAccessModel}
           refreshCustomModels={refreshCustomModels}
+          currentInputValue={value}
+          onInputChange={isControlled ? controlledOnChange : setUncontrolledValue}
         />
       );
-    }, [mounted, isLoggedIn, hideAgentSelection, selectedAgentId, onAgentSelect, selectedModel, handleModelChange, modelOptions, subscriptionStatus, canAccessModel, refreshCustomModels]);
+    }, [mounted, isLoggedIn, hideAgentSelection, selectedAgentId, onAgentSelect, selectedModel, handleModelChange, modelOptions, subscriptionStatus, canAccessModel, refreshCustomModels, value, isControlled, controlledOnChange]);
 
 
 
@@ -603,7 +605,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
           
           {/* New integrated chat container with glassmorphism */}
           <div 
-            className="relative rounded-[32px] border border-white/10 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] transition-all duration-300 overflow-hidden hover:scale-[1.01]"
+            className="relative rounded-[32px] border border-white/10 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] transition-all duration-300 overflow-hidden hover:scale-[1.01] light:border-white/20 light:bg-[rgba(255,255,255,0.25)] light:backdrop-blur-2xl light:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.05)]"
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={(e) => {
@@ -637,6 +639,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                 padding: 1,
                 borderRadius: 32,
               }}
+              data-light-gradient="linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02) 30%, rgba(0,0,0,0.05) 85%, rgba(0,0,0,0.03))"
+              data-dark-gradient="linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))"
             />
             
             {/* Specular streak */}
@@ -649,6 +653,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                 filter: "blur(6px)",
                 mixBlendMode: "screen",
               }}
+              data-light-streak="linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.03) 45%, rgba(0,0,0,0) 100%)"
+              data-dark-streak="linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)"
             />
             
             {/* Fine noise */}
@@ -662,6 +668,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                 mixBlendMode: "overlay",
               }}
             />
+            
             
             <div className="relative p-3 z-10">
               {/* Attachments */}
@@ -700,7 +707,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                       }
                     }}
                     className={cn(
-                      "h-8 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white/70 hover:text-white hover:bg-white/10 hover:border-white/20 flex items-center gap-1.5 cursor-pointer transition-all duration-200",
+                      "h-8 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white/70 hover:text-white hover:bg-white/10 hover:border-white/20 flex items-center gap-1.5 cursor-pointer transition-all duration-200 light:bg-black/5 light:border-black/10 light:text-black/70 light:hover:text-black light:hover:bg-black/10 light:hover:border-black/20",
                       !isModeDismissing && "animate-in fade-in-0 zoom-in-95",
                       isModeDismissing && "animate-out fade-out-0 zoom-out-95"
                     )}
@@ -725,7 +732,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                       onPaste={handlePaste}
                       placeholder={animatedPlaceholder}
                       className={cn(
-                        'w-full bg-transparent dark:bg-transparent border-none shadow-none focus-visible:ring-0 pl-2 pr-0 !text-base min-h-[44px] max-h-[200px] overflow-y-auto resize-none placeholder:text-white/40 text-white',
+                        'w-full bg-transparent dark:bg-transparent border-none shadow-none focus-visible:ring-0 pl-2 pr-0 !text-base min-h-[44px] max-h-[200px] overflow-y-auto resize-none placeholder:text-white/40 text-white light:placeholder:text-black/40 light:text-black',
                         isDraggingOver ? 'opacity-40' : '',
                       )}
                       disabled={loading || (disabled && !isAgentRunning)}
@@ -734,7 +741,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                   </div>
                   
                   {/* Separator line */}
-                  <div className="border-t border-white/5 pt-2"></div>
+                  <div className="border-t border-white/5 pt-2 light:border-black/10"></div>
                   
                   {/* Controls row */}
                   <div className="flex items-center justify-between gap-2">
@@ -759,8 +766,26 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                       
                       {/* Iris Intelligence/Quick Chat Mode Toggle - Glassy icon-only design */}
                       <TooltipProvider>
-                        <div className="flex items-center gap-0 p-1 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
-                          <Tooltip>
+                        <div className="flex items-center gap-0 p-1 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm light:bg-black/0 light:border-black/4 relative overflow-hidden">
+                          {/* Light mode glassmorphism effects */}
+                          <div className="absolute inset-0 opacity-0 dark:opacity-0 light:opacity-100 pointer-events-none rounded-2xl" style={{
+                            background: 'linear-gradient(180deg, rgba(0,0,0,0.05), rgba(0,0,0,0.02) 30%, rgba(0,0,0,0.04) 85%, rgba(0,0,0,0.03))',
+                            WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                            WebkitMaskComposite: 'xor',
+                            maskComposite: 'exclude',
+                            padding: '1px',
+                            borderRadius: '16px'
+                          }}></div>
+                          
+                          {/* Light mode specular streak */}
+                          <div className="absolute inset-x-0 top-0 h-8 opacity-0 dark:opacity-0 light:opacity-100 pointer-events-none rounded-t-2xl" style={{
+                            background: 'linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.03) 45%, rgba(0,0,0,0) 100%)',
+                            filter: 'blur(4px)',
+                            mixBlendMode: 'screen',
+                          }}></div>
+                          
+                          <div className="relative z-10 flex items-center gap-0">
+                            <Tooltip>
                             <TooltipTrigger asChild>
                               <button
                                 type="button"
@@ -768,8 +793,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                                 className={cn(
                                   "p-1.5 rounded-lg transition-all duration-200 cursor-pointer",
                                   chatMode === 'execute'
-                                    ? "opacity-100 text-white"
-                                    : "opacity-60 text-white/70 hover:opacity-80"
+                                    ? "opacity-100 text-white light:text-black"
+                                    : "opacity-60 text-white/70 hover:opacity-80 light:text-black/70 light:hover:text-black/90"
                                 )}
                               >
                                 <Sparkle className="w-4 h-4" />
@@ -781,13 +806,13 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                                   <Sparkle className="w-3 h-3" />
                                   Iris Intelligence ({isMac ? '⌘' : 'Ctrl'}+1)
                                 </p>
-                                <p className="text-xs text-muted-foreground">Next-gen intelligence with agentic power</p>
+                                <p className="text-xs text-muted-foreground light:text-white/80">Next-gen intelligence with agentic power</p>
                               </div>
                             </TooltipContent>
                           </Tooltip>
 
                           {/* Separator line */}
-                          <div className="w-px h-4 bg-white/20 mx-0.5" />
+                          <div className="w-px h-4 bg-white/20 mx-0.5 light:bg-black/20" />
 
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -797,8 +822,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                                 className={cn(
                                   "p-1.5 rounded-lg transition-all duration-200 cursor-pointer",
                                   chatMode === 'chat'
-                                    ? "opacity-100 text-white"
-                                    : "opacity-60 text-white/70 hover:opacity-80"
+                                    ? "opacity-100 text-white light:text-black"
+                                    : "opacity-60 text-white/70 hover:opacity-80 light:text-black/70 light:hover:text-black/90"
                                 )}
                               >
                                 <ZapIcon className="w-4 h-4" />
@@ -810,10 +835,11 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                                   <ZapIcon className="w-3 h-3" />
                                   Quick Chat ({isMac ? '⌘' : 'Ctrl'}+2)
                                 </p>
-                                <p className="text-xs text-muted-foreground">Lightning-fast responses</p>
+                                <p className="text-xs text-muted-foreground light:text-white/80">Lightning-fast responses</p>
                               </div>
                             </TooltipContent>
                           </Tooltip>
+                          </div>
                         </div>
                       </TooltipProvider>
                       
@@ -838,7 +864,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                               <TooltipContent side="bottom">
                                 <div className="space-y-1">
                                   <p className="font-medium text-white">Adaptive</p>
-                                  <p className="text-xs text-gray-200">Quick responses with smart context switching</p>
+                                  <p className="text-xs text-gray-200 light:text-white/80">Quick responses with smart context switching</p>
                                 </div>
                               </TooltipContent>
                             </Tooltip>
@@ -860,7 +886,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                               <TooltipContent side="bottom">
                                 <div className="space-y-1">
                                   <p className="font-medium text-white">Autonomous</p>
-                                  <p className="text-xs text-gray-200">Deep work mode for multi-step problem solving</p>
+                                  <p className="text-xs text-gray-200 light:text-white/80">Deep work mode for multi-step problem solving</p>
                                 </div>
                               </TooltipContent>
                             </Tooltip>
@@ -882,7 +908,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                               <TooltipContent side="bottom">
                                 <div className="space-y-1">
                                   <p className="font-medium text-white">Chat</p>
-                                  <p className="text-xs text-gray-200">Simple back-and-forth conversation</p>
+                                  <p className="text-xs text-gray-200 light:text-white/80">Simple back-and-forth conversation</p>
                                 </div>
                               </TooltipContent>
                             </Tooltip>
@@ -907,7 +933,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                         isUploading
                       }
                       className={cn(
-                        'h-9 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm px-4 text-sm font-medium text-white/90 shadow-[0_2px_8px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-200 hover:border-white/30 hover:bg-white/15 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] active:scale-[0.98]',
+                        'h-9 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm px-4 text-sm font-medium text-white/90 shadow-[0_2px_8px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-200 hover:border-white/30 hover:bg-white/15 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] active:scale-[0.98] light:border-black/10 light:bg-black/5 light:text-black/90 light:shadow-[0_2px_8px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(0,0,0,0.1)] light:hover:border-black/15 light:hover:bg-black/8 light:hover:shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(0,0,0,0.15)]',
                         ((!value.trim() && uploadedFiles.length === 0 && !isAgentRunning) ||
                           loading ||
                           (disabled && !isAgentRunning) ||

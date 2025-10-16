@@ -256,7 +256,7 @@ export const FileUploadHandler = forwardRef<
                 <Button
                   type="button"
                   onClick={handleFileUpload}
-                  className="h-9 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm px-4 text-sm font-medium text-white/90 shadow-[0_2px_8px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-200 hover:border-white/30 hover:bg-white/15 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] active:scale-[0.98] opacity-45 cursor-pointer flex items-center justify-center gap-2"
+                  className="h-9 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm px-4 text-sm font-medium text-white/90 shadow-[0_2px_8px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-200 hover:border-white/30 hover:bg-white/15 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] active:scale-[0.98] opacity-45 cursor-pointer flex items-center justify-center gap-2 light:border-black/10 light:bg-black/5 light:text-black/90 light:shadow-[0_2px_8px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(0,0,0,0.1)] light:hover:border-black/15 light:hover:bg-black/8 light:hover:shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(0,0,0,0.15)]"
                   disabled={
                     !isLoggedIn || loading || (disabled && !isAgentRunning) || isUploading
                   }

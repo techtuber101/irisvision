@@ -37,7 +37,7 @@ export function DeleteSlideToolView({
   project,
 }: ToolViewProps) {
   const { toolResult } = extractToolData(toolContent);
-  
+
   let deleteData: DeleteSlideData | null = null;
   let error: string | null = null;
 
@@ -61,15 +61,15 @@ export function DeleteSlideToolView({
   }
 
   return (
-    <Card className="gap-0 flex border shadow-none border-t border-b-0 border-x-0 p-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+    <Card className="gap-0 flex flex-col h-full overflow-hidden rounded-3xl border border-white/60 bg-white/60 p-0 shadow-[0_25px_45px_-20px_rgba(15,23,42,0.35)] backdrop-blur-xl dark:border-zinc-800/70 dark:bg-zinc-900/80 dark:shadow-none">
+      <CardHeader className="h-14 rounded-t-3xl border-b border-white/40 bg-white/40 p-2 px-4 backdrop-blur-lg dark:border-zinc-800/70 dark:bg-zinc-900/80">
         <div className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="relative p-2 rounded-lg bg-gradient-to-br from-red-500/20 to-red-600/10 border border-red-500/20">
+            <div className="relative flex h-9 w-9 items-center justify-center rounded-[14px] border border-white/50 bg-white/50 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6),0_10px_25px_-15px_rgba(239,68,68,0.6)] backdrop-blur-md dark:border-red-500/30 dark:bg-red-500/20 dark:shadow-none">
               <Trash2 className="w-5 h-5 text-red-500 dark:text-red-400" />
             </div>
             <div>
-              <CardTitle className="text-base font-medium text-zinc-900 dark:text-zinc-100">
+              <CardTitle className="text-base font-semibold text-zinc-800 dark:text-zinc-100">
                 Delete Slide
               </CardTitle>
               {deleteData && (
@@ -84,7 +84,7 @@ export function DeleteSlideToolView({
             {!isStreaming && !error && deleteData && (
               <Badge
                 variant="secondary"
-                className="bg-gradient-to-b from-emerald-200 to-emerald-100 text-emerald-700 dark:from-emerald-800/50 dark:to-emerald-900/60 dark:text-emerald-300"
+                className="border border-emerald-200/70 bg-white/60 text-emerald-600 shadow-[0_8px_20px_-15px_rgba(16,185,129,0.8)] backdrop-blur-md dark:border-emerald-800/60 dark:bg-emerald-900/40 dark:text-emerald-300"
               >
                 <CheckCircle className="h-3.5 w-3.5 mr-1" />
                 Deleted
@@ -93,7 +93,7 @@ export function DeleteSlideToolView({
             {!isStreaming && (error || !isSuccess) && (
               <Badge
                 variant="secondary"
-                className="bg-gradient-to-b from-rose-200 to-rose-100 text-rose-700 dark:from-rose-800/50 dark:to-rose-900/60 dark:text-rose-300"
+                className="border border-rose-200/70 bg-white/60 text-rose-600 shadow-[0_8px_20px_-15px_rgba(244,63,94,0.8)] backdrop-blur-md dark:border-rose-800/60 dark:bg-rose-900/40 dark:text-rose-300"
               >
                 <AlertTriangle className="h-3.5 w-3.5 mr-1" />
                 Failed
@@ -114,56 +114,60 @@ export function DeleteSlideToolView({
             showProgress={true}
           />
         ) : error || !deleteData ? (
-          <div className="flex flex-col items-center justify-center h-full py-12 px-6 bg-gradient-to-b from-white to-zinc-50 dark:from-zinc-950 dark:to-zinc-900">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-gradient-to-b from-rose-100 to-rose-50 shadow-inner dark:from-rose-800/40 dark:to-rose-900/60">
-              <AlertTriangle className="h-10 w-10 text-rose-400 dark:text-rose-600" />
+          <div className="flex h-full flex-col items-center justify-center bg-white/35 py-12 px-6 backdrop-blur-xl dark:bg-zinc-950/70">
+            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-rose-200/70 bg-white/60 shadow-[0_20px_35px_-25px_rgba(244,63,94,0.8)] backdrop-blur-lg dark:border-rose-800/60 dark:bg-rose-900/50">
+              <AlertTriangle className="h-10 w-10 text-rose-500 dark:text-rose-600" />
             </div>
-            <h3 className="text-xl font-semibold mb-2 text-zinc-900 dark:text-zinc-100">
+            <h3 className="mb-2 text-xl font-semibold text-zinc-800 dark:text-zinc-100">
               {error || 'Failed to delete slide'}
             </h3>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center max-w-md">
+            <p className="max-w-md text-center text-sm text-zinc-600 dark:text-zinc-400">
               There was an error deleting the slide. Please try again.
             </p>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full py-12 px-6 bg-gradient-to-b from-white to-zinc-50 dark:from-zinc-950 dark:to-zinc-900">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-gradient-to-b from-emerald-100 to-emerald-50 shadow-inner dark:from-emerald-800/40 dark:to-emerald-900/60">
-              <CheckCircle className="h-10 w-10 text-emerald-400 dark:text-emerald-600" />
+          <div className="flex h-full flex-col items-center justify-center bg-white/35 py-12 px-6 backdrop-blur-xl dark:bg-zinc-950/70">
+            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-emerald-200/70 bg-white/60 shadow-[0_25px_45px_-30px_rgba(16,185,129,0.8)] backdrop-blur-lg dark:border-emerald-800/60 dark:bg-emerald-900/50">
+              <CheckCircle className="h-10 w-10 text-emerald-500 dark:text-emerald-600" />
             </div>
-            <h3 className="text-xl font-semibold mb-2 text-zinc-900 dark:text-zinc-100">
+            <h3 className="mb-2 text-xl font-semibold text-zinc-800 dark:text-zinc-100">
               Slide deleted successfully
             </h3>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center max-w-md mb-6">
+            <p className="mb-6 max-w-md text-center text-sm text-zinc-600 dark:text-zinc-400">
               {deleteData.message}
             </p>
-            
-            <div className="grid grid-cols-2 gap-4 w-full max-w-md">
-              <Card className="p-4 text-center">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <Hash className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Deleted Slide</span>
+
+            <div className="grid w-full max-w-md grid-cols-2 gap-4">
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-white/60 bg-white/55 p-4 text-center shadow-[0_18px_35px_-25px_rgba(15,23,42,0.45)] backdrop-blur-lg dark:border-zinc-800/70 dark:bg-zinc-900/70 dark:shadow-none">
+                <div className="mb-2 flex items-center justify-center gap-2 text-zinc-500 dark:text-zinc-400">
+                  <Hash className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
+                  <span className="text-sm font-medium text-zinc-600 dark:text-zinc-200">
+                    Deleted Slide
+                  </span>
                 </div>
-                <p className="text-lg font-semibold text-red-600 dark:text-red-400">
+                <p className="text-lg font-semibold text-rose-500 dark:text-red-400">
                   #{deleteData.deleted_slide}
                 </p>
-              </Card>
-              
-              <Card className="p-4 text-center">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Remaining</span>
+              </div>
+
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-white/60 bg-white/55 p-4 text-center shadow-[0_18px_35px_-25px_rgba(15,23,42,0.45)] backdrop-blur-lg dark:border-zinc-800/70 dark:bg-zinc-900/70 dark:shadow-none">
+                <div className="mb-2 flex items-center justify-center gap-2 text-zinc-500 dark:text-zinc-400">
+                  <FileText className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
+                  <span className="text-sm font-medium text-zinc-600 dark:text-zinc-200">
+                    Remaining
+                  </span>
                 </div>
-                <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
+                <p className="text-lg font-semibold text-emerald-500 dark:text-emerald-400">
                   {deleteData.remaining_slides}
                 </p>
-              </Card>
+              </div>
             </div>
           </div>
         )}
       </CardContent>
 
-      <div className="px-4 py-2 h-10 bg-gradient-to-r from-zinc-50/90 to-zinc-100/90 dark:from-zinc-900/90 dark:to-zinc-800/90 backdrop-blur-sm border-t border-zinc-200 dark:border-zinc-800 flex justify-end items-center">
-        <div className="flex items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500">
+      <div className="flex h-10 items-center justify-end rounded-b-3xl border-t border-white/40 bg-white/45 px-4 py-2 backdrop-blur-lg dark:border-zinc-800/70 dark:bg-zinc-900/80">
+        <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-500">
           <Clock className="h-3 w-3" />
           <span>
             {formatTimestamp(toolTimestamp)}

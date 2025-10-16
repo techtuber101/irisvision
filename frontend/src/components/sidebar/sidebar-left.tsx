@@ -159,10 +159,25 @@ export function SidebarLeft({
   return (
     <Sidebar
       collapsible="icon"
-      className="border-r-0 backdrop-blur-2xl [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
+      className="border-r-0 backdrop-blur-2xl [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] relative"
       {...props}
     >
-      <SidebarHeader className="px-2 py-1">
+      {/* Light mode glassmorphism background */}
+      <div className="absolute inset-0 opacity-0 dark:opacity-0 light:opacity-100 pointer-events-none" style={{
+        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+      }}></div>
+      
+      {/* Light mode checkered pattern background */}
+      <div className="absolute inset-0 opacity-0 dark:opacity-0 light:opacity-[0.03] pointer-events-none" style={{
+        backgroundImage: `
+          linear-gradient(to right, rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(0, 0, 0, 0.1) 1px, transparent 1px)
+        `,
+        backgroundSize: '40px 40px'
+      }}></div>
+      <SidebarHeader className="px-2 py-1 relative z-10">
         <div className="flex h-[48px] items-center px-1 relative">
           <Link href="/dashboard" className="flex-shrink-0" onClick={() => isMobile && setOpenMobile(false)}>
             {state === 'collapsed' ? (
@@ -199,7 +214,7 @@ export function SidebarLeft({
           </div>
         </div>
       </SidebarHeader>
-      <SidebarContent className="[&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+      <SidebarContent className="[&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] relative z-10">
         <SidebarGroup>
           <Link href="/dashboard">
             <SidebarMenuButton
@@ -254,7 +269,7 @@ export function SidebarLeft({
                           'bg-accent text-accent-foreground font-medium': pathname === '/agents' && (searchParams.get('tab') === 'my-agents' || searchParams.get('tab') === null),
                         })} asChild>
                           <Link href="/agents?tab=my-agents" onClick={() => isMobile && setOpenMobile(false)}>
-                            <span>Added personalities</span>
+                            <span>Added Personalities</span>
                           </Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
@@ -266,7 +281,7 @@ export function SidebarLeft({
                           }}
                           className="cursor-pointer pl-3 touch-manipulation"
                         >
-                          <span>New personality</span>
+                          <span>New Personality</span>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>
@@ -278,7 +293,7 @@ export function SidebarLeft({
         </SidebarGroup>
         <NavAgents />
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="relative z-10">
         {state === 'collapsed' && (
           <div className="mt-2 flex justify-center">
             <Tooltip>

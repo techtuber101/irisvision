@@ -268,7 +268,7 @@ export function renderMarkdownContent(
                         >
                             <button
                                 onClick={() => handleToolClick(messageId, toolName)}
-                                className="inline-flex items-center gap-1.5 py-1.25 px-1.5 pr-1.5 text-sm text-white/90 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] rounded-lg transition-all duration-200 hover:border-white/20 hover:bg-[rgba(10,14,22,0.65)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] cursor-pointer relative overflow-hidden"
+                                className="inline-flex items-center gap-1.5 py-1.25 px-1.5 pr-1.5 text-sm text-white/90 light:text-zinc-800 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] rounded-lg transition-all duration-200 hover:border-white/20 hover:bg-[rgba(10,14,22,0.65)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] cursor-pointer relative overflow-hidden light:bg-white/10 light:border-white/20 light:shadow-none light:backdrop-blur-sm light:hover:border-white/30 light:hover:bg-white/15"
                             >
                                 {/* Gradient rim */}
                                 <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg" style={{
@@ -278,14 +278,20 @@ export function renderMarkdownContent(
                                     maskComposite: 'exclude',
                                     padding: '1px',
                                     borderRadius: '8px'
-                                }}></div>
+                                }} 
+                                data-light-gradient="linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02) 30%, rgba(0,0,0,0.05) 85%, rgba(0,0,0,0.03))"
+                                data-dark-gradient="linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))"
+                                ></div>
                                 
                                 {/* Specular streak */}
                                 <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-12" style={{
                                     background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
                                     filter: 'blur(4px)',
                                     mixBlendMode: 'screen'
-                                }}></div>
+                                }} 
+                                data-light-streak="linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.03) 45%, rgba(0,0,0,0) 100%)"
+                                data-dark-streak="linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)"
+                                ></div>
                                 
                                 {/* Fine noise */}
                                 <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{
@@ -294,11 +300,11 @@ export function renderMarkdownContent(
                                     mixBlendMode: 'overlay'
                                 }}></div>
                                 
-                                <div className='border border-white/20 bg-white/10 backdrop-blur-sm flex items-center justify-center p-0.75 rounded-lg relative z-10'>
-                                    <IconComponent className="h-3.5 w-3.5 text-white/90 flex-shrink-0" />
+                                <div className='border border-white/20 bg-white/10 backdrop-blur-sm flex items-center justify-center p-0.75 rounded-lg relative z-10 light:border-black/10 light:bg-black/5'>
+                                    <IconComponent className="h-3.5 w-3.5 text-white/90 light:text-zinc-700 flex-shrink-0" />
                                 </div>
-                                <span className="font-mono text-white/90 relative z-10" style={{ fontSize: '12px' }}>{getUserFriendlyToolName(toolName)}</span>
-                                {paramDisplay && <span className="ml-1 text-white/70 truncate max-w-[200px] relative z-10" title={paramDisplay}>{paramDisplay}</span>}
+                                <span className="font-mono text-white/90 light:text-zinc-800 relative z-10" style={{ fontSize: '12px' }}>{getUserFriendlyToolName(toolName)}</span>
+                                {paramDisplay && <span className="ml-1 text-white/70 light:text-zinc-600 truncate max-w-[200px] relative z-10" title={paramDisplay}>{paramDisplay}</span>}
                             </button>
                         </div>
                     );
@@ -413,7 +419,7 @@ export function renderMarkdownContent(
                 >
                     <button
                         onClick={() => handleToolClick(messageId, toolName)}
-                        className="inline-flex items-center gap-1.5 py-1.25 px-1.5 pr-1.5 text-sm text-white/90 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] rounded-lg transition-all duration-200 hover:border-white/20 hover:bg-[rgba(10,14,22,0.65)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] cursor-pointer relative overflow-hidden"
+                        className="inline-flex items-center gap-1.5 py-1.25 px-1.5 pr-1.5 text-sm text-white/90 light:text-zinc-800 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] rounded-lg transition-all duration-200 hover:border-white/20 hover:bg-[rgba(10,14,22,0.65)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] cursor-pointer relative overflow-hidden light:bg-white/10 light:border-white/20 light:shadow-none light:backdrop-blur-sm light:hover:border-white/30 light:hover:bg-white/15"
                     >
                         {/* Gradient rim */}
                         <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg" style={{
@@ -539,7 +545,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
 
     const containerClassName = isPreviewMode
         ? "flex-1 overflow-y-auto scrollbar-thin scrollbar-track-secondary/0 scrollbar-thumb-primary/10 scrollbar-thumb-rounded-full hover:scrollbar-thumb-primary/10 py-4 pb-0"
-        : "flex-1 overflow-y-auto scrollbar-thin scrollbar-track-secondary/0 scrollbar-thumb-primary/10 scrollbar-thumb-rounded-full hover:scrollbar-thumb-primary/10 py-4 pb-0 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl";
+        : "flex-1 overflow-y-auto scrollbar-thin scrollbar-track-secondary/0 scrollbar-thumb-primary/10 scrollbar-thumb-rounded-full hover:scrollbar-thumb-primary/10 py-4 pb-0 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl light:bg-[rgba(255,255,255,0.25)] light:backdrop-blur-2xl light:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.05)]";
 
     // In playback mode, we use visibleMessages instead of messages
     // Filter out image_context messages (they're for LLM only, not for display)
@@ -958,7 +964,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                 {renderStandaloneAttachments(attachments as string[], handleOpenFileViewer, sandboxId, project, true)}
 
                                                 <div className="flex justify-end">
-                                                    <div className="flex max-w-[85%] rounded-3xl bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] px-4 py-3 break-words overflow-hidden relative">
+                                                    <div className="flex max-w-[85%] rounded-3xl bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] px-4 py-3 break-words overflow-hidden relative light:border-black/5 light:bg-black/2 light:shadow-[0_2px_8px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(0,0,0,0.05)] light:backdrop-blur-sm">
                                                         {/* Gradient rim */}
                                                         <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-3xl" style={{
                                                             background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
@@ -967,7 +973,10 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                             maskComposite: 'exclude',
                                                             padding: '1px',
                                                             borderRadius: '24px'
-                                                        }}></div>
+                                                        }} 
+                                                        data-light-gradient="linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02) 30%, rgba(0,0,0,0.05) 85%, rgba(0,0,0,0.03))"
+                                                        data-dark-gradient="linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))"
+                                                        ></div>
                                                         
                                                         {/* Specular streak */}
                                                         <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-24" style={{
@@ -1338,7 +1347,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
 
                                         {/* Tool call content */}
                                         <div className="space-y-2">
-                                            <div className="inline-flex items-center gap-1.5 py-1.5 px-2 text-sm font-medium text-white/90 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] rounded-lg relative overflow-hidden">
+                                            <div className="inline-flex items-center gap-1.5 py-1.5 px-2 text-sm font-medium text-white/90 light:text-zinc-800 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] rounded-lg relative overflow-hidden light:bg-white/10 light:border-white/20 light:shadow-none light:backdrop-blur-sm light:hover:border-white/30 light:hover:bg-white/15">
                                                 {/* Gradient rim */}
                                                 <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg" style={{
                                                     background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
@@ -1347,14 +1356,20 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                     maskComposite: 'exclude',
                                                     padding: '1px',
                                                     borderRadius: '8px'
-                                                }}></div>
+                                                }} 
+                                                data-light-gradient="linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02) 30%, rgba(0,0,0,0.05) 85%, rgba(0,0,0,0.03))"
+                                                data-dark-gradient="linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))"
+                                                ></div>
                                                 
                                                 {/* Specular streak */}
                                                 <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-6" style={{
                                                     background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
                                                     filter: 'blur(3px)',
                                                     mixBlendMode: 'screen'
-                                                }}></div>
+                                                }} 
+                                                data-light-streak="linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.03) 45%, rgba(0,0,0,0) 100%)"
+                                                data-dark-streak="linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)"
+                                                ></div>
                                                 
                                                 {/* Fine noise */}
                                                 <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{

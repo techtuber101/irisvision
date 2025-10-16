@@ -283,7 +283,7 @@ export const ShowToolStream: React.FC<ShowToolStreamProps> = ({
             <div className="my-1">
                 {/* Always render the container for smooth transitions */}
                 <div className={`border border-white/10 rounded-2xl overflow-hidden transition-all duration-500 ease-in-out transform-gpu ${
-                    shouldShowContent ? 'bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)]' : 'bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl scale-95 opacity-80'
+                    shouldShowContent ? 'bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] light:bg-white/10 light:border-white/20 light:backdrop-blur-2xl light:shadow-[0_2px_8px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(0,0,0,0.05)]' : 'bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl scale-95 opacity-80 light:bg-white/10 light:border-white/20 light:backdrop-blur-2xl'
                 } relative`}>
                     {/* Gradient rim */}
                     <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl" style={{
@@ -293,14 +293,20 @@ export const ShowToolStream: React.FC<ShowToolStreamProps> = ({
                         maskComposite: 'exclude',
                         padding: '1px',
                         borderRadius: '16px'
-                    }}></div>
+                    }} 
+                    data-light-gradient="linear-gradient(180deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05) 30%, rgba(255,255,255,0.10) 85%, rgba(255,255,255,0.08))"
+                    data-dark-gradient="linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))"
+                    ></div>
                     
                     {/* Specular streak */}
                     <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-12" style={{
                         background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
                         filter: 'blur(4px)',
                         mixBlendMode: 'screen'
-                    }}></div>
+                    }} 
+                    data-light-streak="linear-gradient(180deg, rgba(255,255,255,0.20), rgba(255,255,255,0.08) 45%, rgba(255,255,255,0) 100%)"
+                    data-dark-streak="linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)"
+                    ></div>
                     
                     {/* Fine noise */}
                     <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{
@@ -311,25 +317,25 @@ export const ShowToolStream: React.FC<ShowToolStreamProps> = ({
                     {/* Tool name header */}
                     <button
                         onClick={() => onToolClick?.(messageId, toolName)}
-                        className={`w-full flex items-center gap-1.5 py-1 px-2 text-xs text-white/90 hover:bg-white/10 transition-all duration-400 ease-in-out cursor-pointer relative z-10 ${
-                            shouldShowContent ? 'bg-white/5' : 'bg-white/5 rounded-2xl'
+                        className={`w-full flex items-center gap-1.5 py-1 px-2 text-xs text-white/90 light:text-zinc-800 hover:bg-white/10 light:hover:bg-white/15 transition-all duration-400 ease-in-out cursor-pointer relative z-10 ${
+                            shouldShowContent ? 'bg-white/5 light:bg-white/10' : 'bg-white/5 light:bg-white/10 rounded-2xl'
                         }`}
                     >
-                        <div className='border border-white/20 bg-white/10 backdrop-blur-sm flex items-center justify-center p-1 rounded-sm'>
-                            <CircleDashed className="h-3.5 w-3.5 text-white/90 flex-shrink-0 animate-spin animation-duration-2000" />
+                        <div className='border border-white/20 bg-white/10 backdrop-blur-sm flex items-center justify-center p-1 rounded-sm light:border-white/30 light:bg-white/20'>
+                            <CircleDashed className="h-3.5 w-3.5 text-white/90 light:text-zinc-700 flex-shrink-0 animate-spin animation-duration-2000" />
                         </div>
-                        <span className="font-mono text-white/90" style={{ fontSize: '12px' }}>{displayName}</span>
-                        {paramDisplay && <span className="ml-1 text-white/70 truncate max-w-[200px]" title={paramDisplay}>{paramDisplay}</span>}
+                        <span className="font-mono text-white/90 light:text-zinc-800" style={{ fontSize: '12px' }}>{displayName}</span>
+                        {paramDisplay && <span className="ml-1 text-white/70 light:text-zinc-600 truncate max-w-[200px]" title={paramDisplay}>{paramDisplay}</span>}
                     </button>
 
                     {/* Streaming content below - smooth height transition */}
                     <div className={`transition-all duration-500 ease-in-out overflow-hidden transform-gpu ${
-                        shouldShowContent ? 'max-h-[350px] border-t border-white/10 opacity-100' : 'max-h-0 border-t-0 opacity-0 scale-y-95'
+                        shouldShowContent ? 'max-h-[350px] border-t border-white/10 light:border-white/20 opacity-100' : 'max-h-0 border-t-0 opacity-0 scale-y-95'
                     }`}>
                         <div className="relative">
                             <div
                                 ref={containerRef}
-                                className={`max-h-[300px] overflow-y-auto scrollbar-none text-xs text-white/90 transition-all duration-400 ease-in-out transform-gpu relative z-10 ${
+                                className={`max-h-[300px] overflow-y-auto scrollbar-none text-xs text-white/90 light:text-zinc-700 transition-all duration-400 ease-in-out transform-gpu relative z-10 light:bg-white/5 ${
                                     STREAMABLE_TOOLS.FILE_OPERATIONS.has(toolName || '') || STREAMABLE_TOOLS.COMMAND_TOOLS.has(toolName || '') 
                                         ? 'font-mono whitespace-pre-wrap' 
                                         : 'whitespace-pre-wrap'
@@ -390,14 +396,14 @@ export const ShowToolStream: React.FC<ShowToolStreamProps> = ({
                             {/* Top gradient */}
                             <div className={`absolute top-0 left-0 right-0 h-8 pointer-events-none transition-all duration-400 ease-in-out ${
                                 shouldShowContent
-                                    ? 'opacity-100 bg-gradient-to-b from-[rgba(10,14,22,0.55)] via-[rgba(10,14,22,0.3)] to-transparent'
-                                    : 'opacity-0 bg-gradient-to-b from-[rgba(10,14,22,0.55)] via-[rgba(10,14,22,0.3)] to-transparent'
+                                    ? 'opacity-100 bg-gradient-to-b from-transparent via-transparent to-transparent dark:from-[rgba(10,14,22,0.55)] dark:via-[rgba(10,14,22,0.3)] dark:to-transparent'
+                                    : 'opacity-0 bg-gradient-to-b from-transparent via-transparent to-transparent dark:from-[rgba(10,14,22,0.55)] dark:via-[rgba(10,14,22,0.3)] dark:to-transparent'
                             }`} />
                             {/* Bottom gradient */}
                             <div className={`absolute bottom-0 left-0 right-0 h-8 pointer-events-none transition-all duration-400 ease-in-out ${
                                 shouldShowContent
-                                    ? 'opacity-100 bg-gradient-to-t from-[rgba(10,14,22,0.55)] via-[rgba(10,14,22,0.3)] to-transparent'
-                                    : 'opacity-0 bg-gradient-to-t from-[rgba(10,14,22,0.55)] via-[rgba(10,14,22,0.3)] to-transparent'
+                                    ? 'opacity-100 bg-gradient-to-t from-transparent via-transparent to-transparent dark:from-[rgba(10,14,22,0.55)] dark:via-[rgba(10,14,22,0.3)] dark:to-transparent'
+                                    : 'opacity-0 bg-gradient-to-t from-transparent via-transparent to-transparent dark:from-[rgba(10,14,22,0.55)] dark:via-[rgba(10,14,22,0.3)] dark:to-transparent'
                             }`} />
                         </div>
                     </div>
@@ -411,7 +417,7 @@ export const ShowToolStream: React.FC<ShowToolStreamProps> = ({
         <div className="my-1">
             <button
                 onClick={() => onToolClick?.(messageId, toolName)}
-                className="inline-flex items-center gap-1.5 py-1 px-1 pr-1.5 text-xs text-white/90 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] rounded-lg transition-all duration-200 hover:border-white/20 hover:bg-[rgba(10,14,22,0.65)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] cursor-pointer relative overflow-hidden"
+                className="inline-flex items-center gap-1.5 py-1 px-1 pr-1.5 text-xs text-foreground bg-background/80 dark:bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-border/50 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] rounded-lg transition-all duration-200 hover:border-border dark:hover:border-white/20 hover:bg-background/90 dark:hover:bg-[rgba(10,14,22,0.65)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(0,0,0,0.15)] dark:hover:shadow-[0_12px_40px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] cursor-pointer relative overflow-hidden"
             >
                 {/* Gradient rim */}
                 <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-lg" style={{
@@ -437,11 +443,11 @@ export const ShowToolStream: React.FC<ShowToolStreamProps> = ({
                     mixBlendMode: 'overlay'
                 }}></div>
                 
-                <div className='border border-white/20 bg-white/10 backdrop-blur-sm flex items-center justify-center p-0.5 rounded-sm relative z-10'>
-                    <CircleDashed className="h-3.5 w-3.5 text-white/90 flex-shrink-0 animate-spin animation-duration-2000" />
+                <div className='border border-border/50 dark:border-white/20 bg-muted/50 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center p-0.5 rounded-sm relative z-10'>
+                    <CircleDashed className="h-3.5 w-3.5 text-foreground/80 dark:text-white/90 flex-shrink-0 animate-spin animation-duration-2000" />
                 </div>
-                <span className="font-mono text-white/90 relative z-10" style={{ fontSize: '12px' }}>{displayName}</span>
-                {paramDisplay && <span className="ml-1 text-white/70 truncate max-w-[200px] relative z-10" title={paramDisplay}>{paramDisplay}</span>}
+                <span className="font-mono text-foreground relative z-10" style={{ fontSize: '12px' }}>{displayName}</span>
+                {paramDisplay && <span className="ml-1 text-muted-foreground truncate max-w-[200px] relative z-10" title={paramDisplay}>{paramDisplay}</span>}
             </button>
         </div>
     );

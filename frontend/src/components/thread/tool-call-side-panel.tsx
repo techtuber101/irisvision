@@ -88,10 +88,10 @@ interface ViewToggleProps {
 
 const ViewToggle: React.FC<ViewToggleProps> = memo(function ViewToggle({ currentView, onViewChange }) {
   return (
-    <div className="relative flex items-center gap-1 bg-muted rounded-3xl px-1 py-1">
+    <div className="relative flex items-center gap-1 bg-muted rounded-3xl px-1 py-1 light:bg-black/5 light:border light:border-black/10">
       {/* Sliding background */}
       <motion.div
-        className="absolute h-7 w-7 bg-white rounded-xl shadow-sm"
+        className="absolute h-7 w-7 bg-white rounded-xl shadow-sm light:bg-white/80 light:shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
         initial={false}
         animate={{
           x: currentView === 'tools' ? 0 : 32, // 28px button width + 4px gap
@@ -109,8 +109,8 @@ const ViewToggle: React.FC<ViewToggleProps> = memo(function ViewToggle({ current
         onClick={() => onViewChange('tools')}
         className={`relative z-10 h-7 w-7 p-0 rounded-xl bg-transparent hover:bg-transparent shadow-none ${
           currentView === 'tools'
-            ? 'text-black'
-            : 'text-gray-500 dark:text-gray-400'
+            ? 'text-black light:text-black'
+            : 'text-gray-500 dark:text-gray-400 light:text-black/60'
         }`}
         title="Switch to Tool View"
       >
@@ -122,8 +122,8 @@ const ViewToggle: React.FC<ViewToggleProps> = memo(function ViewToggle({ current
         onClick={() => onViewChange('browser')}
         className={`relative z-10 h-7 w-7 p-0 rounded-xl bg-transparent hover:bg-transparent shadow-none ${
           currentView === 'browser'
-            ? 'text-black'
-            : 'text-gray-500 dark:text-gray-400'
+            ? 'text-black light:text-black'
+            : 'text-gray-500 dark:text-gray-400 light:text-black/60'
         }`}
         title="Switch to Browser View"
       >
@@ -606,19 +606,19 @@ export function ToolCallSidePanel({
       if (agentStatus === 'running') {
         return (
           <div
-            className={`${baseClasses} bg-white/10 border-white/20 hover:bg-white/15`}
+            className={`${baseClasses} bg-white/10 border-white/20 hover:bg-white/15 light:bg-white/10 light:border-white/20 light:hover:bg-white/15`}
             onClick={jumpToLive}
             title="Follow live updates"
           >
             <div className={`${dotClasses} bg-emerald-400 animate-pulse`} />
-            <span className={`${textClasses} text-white/80`}>Live Updates</span>
+            <span className={`${textClasses} text-white/80 light:text-zinc-700`}>Live Updates</span>
           </div>
         );
       } else {
         return (
-          <div className={`${baseClasses} bg-white/10 border-white/20`} title="Showing latest tool">
+          <div className={`${baseClasses} bg-white/10 border-white/20 light:bg-black/5 light:border-black/10`} title="Showing latest tool">
             <div className={`${dotClasses} bg-white/60`} />
-            <span className={`${textClasses} text-white/80`}>Latest Tool</span>
+            <span className={`${textClasses} text-white/80 light:text-zinc-700`}>Latest Tool</span>
           </div>
         );
       }
@@ -626,23 +626,23 @@ export function ToolCallSidePanel({
       if (agentStatus === 'running') {
         return (
           <div
-            className={`${baseClasses} bg-white/10 border-white/20 hover:bg-white/15`}
+            className={`${baseClasses} bg-white/10 border-white/20 hover:bg-white/15 light:bg-white/10 light:border-white/20 light:hover:bg-white/15`}
             onClick={jumpToLive}
             title="Jump to live"
           >
             <div className={`${dotClasses} bg-emerald-400 animate-pulse`} />
-            <span className={`${textClasses} text-white/80`}>Jump to Live</span>
+            <span className={`${textClasses} text-white/80 light:text-zinc-700`}>Jump to Live</span>
           </div>
         );
       } else {
         return (
           <div
-            className={`${baseClasses} bg-white/10 border-white/20 hover:bg-white/15`}
+            className={`${baseClasses} bg-white/10 border-white/20 hover:bg-white/15 light:bg-white/10 light:border-white/20 light:hover:bg-white/15`}
             onClick={jumpToLatest}
             title="Jump to latest"
           >
             <div className={`${dotClasses} bg-white/70`} />
-            <span className={`${textClasses} text-white/80`}>Hop to Latest</span>
+            <span className={`${textClasses} text-white/80 light:text-zinc-700`}>Hop to Latest</span>
           </div>
         );
       }
@@ -974,14 +974,14 @@ export function ToolCallSidePanel({
                       size="sm"
                       onClick={navigateToPrevious}
                       disabled={displayIndex <= 0}
-                      className="h-8 px-2.5 text-xs text-white/70 hover:text-white/90 disabled:opacity-40"
+                      className="h-8 px-2.5 text-xs text-white/70 hover:text-white/90 disabled:opacity-40 light:text-black light:hover:text-black"
                     >
                       <ChevronLeft className="h-3.5 w-3.5 mr-1" />
                       <span>Prev</span>
                     </Button>
 
                     <div className="flex-1 flex items-center gap-2">
-                      <span className="text-xs text-white/70 font-medium tabular-nums min-w-[44px] text-center">
+                      <span className="text-xs text-white/70 light:text-black font-medium tabular-nums min-w-[44px] text-center">
                         {safeInternalIndex + 1}/{totalCalls}
                       </span>
                       <div className="flex-1">
@@ -991,7 +991,7 @@ export function ToolCallSidePanel({
                           step={1}
                           value={[safeInternalIndex]}
                           onValueChange={handleSliderChange}
-                          className="w-full [&>span:first-child]:h-1.5 [&>span:first-child]:bg-white/15 [&>span:first-child>span]:bg-white/60 [&>span:first-child>span]:h-1.5"
+                          className="w-full [&>span:first-child]:h-1.5 [&>span:first-child]:bg-white/15 [&>span:first-child>span]:bg-white/60 [&>span:first-child>span]:h-1.5 light:[&>span:first-child]:bg-black/10 light:[&>span:first-child>span]:bg-black/30"
                         />
                       </div>
                       <div className="shrink-0">
@@ -1004,7 +1004,7 @@ export function ToolCallSidePanel({
                       size="sm"
                       onClick={navigateToNext}
                       disabled={displayIndex >= displayTotalCalls - 1}
-                      className="h-8 px-2.5 text-xs text-white/70 hover:text-white/90 disabled:opacity-40"
+                      className="h-8 px-2.5 text-xs text-white/70 hover:text-white/90 disabled:opacity-40 light:text-black light:hover:text-black"
                     >
                       <span>Next</span>
                       <ChevronRight className="h-3.5 w-3.5 ml-1" />
@@ -1045,7 +1045,7 @@ export function ToolCallSidePanel({
             overflow: 'hidden',
           }}
         >
-          <div className="flex-1 flex flex-col overflow-hidden relative rounded-3xl border border-white/10 bg-[rgba(7,10,17,0.95)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
+          <div className="flex-1 flex flex-col overflow-hidden relative rounded-3xl border border-white/10 bg-[rgba(7,10,17,0.95)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] light:border-black/10 light:bg-[rgba(255,255,255,0.25)] light:backdrop-blur-2xl light:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.05)] light:shadow-[inset_0_1px_0_0_rgba(0,0,0,0.06)]">
             {/* Gradient rim */}
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-3xl" style={{
               background: 'linear-gradient(180deg, rgba(173,216,255,0.10), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.10) 85%, rgba(255,255,255,0.06))',
@@ -1054,13 +1054,19 @@ export function ToolCallSidePanel({
               maskComposite: 'exclude',
               padding: '1px',
               borderRadius: '24px'
-            }} />
+            }} 
+            data-light-gradient="linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02) 30%, rgba(0,0,0,0.05) 85%, rgba(0,0,0,0.03))"
+            data-dark-gradient="linear-gradient(180deg, rgba(173,216,255,0.10), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.10) 85%, rgba(255,255,255,0.06))"
+            />
             {/* Specular streak */}
             <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-20" style={{
               background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
               filter: 'blur(6px)',
               mixBlendMode: 'screen'
-            }} />
+            }} 
+            data-light-streak="linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.03) 45%, rgba(0,0,0,0) 100%)"
+            data-dark-streak="linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)"
+            />
             {/* Fine noise */}
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{
               backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
@@ -1074,7 +1080,7 @@ export function ToolCallSidePanel({
               </div>
               {(displayTotalCalls > 1 || (isCurrentToolStreaming && totalCompletedCalls > 0)) && (
                 <div className="mt-auto px-4 py-2.5">
-                  <div className="relative rounded-2xl border border-white/10 bg-white/10 backdrop-blur-sm px-3 py-2">
+                  <div className="relative rounded-2xl border border-white/10 bg-white/10 backdrop-blur-sm px-3 py-2 light:border-black/10 light:bg-black/5 light:backdrop-blur-sm">
                     {/* subtle inner rim */}
                     <div aria-hidden className="pointer-events-none absolute inset-0 rounded-2xl" style={{
                       background: 'linear-gradient(180deg, rgba(173,216,255,0.10), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.10) 85%, rgba(255,255,255,0.06))',
@@ -1083,7 +1089,10 @@ export function ToolCallSidePanel({
                       maskComposite: 'exclude',
                       padding: '1px',
                       borderRadius: '16px'
-                    }} />
+                    }} 
+                    data-light-gradient="linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02) 30%, rgba(0,0,0,0.05) 85%, rgba(0,0,0,0.03))"
+                    data-dark-gradient="linear-gradient(180deg, rgba(173,216,255,0.10), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.10) 85%, rgba(255,255,255,0.06))"
+                    />
                     <div className="relative flex items-center gap-3">
                       <div className="flex items-center gap-1">
                         <Button
@@ -1091,12 +1100,12 @@ export function ToolCallSidePanel({
                           size="icon"
                           onClick={navigateToPrevious}
                           disabled={displayIndex <= 0}
-                          className="h-7 w-7 text-white/70 hover:text-white/90 disabled:opacity-40"
+                          className="h-7 w-7 text-white/70 hover:text-white/90 disabled:opacity-40 light:text-black light:hover:text-black"
                           title="Previous"
                         >
                           <ChevronLeft className="h-4 w-4" />
                         </Button>
-                        <span className="text-xs text-white/70 font-medium tabular-nums px-1 min-w-[44px] text-center">
+                        <span className="text-xs text-white/70 font-medium tabular-nums px-1 min-w-[44px] text-center light:text-black">
                           {displayIndex + 1}/{displayTotalCalls}
                         </span>
                         <Button
@@ -1104,7 +1113,7 @@ export function ToolCallSidePanel({
                           size="icon"
                           onClick={navigateToNext}
                           disabled={safeInternalIndex >= latestIndex}
-                          className="h-7 w-7 text-white/70 hover:text-white/90 disabled:opacity-40"
+                          className="h-7 w-7 text-white/70 hover:text-white/90 disabled:opacity-40 light:text-black light:hover:text-black"
                           title="Next"
                         >
                           <ChevronRight className="h-4 w-4" />
