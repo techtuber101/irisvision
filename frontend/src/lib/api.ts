@@ -712,7 +712,7 @@ export const startAgent = async (
     }
 
     const defaultOptions = {
-      model_name: 'anthropic/claude-3-7-sonnet-latest',
+      model_name: 'gemini/gemini-2.5-flash',
     };
 
     const finalOptions = { ...defaultOptions, ...options };

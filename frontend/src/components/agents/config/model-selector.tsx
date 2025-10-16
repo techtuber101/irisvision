@@ -165,6 +165,27 @@ export function AgentModelSelector({
     }
   }, [isOpen]);
 
+  const hasSingleOption = enhancedModelOptions.length <= 1;
+
+  if (hasSingleOption) {
+    const fallbackModelId = enhancedModelOptions[0]?.id || selectedModel || 'gemini/gemini-2.5-flash';
+    const fallbackLabel = enhancedModelOptions[0]?.label || selectedModelDisplay || 'Iris Pro';
+
+    return (
+      <div
+        className={cn(
+          variant === 'menu-item'
+            ? 'flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 text-sm font-medium text-foreground/90'
+            : 'flex items-center gap-2 text-sm font-medium text-foreground',
+          className,
+        )}
+      >
+        <ModelProviderIcon modelId={fallbackModelId} size={variant === 'menu-item' ? 18 : 20} className="border-transparent" />
+        <span className="truncate">{fallbackLabel}</span>
+      </div>
+    );
+  }
+
   const handleSelect = (modelId: string) => {
     const isCustomModel = customModels.some(model => model.id === modelId);
     

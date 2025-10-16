@@ -19,7 +19,11 @@ RUN apk add --no-cache \
     python3-dev
 
 # Install Rust compiler separately to avoid conflicts
-RUN apk add --no-cache rust cargo
+# Try installing Rust with retry mechanism to handle I/O errors
+RUN for i in 1 2 3; do \
+        apk add --no-cache rust cargo && break || \
+        (echo "Rust installation attempt $i failed, retrying..." && sleep 5); \
+    done || echo "Rust installation failed, continuing without it"
 
 # Set Rust environment variables to optimize compilation
 ENV RUSTFLAGS="-C target-cpu=native"

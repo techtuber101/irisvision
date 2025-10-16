@@ -5,7 +5,7 @@ Simplified conversation thread management system for AgentPress.
 import json
 from typing import List, Dict, Any, Optional, Type, Union, AsyncGenerator, Literal, cast
 from core.services.llm import make_llm_api_call, LLMError
-from core.agentpress.prompt_caching import apply_anthropic_caching_strategy, validate_cache_blocks
+from core.agentpress.prompt_caching import apply_prompt_caching_strategy, validate_cache_blocks
 from core.agentpress.tool import Tool
 from core.agentpress.tool_registry import ToolRegistry
 from core.agentpress.context_manager import ContextManager
@@ -316,7 +316,7 @@ class ThreadManager:
 
             # Apply caching
             if ENABLE_PROMPT_CACHING:
-                prepared_messages = apply_anthropic_caching_strategy(system_prompt, messages, llm_model)
+                prepared_messages = apply_prompt_caching_strategy(system_prompt, messages, llm_model)
                 prepared_messages = validate_cache_blocks(prepared_messages, llm_model)
             else:
                 prepared_messages = [system_prompt] + messages
@@ -445,16 +445,10 @@ class ThreadManager:
                     break
 
             except Exception as e:
-                if "AnthropicException - Overloaded" in str(e):
-                    logger.error(f"Anthropic overloaded, falling back to OpenRouter")
-                    llm_model = f"openrouter/{llm_model.replace('-20250514', '')}"
-                    auto_continue_state['active'] = True
-                    continue
-                else:
-                    processed_error = ErrorProcessor.process_system_error(e, context={"thread_id": thread_id})
-                    ErrorProcessor.log_error(processed_error)
-                    yield processed_error.to_stream_dict()
-                    return
+                processed_error = ErrorProcessor.process_system_error(e, context={"thread_id": thread_id})
+                ErrorProcessor.log_error(processed_error)
+                yield processed_error.to_stream_dict()
+                return
 
         # Handle max iterations reached
         if auto_continue_state['active'] and auto_continue_state['count'] >= native_max_auto_continues:

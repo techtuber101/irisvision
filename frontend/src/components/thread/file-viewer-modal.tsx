@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, Fragment, useCallback } from 'react';
+import { useState, useEffect, useRef, Fragment, useCallback, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,10 @@ import {
   Copy,
   Check,
   Edit,
+  FileText as MarkdownIcon,
+  FileImage,
+  Database,
+  FileArchive,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -162,6 +166,53 @@ export function FileViewerModal({
   // Add state for TipTap document editor
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editorDocumentData, setEditorDocumentData] = useState<any>(null);
+
+  // Add state for file filtering
+  const [activeFilter, setActiveFilter] = useState<string>('all');
+  const [allWorkspaceFiles, setAllWorkspaceFiles] = useState<FileInfo[]>([]);
+
+  // File filter definitions
+  const fileFilters = [
+    { key: 'all', label: 'All', icon: Folder },
+    { key: 'markdown', label: 'Markdown', icon: MarkdownIcon, extensions: ['.md', '.txt'] },
+    { key: 'docs', label: 'Docs', icon: FileText, extensions: ['.doc', '.docx'] },
+    { key: 'pdf', label: 'PDF', icon: FileText, extensions: ['.pdf'] },
+    { key: 'images', label: 'Images', icon: FileImage, extensions: ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.bmp', '.ico', '.tiff'] },
+    { key: 'data', label: 'Data', icon: Database, extensions: ['.json', '.xml', '.csv', '.yaml', '.yml', '.toml', '.ini', '.conf', '.config'] },
+    { key: 'archives', label: 'Archives', icon: FileArchive, extensions: ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz'] },
+  ];
+
+  // Load all workspace files when modal opens
+  useEffect(() => {
+    if (!open || !sandboxId) return;
+
+    const loadAllWorkspaceFiles = async () => {
+      try {
+        const { files: allFiles } = await discoverAllFiles('/workspace');
+        setAllWorkspaceFiles(allFiles);
+      } catch (error) {
+        console.error('Failed to load all workspace files:', error);
+        setAllWorkspaceFiles([]);
+      }
+    };
+
+    loadAllWorkspaceFiles();
+  }, [open, sandboxId]);
+
+  // Filter files based on active filter - use all workspace files when filtering
+  const filteredFiles = useMemo(() => {
+    const filesToFilter = activeFilter === 'all' ? files : allWorkspaceFiles;
+    
+    if (activeFilter === 'all') return files;
+    
+    const filter = fileFilters.find(f => f.key === activeFilter);
+    if (!filter || !filter.extensions) return filesToFilter;
+    
+    return filesToFilter.filter(file => {
+      const extension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+      return filter.extensions!.includes(extension);
+    });
+  }, [files, allWorkspaceFiles, activeFilter]);
 
   // Setup project with sandbox URL if not provided directly
   useEffect(() => {
@@ -1166,14 +1217,7 @@ export function FileViewerModal({
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent 
-        className="sm:max-w-[90vw] md:max-w-[1200px] w-[95vw] h-[90vh] max-h-[900px] flex flex-col p-0 gap-0 overflow-hidden relative rounded-3xl border border-white/10 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)]"
-        style={{ 
-          position: 'fixed',
-          top: '1rem',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 9999
-        }}
+        className="sm:max-w-[90vw] md:max-w-[1200px] w-[95vw] h-[90vh] max-h-[900px] flex flex-col p-0 gap-0 overflow-hidden rounded-3xl border border-blue-500/10 bg-[rgba(15,23,42,0.12)] backdrop-blur-md shadow-[0_20px_60px_-10px_rgba(0,0,0,0.1),inset_0_1px_0_0_rgba(59,130,246,0.05)] !top-[50%] !left-[50%] !translate-x-[-50%] !translate-y-[-50%]"
       >
         {/* Gradient rim */}
         <div
@@ -1215,30 +1259,32 @@ export function FileViewerModal({
         />
 
         {/* Header */}
-        <DialogHeader className="px-4 py-3 flex-shrink-0 flex flex-row gap-4 items-center border-b border-white/10 relative z-10">
-          <DialogTitle className="text-lg font-semibold text-white/90">
-            Workspace Files
-          </DialogTitle>
-
-          {/* Download progress display */}
-          {downloadProgress && (
-            <div className="flex items-center gap-2 text-sm text-white/70">
-              <div className="flex items-center gap-1.5">
-                <Loader className="h-4 w-4 animate-spin text-white/60" />
-                <span>
-                  {downloadProgress.total > 0
-                    ? `${downloadProgress.current}/${downloadProgress.total}`
-                    : 'Preparing...'
-                  }
+        <DialogHeader className="px-4 py-3 flex-shrink-0 grid grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-white/10 relative z-10">
+          <div className="flex items-center gap-2 text-sm text-white/70 h-8">
+            {/* Download progress display */}
+            {downloadProgress && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <Loader className="h-4 w-4 animate-spin text-white/60" />
+                  <span>
+                    {downloadProgress.total > 0
+                      ? `${downloadProgress.current}/${downloadProgress.total}`
+                      : 'Preparing...'
+                    }
+                  </span>
+                </div>
+                <span className="max-w-[200px] truncate">
+                  {downloadProgress.currentFile}
                 </span>
               </div>
-              <span className="max-w-[200px] truncate">
-                {downloadProgress.currentFile}
-              </span>
-            </div>
-          )}
+            )}
+          </div>
 
-          <div className="flex items-center gap-2 ml-auto">
+          <DialogTitle className="text-lg font-semibold text-white/90 text-center">
+            Iris's Vault
+          </DialogTitle>
+
+          <div className="flex items-center gap-2 justify-end">
             {/* Navigation arrows for file list mode */}
             {(() => {
               return isFileListMode && selectedFilePath && filePathList && filePathList.length > 1 && currentFileIndex >= 0;
@@ -1462,6 +1508,41 @@ export function FileViewerModal({
           </div>
         </div>
 
+        {/* File Type Filter Buttons */}
+        {!selectedFilePath && (
+          <div className="px-4 py-3 border-b border-blue-500/10 relative z-10">
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+              {fileFilters.map((filter) => {
+                const IconComponent = filter.icon;
+                return (
+                  <Button
+                    key={filter.key}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActiveFilter(filter.key)}
+                    className={`h-9 px-4 text-xs font-medium whitespace-nowrap transition-all duration-300 rounded-2xl border backdrop-blur-md ${
+                      activeFilter === filter.key
+                        ? 'bg-[rgba(15,23,42,0.25)] border-blue-400/30 text-blue-300 hover:bg-[rgba(15,23,42,0.35)] shadow-[0_4px_12px_-2px_rgba(59,130,246,0.2)]'
+                        : 'border-blue-500/15 bg-[rgba(15,23,42,0.12)] text-white/70 hover:bg-[rgba(15,23,42,0.2)] hover:border-blue-400/25 hover:text-white/90 shadow-[0_2px_8px_-2px_rgba(59,130,246,0.1)]'
+                    }`}
+                  >
+                    <IconComponent className="h-3.5 w-3.5 mr-2 stroke-[1.5]" />
+                    {filter.label}
+                    {filter.key !== 'all' && (
+                      <span className="ml-2 text-xs opacity-60">
+                        ({allWorkspaceFiles.filter(file => {
+                          const extension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+                          return filter.extensions?.includes(extension);
+                        }).length})
+                      </span>
+                    )}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Content Area */}
         <div className="flex-1 overflow-hidden relative z-10">
           {selectedFilePath ? (
@@ -1581,28 +1662,37 @@ export function FileViewerModal({
                 <div className="h-full w-full flex items-center justify-center">
                   <Loader className="h-6 w-6 animate-spin text-white/60" />
                 </div>
-              ) : files.length === 0 ? (
+              ) : filteredFiles.length === 0 ? (
                 <div className="h-full w-full flex flex-col items-center justify-center">
                   <Folder className="h-12 w-12 mb-2 text-white/30 opacity-30" />
                   <p className="text-sm text-white/50">
-                    Directory is empty
+                    {activeFilter === 'all' ? 'Directory is empty' : `No ${fileFilters.find(f => f.key === activeFilter)?.label.toLowerCase()} files found`}
                   </p>
                 </div>
               ) : (
                 <ScrollArea className="h-full w-full p-2">
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-4">
-                    {files.map((file) => (
+                    {filteredFiles.map((file) => (
                       <button
                         key={file.path}
-                        className={`group flex flex-col items-center p-3 rounded-2xl border border-white/10 bg-[rgba(10,14,22,0.4)] backdrop-blur-sm hover:bg-[rgba(10,14,22,0.6)] hover:border-white/20 hover:scale-[1.02] transition-all duration-300 ${selectedFilePath === file.path
-                          ? 'bg-[rgba(10,14,22,0.8)] border-white/30 ring-1 ring-white/20'
+                        className={`group flex flex-col items-center p-3 rounded-2xl border border-blue-500/15 bg-[rgba(15,23,42,0.15)] backdrop-blur-md hover:bg-[rgba(15,23,42,0.25)] hover:border-blue-400/25 hover:scale-[1.02] transition-all duration-300 shadow-[0_4px_12px_-2px_rgba(59,130,246,0.1)] ${selectedFilePath === file.path
+                          ? 'bg-[rgba(15,23,42,0.3)] border-blue-400/30 ring-1 ring-blue-400/20 shadow-[0_4px_12px_-2px_rgba(59,130,246,0.2)]'
                           : ''
                           }`}
                         onClick={() => {
                           if (file.is_dir) {
                             navigateToFolder(file);
                           } else {
-                            openFile(file);
+                            // If we're in filter mode and the file is not in current directory,
+                            // navigate to the file's directory first, then open the file
+                            if (activeFilter !== 'all' && !file.path.startsWith(currentPath)) {
+                              const fileDir = file.path.substring(0, file.path.lastIndexOf('/'));
+                              setCurrentPath(fileDir);
+                              // Small delay to ensure directory loads before opening file
+                              setTimeout(() => openFile(file), 100);
+                            } else {
+                              openFile(file);
+                            }
                           }
                         }}
                       >

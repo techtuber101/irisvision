@@ -84,6 +84,179 @@ export async function continueSimpleChat(threadId: string, message: string): Pro
 }
 
 /**
+ * Streaming simple chat - creates project/thread and streams response
+ */
+export async function simpleChatStream(
+  message: string,
+  callbacks: {
+    onMetadata?: (data: { thread_id: string; project_id: string }) => void;
+    onContent?: (content: string) => void;
+    onDone?: () => void;
+    onError?: (error: string) => void;
+  }
+): Promise<void> {
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    throw new Error('No authentication token available');
+  }
+
+  const formData = new FormData();
+  formData.append('message', message);
+
+  const response = await fetch(`${API_URL}/simple-chat/simple/stream`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${session.access_token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    callbacks.onError?.(error.detail || 'Failed to stream message');
+    return;
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    callbacks.onError?.('No response body');
+    return;
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            
+            switch (data.type) {
+              case 'metadata':
+                callbacks.onMetadata?.(data);
+                break;
+              case 'content':
+                callbacks.onContent?.(data.content);
+                break;
+              case 'done':
+                callbacks.onDone?.();
+                return;
+              case 'error':
+                callbacks.onError?.(data.error);
+                return;
+            }
+          } catch (e) {
+            console.error('Failed to parse SSE data:', line);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    callbacks.onError?.(error instanceof Error ? error.message : 'Streaming error');
+  }
+}
+
+/**
+ * Streaming continue simple chat conversation
+ */
+export async function continueSimpleChatStream(
+  threadId: string,
+  message: string,
+  callbacks: {
+    onContent?: (content: string) => void;
+    onDone?: () => void;
+    onError?: (error: string) => void;
+  }
+): Promise<void> {
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    throw new Error('No authentication token available');
+  }
+
+  const formData = new FormData();
+  formData.append('thread_id', threadId);
+  formData.append('message', message);
+
+  const response = await fetch(`${API_URL}/simple-chat/simple/continue/stream`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${session.access_token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    callbacks.onError?.(error.detail || 'Failed to stream message');
+    return;
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    callbacks.onError?.('No response body');
+    return;
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            
+            switch (data.type) {
+              case 'content':
+                console.log('Received content chunk:', data.content.length, 'characters');
+                callbacks.onContent?.(data.content);
+                break;
+              case 'done':
+                console.log('Streaming completed');
+                callbacks.onDone?.();
+                return;
+              case 'error':
+                console.error('Streaming error:', data.error);
+                callbacks.onError?.(data.error);
+                return;
+            }
+          } catch (e) {
+            console.error('Failed to parse SSE data:', line);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    callbacks.onError?.(error instanceof Error ? error.message : 'Streaming error');
+  }
+}
+
+/**
  * Health check for simple chat
  */
 export async function simpleChatHealth(): Promise<{

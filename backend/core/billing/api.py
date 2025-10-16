@@ -739,10 +739,20 @@ async def get_available_models(
         from core.ai_models import model_manager
         from core.services.supabase import DBConnection
         # Use the implemented get_allowed_models_for_user function
-        
+
+        VISIBLE_MODEL_IDS = {"gemini/gemini-2.5-flash"}
+        fallback_visible_if_missing = True
+        def filter_visible(models: List[Dict]) -> List[Dict]:
+            if not models:
+                return models
+            filtered = [model for model in models if model.get("id") in VISIBLE_MODEL_IDS]
+            if filtered or not fallback_visible_if_missing:
+                return filtered
+            return models
+
         if config.ENV_MODE == EnvMode.LOCAL:
             logger.debug("Running in local development mode - all models available")
-            all_models = model_manager.list_available_models(include_disabled=False)
+            all_models = filter_visible(model_manager.list_available_models(include_disabled=False))
             model_info = []
             
             for model_data in all_models:
@@ -776,11 +786,12 @@ async def get_available_models(
         from .subscription_service import subscription_service
         tier = await subscription_service.get_user_subscription_tier(account_id)
         
-        all_models = model_manager.list_available_models(tier=None, include_disabled=False)
+        all_models = filter_visible(model_manager.list_available_models(tier=None, include_disabled=False))
         logger.debug(f"Found {len(all_models)} total models available")
-        
+
         # Get allowed models using the service method
         allowed_models = await subscription_service.get_allowed_models_for_user(account_id, client)
+        allowed_models = [model_id for model_id in allowed_models if model_id in VISIBLE_MODEL_IDS]
             
         logger.debug(f"User {account_id} allowed models: {allowed_models}")
         logger.debug(f"User tier: {tier['name']}")
@@ -788,7 +799,7 @@ async def get_available_models(
         model_info = []
         for model_data in all_models:
             model_id = model_data["id"]
-            
+
             can_access = model_id in allowed_models
             
             model_info.append({

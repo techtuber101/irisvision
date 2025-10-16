@@ -79,11 +79,11 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 # Infrastructure
 REDIS_HOST=redis  # Use 'localhost' when running API locally
 REDIS_PORT=6379
-# LLM Providers (at least one required)
-ANTHROPIC_API_KEY=your-anthropic-key
+
+# LLM Providers (Gemini is the primary default)
+GEMINI_API_KEY=your-gemini-api-key
 OPENAI_API_KEY=your-openai-key
 OPENROUTER_API_KEY=your-openrouter-key
-GEMINI_API_KEY=your-gemini-api-key
 
 # Search and Web Scraping
 TAVILY_API_KEY=your-tavily-key

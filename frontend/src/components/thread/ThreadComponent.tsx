@@ -50,7 +50,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { threadKeys } from '@/hooks/react-query/threads/keys';
 import { useProjectRealtime } from '@/hooks/useProjectRealtime';
 import { fastGeminiChatStream } from '@/lib/fast-gemini-chat';
-import { continueSimpleChat } from '@/lib/simple-chat';
+import { continueSimpleChatStream } from '@/lib/simple-chat';
 import { handleGoogleSlidesUpload } from './tool-views/utils/presentation-utils';
 
 
@@ -516,66 +516,236 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
       }, 10000);
 
       try {
-        // Add user message first in both modes
+        if (options?.chat_mode === 'chat') {
+          // Remove the "Hmm..." message immediately
+          setMessages((prev) => 
+            prev.filter((m) => m.message_id !== optimisticHmmMessage.message_id)
+          );
+          clearTimeout(hmmTimeout);
+          
+          // Set simple chat loading state
+          setIsSimpleChatLoading(true);
+          
+          // Create a streaming assistant message
+          const assistantMessageId = `assistant-${Date.now()}`;
+          let streamedContent = '';
+          let displayedContent = '';
+          let characterQueue: string[] = [];
+          let isTyping = false;
+          let characterCount = 0;
+          let useTypewriterEffect = true;
+          
+          const assistantMessage: UnifiedMessage = {
+            message_id: assistantMessageId,
+            thread_id: threadId,
+            type: 'assistant',
+            is_llm_message: true,
+            content: JSON.stringify({ content: '' }),
+            metadata: JSON.stringify({ 
+              chat_mode: 'chat',
+              streaming: true
+            }),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          
+          // Add the streaming message to the UI
+          setMessages((prev) => [...prev, assistantMessage]);
+          
+          // Dynamic typewriter effect: Start with typewriter, then switch to raw streaming
+          const getTypewriterInterval = () => {
+            // First ~500 characters: 10ms (super fast start)
+            if (characterCount < 500) {
+              return 10;
+            }
+            // Next ~1000 characters: 5ms (even faster)
+            else if (characterCount < 1500) {
+              return 5;
+            }
+            // After that: 2ms (maximum speed)
+            else {
+              return 2;
+            }
+          };
+          
+          const startTyping = () => {
+            if (isTyping || characterQueue.length === 0) return;
+            
+            isTyping = true;
+            const typeNextCharacter = () => {
+              if (characterQueue.length === 0) {
+                isTyping = false;
+                return;
+              }
+              
+              const char = characterQueue.shift()!;
+              displayedContent += char;
+              characterCount++;
+              
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.message_id === assistantMessageId
+                    ? {
+                        ...m,
+                        content: JSON.stringify({ content: displayedContent }),
+                        metadata: JSON.stringify({ is_streaming: true }),
+                      }
+                    : m
+                )
+              );
+              
+              // Check if we've reached 500 characters and should switch to raw streaming
+              if (characterCount >= 500) {
+                switchToRawStreaming();
+                return;
+              }
+              
+              setTimeout(typeNextCharacter, getTypewriterInterval());
+            };
+            
+            typeNextCharacter();
+          };
+          
+          // Switch to raw streaming after 500 characters
+          const switchToRawStreaming = () => {
+            useTypewriterEffect = false;
+            // Flush any remaining characters in queue immediately
+            if (characterQueue.length > 0) {
+              const remainingContent = characterQueue.join('');
+              displayedContent += remainingContent;
+              characterQueue = [];
+              isTyping = false;
+              
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.message_id === assistantMessageId
+                    ? {
+                        ...m,
+                        content: JSON.stringify({ content: displayedContent }),
+                        metadata: JSON.stringify({ is_streaming: true }),
+                      }
+                    : m
+                )
+              );
+            }
+          };
+          
+          // Save message to database and mark as complete
+          const saveAndCompleteMessage = async () => {
+            const finalMetadata = { 
+              is_streaming: false, 
+              chat_mode: 'chat' // Mark as chat mode message
+            };
+            
+            // Update local state
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.message_id === assistantMessageId
+                  ? {
+                      ...m,
+                      content: JSON.stringify({ content: streamedContent }),
+                      metadata: JSON.stringify(finalMetadata),
+                    }
+                  : m
+              )
+            );
+          };
+          
+          try {
+            // Use the streaming simple chat continue endpoint
+            await continueSimpleChatStream(threadId, message, {
+              onContent: (content: string) => {
+                console.log('ThreadComponent received content chunk:', content.length, 'characters');
+                // Clear loading indicator on first content chunk
+                if (streamedContent === '') {
+                  console.log('Clearing loading indicator - first chunk received');
+                  setIsSimpleChatLoading(false);
+                }
+                
+                streamedContent += content;
+                
+                if (useTypewriterEffect) {
+                  // Add each character to the queue for typewriter effect
+                  for (const char of content) {
+                    characterQueue.push(char);
+                  }
+                  
+                  // Check if we've reached 500 characters and should switch to raw streaming
+                  if (characterCount + characterQueue.length >= 500) {
+                    switchToRawStreaming();
+                  }
+                  
+                  // Start typing if not already typing
+                  startTyping();
+                } else {
+                  // Raw streaming mode - display content immediately in huge chunks
+                  displayedContent += content;
+                  
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.message_id === assistantMessageId
+                        ? {
+                            ...m,
+                            content: JSON.stringify({ content: displayedContent }),
+                            metadata: JSON.stringify({ is_streaming: true }),
+                          }
+                        : m
+                    )
+                  );
+                }
+              },
+              onDone: () => {
+                console.log(`Simple chat streaming completed`);
+                
+                if (useTypewriterEffect) {
+                  // Wait for all characters to be typed before marking complete
+                  const waitForTyping = () => {
+                    if (characterQueue.length > 0 || isTyping) {
+                      setTimeout(waitForTyping, 50);
+                    } else {
+                      // All characters typed, save to database and mark as complete
+                      saveAndCompleteMessage();
+                    }
+                  };
+                  
+                  waitForTyping();
+                } else {
+                  // Raw streaming mode - save immediately
+                  saveAndCompleteMessage();
+                }
+              },
+              onError: (error: string) => {
+                console.error('Simple chat streaming error:', error);
+                toast.error(`Chat error: ${error}`);
+                // Remove the failed message
+                setMessages((prev) => 
+                  prev.filter((msg) => msg.message_id !== assistantMessageId)
+                );
+              }
+            });
+            
+          } catch (error) {
+            console.error('Simple chat error:', error);
+            toast.error(`Chat error: ${error}`);
+            // Remove the failed message
+            setMessages((prev) => 
+              prev.filter((msg) => msg.message_id !== assistantMessageId)
+            );
+          } finally {
+            // Loading state is cleared when streaming starts, but ensure it's cleared on error
+            if (streamedContent === '') {
+              setIsSimpleChatLoading(false);
+            }
+          }
+          
+          return;
+        }
+
+        // Add user message before handling execute mode
         const messagePromise = addUserMessageMutation.mutateAsync({
           threadId,
           message,
         });
-
-        // Handle Chat Mode - Only use simple chat for threads that were originally created as simple chat
-        if (options?.chat_mode === 'chat') {
-          // Check if this thread was originally created as a simple chat thread
-          const threadMetadata = threadQuery.data?.metadata;
-          const isSimpleChatThread = threadMetadata && typeof threadMetadata === 'object' && threadMetadata.chat_mode === 'simple';
-          
-          if (isSimpleChatThread) {
-            // Remove the "Hmm..." message immediately
-            setMessages((prev) => 
-              prev.filter((m) => m.message_id !== optimisticHmmMessage.message_id)
-            );
-            clearTimeout(hmmTimeout);
-            
-            // Set simple chat loading state
-            setIsSimpleChatLoading(true);
-            
-            try {
-              // Use the new simple chat continue endpoint
-              const result = await continueSimpleChat(threadId, message);
-              
-              // Add the assistant response to the UI
-            const assistantMessage: UnifiedMessage = {
-                message_id: `assistant-${Date.now()}`,
-              thread_id: threadId,
-              type: 'assistant',
-              is_llm_message: true,
-                content: JSON.stringify({ content: result.response }),
-                metadata: JSON.stringify({ 
-                  response_time_ms: result.time_ms,
-                  chat_mode: 'chat'
-                }),
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            };
-            
-            setMessages((prev) => [...prev, assistantMessage]);
-            
-              console.log(`Simple chat response completed in ${result.time_ms}ms`);
-              
-              } catch (error) {
-              console.error('Simple chat error:', error);
-              toast.error(`Chat error: ${error}`);
-            } finally {
-              // Always clear loading state
-              setIsSimpleChatLoading(false);
-            }
-            
-            setIsSending(false);
-            return;
-          } else {
-            // For non-simple chat threads, fall through to execute mode
-            console.log('Chat mode requested but thread is not a simple chat thread, using execute mode instead');
-          }
-        }
 
         // Handle Execute Mode - Normal agent run
         const agentPromise = startAgentMutation.mutateAsync({

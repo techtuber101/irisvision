@@ -136,7 +136,7 @@ The caching system is automatically applied in `ThreadManager.run_thread()`:
 
 ```python
 # Auto-detects context window and calculates optimal thresholds
-prepared_messages = apply_anthropic_caching_strategy(
+prepared_messages = apply_prompt_caching_strategy(
     system_prompt, 
     conversation_messages, 
     model_name  # e.g., "claude-sonnet-4"

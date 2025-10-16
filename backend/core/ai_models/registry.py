@@ -19,86 +19,6 @@ class ModelRegistry:
         self._initialize_models()
     
     def _initialize_models(self):
-        
-        self.register(Model(
-            id="anthropic/claude-sonnet-4-5-20250929" if is_local else "bedrock/converse/arn:aws:bedrock:us-west-2:935064898258:inference-profile/global.anthropic.claude-sonnet-4-5-20250929-v1:0",
-            name="Sonnet 4.5",
-            provider=ModelProvider.ANTHROPIC,
-            aliases=["claude-sonnet-4.5", "anthropic/claude-sonnet-4.5", "Claude Sonnet 4.5", "claude-sonnet-4-5-20250929", "global.anthropic.claude-sonnet-4-5-20250929-v1:0", "arn:aws:bedrock:us-west-2:935064898258:inference-profile/global.anthropic.claude-sonnet-4-5-20250929-v1:0", "bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0"],
-            context_window=1_000_000,
-            capabilities=[
-                ModelCapability.CHAT,
-                ModelCapability.FUNCTION_CALLING,
-                ModelCapability.VISION,
-                ModelCapability.THINKING,
-            ],
-            pricing=ModelPricing(
-                input_cost_per_million_tokens=3.00,
-                output_cost_per_million_tokens=15.00
-            ),
-            tier_availability=["paid"],
-            priority=101,
-            recommended=True,
-            enabled=True,
-            config=ModelConfig(
-                extra_headers={
-                    "anthropic-beta": "context-1m-2025-08-07" 
-                },
-            )
-        ))
-        
-        self.register(Model(
-            id="anthropic/claude-sonnet-4-20250514" if is_local else "bedrock/converse/arn:aws:bedrock:us-west-2:935064898258:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0",
-            name="Sonnet 4",
-            provider=ModelProvider.ANTHROPIC,
-            aliases=["claude-sonnet-4", "Claude Sonnet 4", "claude-sonnet-4-20250514", "arn:aws:bedrock:us-west-2:935064898258:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0", "bedrock/anthropic.claude-sonnet-4-20250514-v1:0"],
-            context_window=1_000_000,
-            capabilities=[
-                ModelCapability.CHAT,
-                ModelCapability.FUNCTION_CALLING,
-                ModelCapability.VISION,
-                ModelCapability.THINKING,
-            ],
-            pricing=ModelPricing(
-                input_cost_per_million_tokens=3.00,
-                output_cost_per_million_tokens=15.00
-            ),
-            tier_availability=["paid"],
-            priority=100,
-            recommended=True,
-            enabled=True,
-            config=ModelConfig(
-                extra_headers={
-                    "anthropic-beta": "context-1m-2025-08-07" 
-                },
-            )
-        ))
-        
-        self.register(Model(
-            id="anthropic/claude-3-7-sonnet-latest" if is_local else "bedrock/converse/arn:aws:bedrock:us-west-2:935064898258:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-            name="Sonnet 3.7",
-            provider=ModelProvider.ANTHROPIC,
-            aliases=["claude-3.7", "Claude 3.7 Sonnet", "claude-3-7-sonnet-latest", "arn:aws:bedrock:us-west-2:935064898258:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0", "bedrock/anthropic.claude-3-7-sonnet-20250219-v1:0"],
-            context_window=200_000,
-            capabilities=[
-                ModelCapability.CHAT,
-                ModelCapability.FUNCTION_CALLING,
-                ModelCapability.VISION,
-            ],
-            pricing=ModelPricing(
-                input_cost_per_million_tokens=3.00,
-                output_cost_per_million_tokens=15.00
-            ),
-            tier_availability=["paid"],
-            priority=99,
-            enabled=True,
-            config=ModelConfig(
-                # extra_headers={
-                #     "anthropic-beta": "prompt-caching-2024-07-31"
-                # },
-            )
-        ))
-
         self.register(Model(
             id="xai/grok-4-fast-non-reasoning",
             name="Grok 4 Fast",
@@ -181,9 +101,14 @@ class ModelRegistry:
         
         self.register(Model(
             id="gemini/gemini-2.5-flash",
-            name="Gemini 2.5 Flash",
+            name="Iris Pro",
             provider=ModelProvider.GOOGLE,
-            aliases=["gemini-2.5-flash", "Gemini 2.5 Flash", "gemini-2.5-pro", "Gemini 2.5 Pro"],
+            aliases=[
+                "iris-pro",
+                "Iris Pro",
+                "gemini-2.5-flash",
+                "Gemini 2.5 Flash",
+            ],
             context_window=1_000_000,
             max_output_tokens=65_536,
             capabilities=[
@@ -197,12 +122,78 @@ class ModelRegistry:
                 output_cost_per_million_tokens=0.30
             ),
             tier_availability=["free", "paid"],
-            priority=95,
+            priority=120,
             enabled=True,
             recommended=True,
             config=ModelConfig(
-                timeout=60.0,  # 60 second timeout for Flash model
+                timeout=60.0,
                 num_retries=3,
+                extra_headers={
+                    "User-Agent": "Suna-AI-Agent/1.0"
+                }
+            )
+        ))
+        
+        self.register(Model(
+            id="gemini/gemini-2.5-flash-lite",
+            name="Gemini 2.5 Flash Lite",
+            provider=ModelProvider.GOOGLE,
+            aliases=[
+                "gemini-2.5-flash-lite",
+                "Gemini 2.5 Flash Lite",
+            ],
+            context_window=1_000_000,
+            max_output_tokens=32_768,
+            capabilities=[
+                ModelCapability.CHAT,
+                ModelCapability.FUNCTION_CALLING,
+                ModelCapability.VISION,
+                ModelCapability.STRUCTURED_OUTPUT,
+            ],
+            pricing=ModelPricing(
+                input_cost_per_million_tokens=0.045,
+                output_cost_per_million_tokens=0.18
+            ),
+            tier_availability=["internal"],
+            priority=90,
+            enabled=False,
+            recommended=False,
+            config=ModelConfig(
+                timeout=45.0,
+                num_retries=3,
+                extra_headers={
+                    "User-Agent": "Suna-AI-Agent/1.0"
+                }
+            )
+        ))
+        
+        self.register(Model(
+            id="gemini/gemini-2.5-pro",
+            name="Gemini 2.5 Pro",
+            provider=ModelProvider.GOOGLE,
+            aliases=[
+                "gemini-2.5-pro",
+                "Gemini 2.5 Pro",
+            ],
+            context_window=2_000_000,
+            max_output_tokens=100_000,
+            capabilities=[
+                ModelCapability.CHAT,
+                ModelCapability.FUNCTION_CALLING,
+                ModelCapability.VISION,
+                ModelCapability.STRUCTURED_OUTPUT,
+            ],
+            pricing=ModelPricing(
+                input_cost_per_million_tokens=0.50,
+                output_cost_per_million_tokens=1.50
+            ),
+            tier_availability=["internal"],
+            priority=85,
+            enabled=False,
+            recommended=False,
+            config=ModelConfig(
+                timeout=90.0,
+                num_retries=2,
                 extra_headers={
                     "User-Agent": "Suna-AI-Agent/1.0"
                 }

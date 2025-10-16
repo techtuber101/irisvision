@@ -37,7 +37,7 @@ import { Calendar, MessageSquare, Plus, Sparkles, Zap } from 'lucide-react';
 import { AgentConfigurationDialog } from '@/components/agents/agent-configuration-dialog';
 import { fastGeminiChat } from '@/lib/fast-gemini-chat';
 import { addAssistantMessage } from '@/lib/api';
-import { simpleChat } from '@/lib/simple-chat';
+import { simpleChat, simpleChatStream } from '@/lib/simple-chat';
 
 const PENDING_PROMPT_KEY = 'pendingAgentPrompt';
 
@@ -170,17 +170,34 @@ export function DashboardContent() {
       const files = chatInputRef.current?.getPendingFiles() || [];
       localStorage.removeItem(PENDING_PROMPT_KEY);
 
-      // Handle Chat Mode - Use new simple chat endpoint
+      // Handle Chat Mode - Use streaming simple chat endpoint
       if (options?.chat_mode === 'chat') {
-        // Ultra-simple chat mode - direct API call, no complexity
-        const result = await simpleChat(message);
-
-        if (result.thread_id && result.project_id) {
-          // Direct redirect to the created thread
-          router.push(`/projects/${result.project_id}/thread/${result.thread_id}`);
-        } else {
-          throw new Error('Simple chat did not return thread_id and project_id.');
-        }
+        // Streaming simple chat mode - real-time response
+        let threadId: string | null = null;
+        let projectId: string | null = null;
+        
+        await simpleChatStream(message, {
+          onMetadata: (data) => {
+            threadId = data.thread_id;
+            projectId = data.project_id;
+          },
+          onContent: (content) => {
+            // Content is streamed but we don't need to handle it here
+            // The streaming will be handled by the thread page after redirect
+          },
+          onDone: () => {
+            // Redirect to the created thread after streaming is complete
+            if (threadId && projectId) {
+              router.push(`/projects/${projectId}/thread/${threadId}`);
+            } else {
+              throw new Error('Simple chat streaming did not return thread_id and project_id.');
+            }
+          },
+          onError: (error) => {
+            throw new Error(`Simple chat streaming error: ${error}`);
+          }
+        });
+        
         chatInputRef.current?.clearPendingFiles();
         return;
       }

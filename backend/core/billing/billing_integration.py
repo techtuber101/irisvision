@@ -40,8 +40,8 @@ class BillingIntegration:
             non_cached_prompt_tokens = prompt_tokens - cache_read_tokens
             
             model_lower = model.lower()
-            if any(provider in model_lower for provider in ['anthropic', 'claude', 'sonnet']):
-                cache_discount = Decimal('0.1')
+            if any(provider in model_lower for provider in ['gemini', 'flash']):
+                cache_discount = Decimal('0.25')
             elif any(provider in model_lower for provider in ['gpt', 'openai', 'gpt-4o']):
                 cache_discount = Decimal('0.5')
             else:

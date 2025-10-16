@@ -5,7 +5,7 @@ This module provides a unified interface for making API calls to different LLM p
 using LiteLLM with simplified error handling and clean parameter management.
 """
 
-from typing import Union, Dict, Any, Optional, AsyncGenerator, List
+from typing import Union, Dict, Any, Optional, AsyncGenerator, List, Set
 import os
 import asyncio
 import litellm
@@ -28,7 +28,18 @@ litellm.drop_params = True
 
 # Constants
 MAX_RETRIES = 3
+BASE_BACKOFF_SECONDS = 1.0
+MAX_BACKOFF_SECONDS = 8.0
 provider_router = None
+MODEL_FALLBACKS = {
+    "gemini/gemini-2.5-flash": [
+        "gemini/gemini-2.5-flash-lite",
+        "gemini/gemini-2.5-pro",
+    ],
+    "gemini/gemini-2.5-flash-lite": [
+        "gemini/gemini-2.5-pro",
+    ],
+}
 
 
 class LLMError(Exception):
@@ -89,36 +100,7 @@ def setup_provider_router(openai_compatible_api_key: str = None, openai_compatib
     ]
     
     # Configure fallbacks: Bedrock models -> Direct Anthropic API
-    fallbacks = [
-        # Bedrock Sonnet 4.5 -> Anthropic Sonnet 4.5
-        # {
-        #     "bedrock/converse/arn:aws:bedrock:eu-north-1:737973863695:inference-profile/eu.anthropic.claude-sonnet-4-5-20250929-v1:0": [
-        #         "anthropic/claude-sonnet-4-5-20250929"  # Fallback to direct Anthropic API
-        #     ]
-        # },
-        {
-            "bedrock/converse/arn:aws:bedrock:us-west-2:935064898258:inference-profile/global.anthropic.claude-sonnet-4-5-20250929-v1:0": [
-                "anthropic/claude-sonnet-4-5-20250929"
-            ]
-        },
-        # Bedrock Sonnet 4 -> Anthropic Sonnet 4
-        # {
-        #     "bedrock/converse/arn:aws:bedrock:eu-north-1:737973863695:inference-profile/eu.anthropic.claude-sonnet-4-20250929-v1:0": [
-        #         "anthropic/claude-sonnet-4-20250514"
-        #     ]
-        # },
-        {
-            "bedrock/converse/arn:aws:bedrock:us-west-2:935064898258:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0": [
-                "anthropic/claude-sonnet-4-20250514"
-            ]
-        },
-        # Bedrock Sonnet 3.7 -> Anthropic Sonnet 3.7
-        {
-            "bedrock/converse/arn:aws:bedrock:us-west-2:935064898258:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0": [
-                "anthropic/claude-3-7-sonnet-latest"
-            ]
-        }
-    ]
+    fallbacks = []
     
     provider_router = Router(
         model_list=model_list,
@@ -197,57 +179,76 @@ async def make_llm_api_call(
     if extra_headers is not None:
         override_params["extra_headers"] = extra_headers
     
-    params = model_manager.get_litellm_params(resolved_model_name, **override_params)
+    def build_attempt_sequence(primary: str) -> List[str]:
+        sequence: List[str] = []
+        queue: List[str] = [primary]
+        seen: Set[str] = set()
+        
+        while queue:
+            current = queue.pop(0)
+            if current in seen:
+                continue
+            seen.add(current)
+            sequence.append(current)
+            for fallback_model in MODEL_FALLBACKS.get(current, []):
+                if fallback_model not in seen:
+                    queue.append(fallback_model)
+        return sequence
     
-    # logger.debug(f"Parameters from model_manager.get_litellm_params: {params}")
+    def build_params_for_model(candidate: str) -> Dict[str, Any]:
+        params = model_manager.get_litellm_params(candidate, **override_params)
+        if model_id:
+            params["model_id"] = model_id
+        if stream:
+            params["stream_options"] = {"include_usage": True}
+        _configure_openai_compatible(params, candidate, api_key, api_base)
+        _add_tools_config(params, tools, tool_choice)
+        return params
     
-    if model_id:
-        params["model_id"] = model_id
+    async def call_with_retries(candidate: str) -> Union[Dict[str, Any], AsyncGenerator, ModelResponse, None]:
+        if provider_router is None:
+            setup_provider_router()
+        backoff = BASE_BACKOFF_SECONDS
+        for attempt in range(1, MAX_RETRIES + 1):
+            params = build_params_for_model(candidate)
+            try:
+                response = await provider_router.acompletion(**params)
+                if hasattr(response, '__aiter__') and stream:
+                    return _wrap_streaming_response(response)
+                return response
+            except Exception as exc:
+                processed_error = ErrorProcessor.process_llm_error(exc, context={"model": candidate, "attempt": attempt})
+                logger.warning(
+                    f"LLM call failed for model '{candidate}' (attempt {attempt}/{MAX_RETRIES}): {processed_error.message}"
+                )
+                if attempt < MAX_RETRIES:
+                    await asyncio.sleep(min(backoff, MAX_BACKOFF_SECONDS))
+                    backoff = min(backoff * 2, MAX_BACKOFF_SECONDS)
+                    continue
+                ErrorProcessor.log_error(processed_error)
+                raise LLMError(processed_error.message) from exc
+        return None
     
-    if stream:
-        params["stream_options"] = {"include_usage": True}
+    attempt_sequence = build_attempt_sequence(resolved_model_name)
+    errors: List[str] = []
     
-    # Apply additional configurations that aren't in the model config yet
-    _configure_openai_compatible(params, model_name, api_key, api_base)
-    _add_tools_config(params, tools, tool_choice)
+    for candidate in attempt_sequence:
+        logger.info(f"Attempting LLM call with model '{candidate}'")
+        try:
+            response = await call_with_retries(candidate)
+            if response is not None:
+                if candidate != resolved_model_name:
+                    logger.info(f"LLM call succeeded using fallback model '{candidate}'")
+                return response
+        except LLMError as err:
+            errors.append(f"{candidate}: {err}")
+            if candidate == attempt_sequence[-1]:
+                break
+            logger.warning(f"Switching to fallback model after failure on '{candidate}'")
+            continue
     
-    try:
-        # Log the complete parameters being sent to LiteLLM
-        # logger.debug(f"Calling LiteLLM acompletion for {resolved_model_name}")
-        # logger.debug(f"Complete LiteLLM parameters: {params}")
-        
-        # # Save parameters to txt file for debugging
-        # import json
-        # import os
-        # from datetime import datetime
-        
-        # debug_dir = "debug_logs"
-        # os.makedirs(debug_dir, exist_ok=True)
-        
-        # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        # filename = f"{debug_dir}/llm_params_{timestamp}.txt"
-        
-        # with open(filename, 'w') as f:
-        #     f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-        #     f.write(f"Model Name: {model_name}\n")
-        #     f.write(f"Resolved Model Name: {resolved_model_name}\n")
-        #     f.write(f"Parameters:\n{json.dumps(params, indent=2, default=str)}\n")
-        
-        # logger.debug(f"LiteLLM parameters saved to: {filename}")
-        
-        response = await provider_router.acompletion(**params)
-        
-        # For streaming responses, we need to handle errors that occur during iteration
-        if hasattr(response, '__aiter__') and stream:
-            return _wrap_streaming_response(response)
-        
-        return response
-        
-    except Exception as e:
-        # Use ErrorProcessor to handle the error consistently
-        processed_error = ErrorProcessor.process_llm_error(e, context={"model": model_name})
-        ErrorProcessor.log_error(processed_error)
-        raise LLMError(processed_error.message)
+    aggregated_error = "; ".join(errors) if errors else f"All attempts failed for model '{resolved_model_name}'"
+    raise LLMError(aggregated_error)
 
 async def _wrap_streaming_response(response) -> AsyncGenerator:
     """Wrap streaming response to handle errors during iteration."""
@@ -266,16 +267,11 @@ setup_provider_router()
 
 if __name__ == "__main__":
     from litellm import completion
-    import os
 
     setup_api_keys()
 
     response = completion(
-        model="bedrock/anthropic.claude-sonnet-4-20250115-v1:0",
-        messages=[{"role": "user", "content": "Hello! Testing 1M context window."}],
+        model="gemini/gemini-2.5-flash",
+        messages=[{"role": "user", "content": "Hello! Testing Iris Pro pipeline."}],
         max_tokens=100,
-        extra_headers={
-            "anthropic-beta": "context-1m-2025-08-07"  # 👈 Enable 1M context
-        }
     )
-

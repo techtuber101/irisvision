@@ -31,7 +31,7 @@ Cache Strategy:
 Achieves 70-90% cost/latency savings while scaling efficiently
 from 200k to 1M+ token context windows.
 
-Based on Anthropic documentation and mathematical optimization (Sept 2025).
+Based on large-context model caching documentation and mathematical optimization (Sept 2025).
 """
 
 from typing import Dict, Any, List, Optional
@@ -56,12 +56,12 @@ def get_resolved_model_id(model_name: str) -> str:
         logger.warning(f"Error resolving model name: {e}")
         return model_name
 
-def is_anthropic_model(model_name: str) -> bool:
-    """Check if model supports Anthropic prompt caching."""
+def is_caching_supported_model(model_name: str) -> bool:
+    """Check if model supports advanced prompt caching."""
     resolved_model = get_resolved_model_id(model_name).lower()
-    return any(provider in resolved_model for provider in ['anthropic', 'claude', 'sonnet', 'haiku', 'opus'])
+    return any(provider in resolved_model for provider in ['gemini', 'flash'])
 
-def estimate_token_count(text: str, model: str = "claude-3-5-sonnet-20240620") -> int:
+def estimate_token_count(text: str, model: str = "gemini/gemini-2.5-flash") -> int:
     """
     Accurate token counting using LiteLLM's token_counter.
     Uses model-specific tokenizers when available, falls back to tiktoken.
@@ -79,7 +79,7 @@ def estimate_token_count(text: str, model: str = "claude-3-5-sonnet-20240620") -
         word_count = len(str(text).split())
         return int(word_count * 1.3)
 
-def get_message_token_count(message: Dict[str, Any], model: str = "claude-3-5-sonnet-20240620") -> int:
+def get_message_token_count(message: Dict[str, Any], model: str = "gemini/gemini-2.5-flash") -> int:
     """Get estimated token count for a message, including base64 image data."""
     content = message.get('content', '')
     if isinstance(content, list):
@@ -95,7 +95,7 @@ def get_message_token_count(message: Dict[str, Any], model: str = "claude-3-5-so
         return total_tokens
     return estimate_token_count(str(content), model)
 
-def get_messages_token_count(messages: List[Dict[str, Any]], model: str = "claude-3-5-sonnet-20240620") -> int:
+def get_messages_token_count(messages: List[Dict[str, Any]], model: str = "gemini/gemini-2.5-flash") -> int:
     """Get total token count for a list of messages."""
     return sum(get_message_token_count(msg, model) for msg in messages)
 
@@ -206,7 +206,7 @@ def add_cache_control(message: Dict[str, Any]) -> Dict[str, Any]:
         ]
     }
 
-def apply_anthropic_caching_strategy(
+def apply_prompt_caching_strategy(
     working_system_prompt: Dict[str, Any], 
     conversation_messages: List[Dict[str, Any]], 
     model_name: str,
@@ -214,7 +214,7 @@ def apply_anthropic_caching_strategy(
     cache_threshold_tokens: Optional[int] = None  # Auto-calculate based on context window
 ) -> List[Dict[str, Any]]:
     """
-    Apply mathematically optimized token-based caching strategy for Anthropic models.
+    Apply mathematically optimized token-based caching strategy for supported models.
     
     Dynamic Strategy:
     - Auto-detects context window from model registry (200k-1M+ tokens)
@@ -241,9 +241,9 @@ def apply_anthropic_caching_strategy(
     if not conversation_messages:
         conversation_messages = []
     
-    # Return early for non-Anthropic models
-    if not is_anthropic_model(model_name):
-        logger.debug(f"Model {model_name} doesn't support Anthropic caching")
+    # Return early for models without caching support
+    if not is_caching_supported_model(model_name):
+        logger.debug(f"Model {model_name} doesn't support advanced caching")
         # Filter out system messages to prevent duplication
         filtered_conversation = [msg for msg in conversation_messages if msg.get('role') != 'system']
         if len(filtered_conversation) < len(conversation_messages):
@@ -286,7 +286,7 @@ def apply_anthropic_caching_strategy(
     
     # Block 1: System prompt (cache if ≥1024 tokens)
     system_tokens = get_message_token_count(working_system_prompt, model_name)
-    if system_tokens >= 1024:  # Anthropic's minimum cacheable size
+    if system_tokens >= 1024:  # Minimum cacheable size threshold for advanced caching
         cached_system = add_cache_control(working_system_prompt)
         prepared_messages.append(cached_system)
         logger.info(f"🔥 Block 1: Cached system prompt ({system_tokens} tokens)")
@@ -355,7 +355,7 @@ def create_conversation_chunks(
     chunk_threshold_tokens: int,
     max_blocks: int,
     prepared_messages: List[Dict[str, Any]],
-    model: str = "claude-3-5-sonnet-20240620"
+    model: str = "gemini/gemini-2.5-flash"
 ) -> int:
     """
     Create conversation cache chunks based on token thresholds.
@@ -412,7 +412,7 @@ def create_conversation_chunks(
     
     return chunks_created
 
-def get_recent_messages_within_token_limit(messages: List[Dict[str, Any]], token_limit: int, model: str = "claude-3-5-sonnet-20240620") -> List[Dict[str, Any]]:
+def get_recent_messages_within_token_limit(messages: List[Dict[str, Any]], token_limit: int, model: str = "gemini/gemini-2.5-flash") -> List[Dict[str, Any]]:
     """Get the most recent messages that fit within the token limit."""
     if not messages:
         return []
@@ -461,10 +461,10 @@ def format_conversation_for_cache(messages: List[Dict[str, Any]]) -> str:
 
 def validate_cache_blocks(messages: List[Dict[str, Any]], model_name: str, max_blocks: int = 4) -> List[Dict[str, Any]]:
     """
-    Validate cache block count stays within Anthropic's 4-block limit.
+    Validate cache block count stays within the supported 4-block limit.
     With our 2-block strategy, this should never be an issue.
     """
-    if not is_anthropic_model(model_name):
+    if not is_caching_supported_model(model_name):
         return messages
     
     cache_count = sum(1 for msg in messages 
