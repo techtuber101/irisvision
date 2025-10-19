@@ -1034,10 +1034,8 @@ print(json.dumps(asyncio.run(measure())))
                     "slide_count": {"type": "integer"},
                     "text": {"type": "string", "description": "Human readable summary."},
                     "attachments": {
-                        "anyOf": [
-                            {"type": "string"},
-                            {"type": "array", "items": {"type": "string"}},
-                        ]
+                        "type": "array",
+                        "items": {"type": "string"},
                     },
                     "presentation_url": {"type": "string"},
                 },
