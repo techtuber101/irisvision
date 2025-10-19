@@ -629,8 +629,10 @@ print(json.dumps(result))
                         "description": "A summary or description of the presentation to present to the user. Include: 1) What the presentation covers, 2) Key highlights or features, 3) Any important notes about the presentation, 4) How to use or view the presentation."
                     },
                     "attachments": {
-                        "type": ["string", "array"],
-                        "items": {"type": "string"},
+                        "oneOf": [
+                            {"type": "string"},
+                            {"type": "array", "items": {"type": "string"}}
+                        ],
                         "description": "List of presentation files to attach. Include: 1) All HTML slide files (e.g., 'presentations/my-presentation/slide_01.html'), 2) Any additional presentation files (PDF exports, etc.), 3) Supporting files if relevant. Always use relative paths to /workspace directory."
                     },
                     "presentation_url": {
