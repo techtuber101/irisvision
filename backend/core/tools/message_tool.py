@@ -1,4 +1,5 @@
 from typing import List, Optional, Union
+import json
 from core.agentpress.tool import Tool, ToolResult, openapi_schema, tool_metadata
 from core.utils.logger import logger
 
@@ -31,18 +32,19 @@ class MessageTool(Tool):
                         "description": "Question text to present to user - should be specific and clearly indicate what information you need. Use natural, conversational language. Include: 1) Clear question or request, 2) Context about why the input is needed, 3) Available options if applicable, 4) Impact of different choices, 5) Any relevant constraints or considerations."
                     },
                     "attachments": {
-                        "oneOf": [
-                            {"type": "string"},
-                            {"type": "array", "items": {"type": "string"}}
-                        ],
-                        "description": "(Optional) File path or list of paths/URLs to attach to the question. Include when: 1) Question relates to specific files or configurations, 2) User needs to review content before answering, 3) Options or choices are documented in files, 4) Supporting evidence or context is needed. Always use relative paths to /workspace directory."
-                    }
+                        "type": "string",
+                        "description": "(Optional) File attachment(s) for the question. Provide a single relative path or a comma-separated / JSON-formatted list (e.g., \"workspace/report.pdf\" or \"[\\\"workspace/report.pdf\\\", \\\"workspace/data.csv\\\"]\")."
+                    },
                 },
                 "required": ["text"]
             }
         }
     })
-    async def ask(self, text: str, attachments: Optional[Union[str, List[str]]] = None) -> ToolResult:
+    async def ask(
+        self,
+        text: str,
+        attachments: Optional[Union[str, List[str]]] = None
+    ) -> ToolResult:
         """Ask the user a question and wait for a response.
 
         Args:
@@ -53,10 +55,10 @@ class MessageTool(Tool):
             ToolResult indicating the question was successfully sent
         """
         try:            
-            # Convert single attachment to list for consistent handling
-            if attachments and isinstance(attachments, str):
-                attachments = [attachments]
-          
+            normalized_attachments = self._normalize_attachments(attachments)
+            if normalized_attachments is not None:
+                attachments = normalized_attachments
+
             return self.success_response({"status": "Awaiting user response..."})
         except Exception as e:
             return self.fail_response(f"Error asking user: {str(e)}")
@@ -149,18 +151,19 @@ class MessageTool(Tool):
                         "description": "Completion message or summary to present to user - should provide clear indication of what was accomplished. Include: 1) Summary of completed tasks, 2) Key deliverables or outputs, 3) Any important notes or next steps, 4) Impact or benefits achieved."
                     },
                     "attachments": {
-                        "oneOf": [
-                            {"type": "string"},
-                            {"type": "array", "items": {"type": "string"}}
-                        ],
-                        "description": "(Optional) File path or list of paths/URLs to attach to the completion message. Include when: 1) Completion relates to specific files or configurations, 2) User needs to review final outputs, 3) Deliverables are documented in files, 4) Supporting evidence or context is needed. Always use relative paths to /workspace directory."
+                        "type": "string",
+                        "description": "(Optional) File attachment(s) for the completion summary. Provide a single relative path or a comma-separated / JSON-formatted list (e.g., \"workspace/report.pdf\" or \"[\\\"workspace/report.pdf\\\", \\\"workspace/data.csv\\\"]\")."
                     }
                 },
                 "required": []
             }
         }
     })
-    async def complete(self, text: Optional[str] = None, attachments: Optional[Union[str, List[str]]] = None) -> ToolResult:
+    async def complete(
+        self,
+        text: Optional[str] = None,
+        attachments: Optional[Union[str, List[str]]] = None
+    ) -> ToolResult:
         """Indicate that the agent has completed all tasks and is entering complete state.
 
         Args:
@@ -171,13 +174,52 @@ class MessageTool(Tool):
             ToolResult indicating successful transition to complete state
         """
         try:
-            # Convert single attachment to list for consistent handling
-            if attachments and isinstance(attachments, str):
-                attachments = [attachments]
+            normalized_attachments = self._normalize_attachments(attachments)
+            if normalized_attachments is not None:
+                attachments = normalized_attachments
                 
             return self.success_response({"status": "complete"})
         except Exception as e:
             return self.fail_response(f"Error entering complete state: {str(e)}")
+
+    def _normalize_attachments(
+        self,
+        attachments: Optional[Union[str, List[str]]]
+    ) -> Optional[List[str]]:
+        """Normalize attachments input into a list of strings.
+        
+        Accepts strings (single path, comma-separated values, or JSON arrays)
+        and lists. Returns None if no attachments provided.
+        """
+        if attachments is None:
+            return None
+
+        if isinstance(attachments, list):
+            return [item for item in attachments if isinstance(item, str) and item.strip()]
+
+        if not isinstance(attachments, str):
+            return None
+
+        value = attachments.strip()
+        if not value:
+            return None
+
+        # Try to parse JSON array
+        if value.startswith('[') and value.endswith(']'):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, list):
+                    return [str(item).strip() for item in parsed if str(item).strip()]
+            except json.JSONDecodeError:
+                pass
+
+        # Fallback: split comma-separated list
+        if ',' in value:
+            parts = [part.strip() for part in value.split(',') if part.strip()]
+            if parts:
+                return parts
+
+        return [value]
 
     @openapi_schema({
         "type": "function",

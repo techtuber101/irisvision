@@ -1034,10 +1034,8 @@ print(json.dumps(asyncio.run(measure())))
                     "slide_count": {"type": "integer"},
                     "text": {"type": "string", "description": "Human readable summary."},
                     "attachments": {
-                        "oneOf": [
-                            {"type": "string"},
-                            {"type": "array", "items": {"type": "string"}}
-                        ],
+                        "type": "string",
+                        "description": "File attachment(s) to include with the presentation summary. Provide a single relative path or a comma-separated / JSON-formatted list (e.g., \"presentations/demo/slide_01.html\" or \"[\\\"presentations/demo/slide_01.html\\\", \\\"presentations/demo/slide_02.html\\\"]\").",
                     },
                     "presentation_url": {"type": "string"},
                 },
