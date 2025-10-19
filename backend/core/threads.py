@@ -436,12 +436,18 @@ async def generate_project_title(
         if project['account_id'] != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
         
-        # Trigger background title generation
-        from core.utils.project_helpers import generate_and_update_project_name
-        import asyncio
-        asyncio.create_task(generate_and_update_project_name(project_id=project_id, prompt=prompt))
+        from core.utils.project_helpers import generate_and_update_project_name, TitleGenerationError
+        try:
+            result = await generate_and_update_project_name(project_id=project_id, prompt=prompt)
+        except TitleGenerationError as e:
+            logger.error(f"Title generation failed for project {project_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to generate title: {str(e)}") from e
         
-        return {"message": "Title generation started"}
+        return {
+            "message": "Title generated successfully",
+            "title": result["title"],
+            "icon": result["icon"],
+        }
         
     except Exception as e:
         logger.error(f"Error generating title for project {project_id}: {str(e)}")

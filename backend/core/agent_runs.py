@@ -838,6 +838,34 @@ async def initiate_agent_with_files(
             "created_at": datetime.now(timezone.utc).isoformat()
         }).execute()
 
+        # Kick off project title generation without blocking the request
+        try:
+            title_task = asyncio.create_task(
+                generate_and_update_project_name(project_id=project_id, prompt=prompt)
+            )
+
+            def _log_title_generation_result(task: asyncio.Task) -> None:
+                try:
+                    result = task.result()
+                    if result:
+                        logger.debug(
+                            "Background title generation completed for project %s with title '%s' and icon '%s'",
+                            project_id,
+                            result.get("title"),
+                            result.get("icon"),
+                        )
+                except Exception as task_error:
+                    logger.warning(
+                        "Background title generation failed for project %s: %s",
+                        project_id,
+                        str(task_error),
+                    )
+
+            title_task.add_done_callback(_log_title_generation_result)
+            logger.debug(f"Triggered background title generation for project {project_id}")
+        except Exception as e:
+            logger.warning(f"Failed to trigger title generation for project {project_id}: {str(e)}")
+
         # Handle Chat Mode - Return thread_id without starting agent
         if chat_mode == 'chat':
             logger.info(f"Chat mode initiated for thread {thread_id} - returning without starting agent")
@@ -892,4 +920,3 @@ async def initiate_agent_with_files(
         logger.error(f"Error in agent initiation: {str(e)}\n{traceback.format_exc()}")
         # TODO: Clean up created project/thread if initiation fails mid-way
         raise HTTPException(status_code=500, detail=f"Failed to initiate agent session: {str(e)}")
-

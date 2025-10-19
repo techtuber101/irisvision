@@ -98,6 +98,26 @@ class ModelRegistry:
             priority=96,
             enabled=True
         ))
+
+        self.register(Model(
+            id="openai/gpt-5-nano",
+            name="GPT-5 Nano",
+            provider=ModelProvider.OPENAI,
+            aliases=["gpt-5-nano", "GPT-5 Nano"],
+            context_window=200_000,
+            capabilities=[
+                ModelCapability.CHAT,
+                ModelCapability.FUNCTION_CALLING,
+                ModelCapability.STRUCTURED_OUTPUT,
+            ],
+            pricing=ModelPricing(
+                input_cost_per_million_tokens=0.12,
+                output_cost_per_million_tokens=0.90
+            ),
+            tier_availability=["free", "paid"],
+            priority=95,
+            enabled=True
+        ))
         
         self.register(Model(
             id="gemini/gemini-2.5-flash",

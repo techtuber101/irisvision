@@ -1,13 +1,76 @@
 """Project-related helper functions."""
 import json
+import re
 import traceback
+from typing import Dict, Optional
 from core.services.supabase import DBConnection
 from core.services.llm import make_llm_api_call
 from .logger import logger
 from .icon_generator import RELEVANT_ICONS
 
 
-async def generate_and_update_project_name(project_id: str, prompt: str):
+class TitleGenerationError(Exception):
+    """Raised when project title generation fails."""
+
+
+def _parse_llm_structured_output(raw_content: str):
+    """
+    Attempt to parse structured JSON output from an LLM response.
+    Handles code fences and stray text around the JSON payload.
+    """
+    if not raw_content:
+        return None
+
+    cleaned = raw_content.strip()
+
+    # Handle fenced code blocks like ```json ... ```
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?", "", cleaned, flags=re.IGNORECASE).strip()
+        cleaned = re.sub(r"```$", "", cleaned).strip()
+
+    # First attempt direct JSON parse
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
+    # Attempt to extract the first JSON object within the text
+    match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
+    if match:
+        json_candidate = match.group(0)
+        try:
+            return json.loads(json_candidate)
+        except json.JSONDecodeError:
+            logger.debug(f"Failed to parse JSON candidate from LLM output: {json_candidate}")
+
+    return None
+
+
+def _extract_title_and_icon(parsed_response: Dict[str, str], available_icons) -> Dict[str, str]:
+    """
+    Validate and extract the title/icon pair from a parsed LLM response.
+    Raises TitleGenerationError when the payload is unusable.
+    """
+    if not isinstance(parsed_response, dict):
+        raise TitleGenerationError("LLM response must be a JSON object.")
+
+    raw_title = parsed_response.get("title", "")
+    title = str(raw_title).strip('\'" \n\t')
+    if not title:
+        raise TitleGenerationError("LLM response missing required 'title' field.")
+
+    raw_icon = parsed_response.get("icon", "")
+    icon = str(raw_icon).strip('\'" \n\t')
+    if not icon:
+        raise TitleGenerationError("LLM response missing required 'icon' field.")
+
+    if icon not in available_icons:
+        raise TitleGenerationError(f"Icon '{icon}' is not in the approved icon list.")
+
+    return {"title": title, "icon": icon}
+
+
+async def generate_and_update_project_name(project_id: str, prompt: str) -> Dict[str, str]:
     """
     Generates a project name and icon using an LLM and updates the database.
     
@@ -17,13 +80,13 @@ async def generate_and_update_project_name(project_id: str, prompt: str):
         project_id: The project ID to update
         prompt: The initial user prompt to base the name/icon on
     """
-    logger.debug(f"Starting background task to generate name and icon for project: {project_id}")
+    logger.debug(f"Starting project title generation for project: {project_id}")
     
     try:
         db_conn = DBConnection()
         client = await db_conn.client
 
-        model_name = "gemini/gemini-2.5-flash-lite"
+        model_name = "openai/gpt-5-nano"
         
         # Use pre-loaded Lucide React icons
         relevant_icons = RELEVANT_ICONS
@@ -43,71 +106,57 @@ async def generate_and_update_project_name(project_id: str, prompt: str):
         messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_message}]
 
         logger.debug(f"Calling LLM ({model_name}) for project {project_id} naming and icon selection.")
-        response = await make_llm_api_call(
-            messages=messages, 
-            model_name=model_name, 
-            max_tokens=1000, 
-            temperature=0.7,
-            response_format={"type": "json_object"},
-            stream=False
+        try:
+            response = await make_llm_api_call(
+                messages=messages,
+                model_name=model_name,
+                max_tokens=1000,
+                temperature=0.7,
+                response_format={"type": "json_object"},
+                stream=False
+            )
+        except Exception as llm_error:
+            raise TitleGenerationError(f"LLM call failed: {llm_error}") from llm_error
+
+        if not response:
+            raise TitleGenerationError("LLM call returned an empty response.")
+
+        choices = response.get("choices") or []
+        if not choices:
+            raise TitleGenerationError("LLM response did not include any choices.")
+
+        message_payload: Optional[Dict[str, str]] = choices[0].get("message")
+        if not message_payload:
+            raise TitleGenerationError("LLM response missing message payload.")
+
+        raw_content = (message_payload.get("content") or "").strip()
+        if not raw_content:
+            raise TitleGenerationError("LLM response contained no content.")
+
+        parsed_response = _parse_llm_structured_output(raw_content)
+        if parsed_response is None:
+            raise TitleGenerationError("Unable to parse JSON payload from LLM response.")
+
+        extracted = _extract_title_and_icon(parsed_response, relevant_icons)
+        logger.debug(
+            f"LLM generated payload for project {project_id}: title='{extracted['title']}' icon='{extracted['icon']}'"
         )
 
-        generated_name = None
-        selected_icon = None
-        
-        if response and response.get('choices') and response['choices'][0].get('message'):
-            raw_content = response['choices'][0]['message'].get('content', '').strip()
-            try:
-                parsed_response = json.loads(raw_content)
-                
-                if isinstance(parsed_response, dict):
-                    # Extract title
-                    title = parsed_response.get('title', '').strip()
-                    if title:
-                        generated_name = title.strip('\'" \n\t')
-                        logger.debug(f"LLM generated name for project {project_id}: '{generated_name}'")
-                    
-                    # Extract icon
-                    icon = parsed_response.get('icon', '').strip()
-                    if icon and icon in relevant_icons:
-                        selected_icon = icon
-                        logger.debug(f"LLM selected icon for project {project_id}: '{selected_icon}'")
-                    else:
-                        logger.warning(f"LLM selected invalid icon '{icon}' for project {project_id}, using default 'message-circle'")
-                        selected_icon = "message-circle"
-                else:
-                    logger.warning(f"LLM returned non-dict JSON for project {project_id}: {parsed_response}")
-                    
-            except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse LLM JSON response for project {project_id}: {e}. Raw content: {raw_content}")
-                # Fallback to extracting title from raw content
-                cleaned_content = raw_content.strip('\'" \n\t{}')
-                if cleaned_content:
-                    generated_name = cleaned_content[:50]  # Limit fallback title length
-                selected_icon = "message-circle"  # Default icon
-        else:
-            logger.warning(f"Failed to get valid response from LLM for project {project_id} naming. Response: {response}")
+        update_data = {"name": extracted["title"], "icon_name": extracted["icon"]}
 
-        if generated_name:
-            # Store title and icon in dedicated fields
-            update_data = {"name": generated_name}
-            if selected_icon:
-                update_data["icon_name"] = selected_icon
-                logger.debug(f"Storing project {project_id} with title: '{generated_name}' and icon: '{selected_icon}'")
-            else:
-                logger.debug(f"Storing project {project_id} with title: '{generated_name}' (no icon)")
-            
+        try:
             update_result = await client.table('projects').update(update_data).eq("project_id", project_id).execute()
-            if hasattr(update_result, 'data') and update_result.data:
-                logger.debug(f"Successfully updated project {project_id} with clean title and dedicated icon field")
-            else:
-                logger.error(f"Failed to update project {project_id} in database. Update result: {update_result}")
-        else:
-            logger.warning(f"No generated name, skipping database update for project {project_id}.")
+        except Exception as db_error:
+            raise TitleGenerationError(f"Failed to update project record: {db_error}") from db_error
 
+        if not getattr(update_result, "data", None):
+            raise TitleGenerationError("Database update did not return any rows.")
+
+        logger.debug(f"Successfully updated project {project_id} with generated title and icon.")
+        return extracted
+
+    except TitleGenerationError:
+        raise
     except Exception as e:
-        logger.error(f"Error in background naming task for project {project_id}: {str(e)}\n{traceback.format_exc()}")
-    finally:
-        # No need to disconnect DBConnection singleton instance here
-        logger.debug(f"Finished background naming and icon selection task for project: {project_id}")
-
+        logger.error(f"Unexpected error during title generation for project {project_id}: {str(e)}\n{traceback.format_exc()}")
+        raise TitleGenerationError("Unexpected error during title generation.") from e

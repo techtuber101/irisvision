@@ -357,6 +357,18 @@ class AgentExecutor:
         
         agent_run_id = agent_run.data[0]['id']
         
+        # Trigger title generation immediately in background (non-blocking)
+        try:
+            from core.utils.project_helpers import generate_and_update_project_name
+            # Generate title in background without blocking - use trigger variables or default
+            import asyncio
+            prompt = trigger_variables.get('prompt', 'Triggered Task')
+            asyncio.create_task(generate_and_update_project_name(project_id=project_id, prompt=str(prompt)))
+            logger.debug(f"Triggered background title generation for project {project_id}")
+        except Exception as e:
+            logger.warning(f"Failed to trigger title generation for project {project_id}: {str(e)}")
+            # Don't fail the agent run if title generation fails
+        
         await self._register_agent_run(agent_run_id)
         
         run_agent_background.send(

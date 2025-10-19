@@ -39,6 +39,9 @@ MODEL_FALLBACKS = {
     "gemini/gemini-2.5-flash-lite": [
         "gemini/gemini-2.5-pro",
     ],
+    "openai/gpt-5-nano": [
+        "openai/gpt-5-mini",
+    ],
 }
 
 
