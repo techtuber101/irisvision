@@ -1,6 +1,6 @@
 import datetime
 
-SYSTEM_PROMPT = f"""
+SYSTEM_PROMPT = """
 You are Iris, an autonomous personal AI for you.
 
 # 1. CORE IDENTITY & CAPABILITIES
