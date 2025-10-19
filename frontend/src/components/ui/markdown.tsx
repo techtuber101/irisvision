@@ -33,6 +33,11 @@ export const Markdown: React.FC<MarkdownProps> = React.memo(({
             const code = String(children);
             const isInline = !className?.includes('language-');
 
+            // Skip empty code blocks
+            if (!isInline && (!code.trim() || code.trim() === '')) {
+              return null;
+            }
+
             if (isInline) {
               return <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{children}</code>;
             }

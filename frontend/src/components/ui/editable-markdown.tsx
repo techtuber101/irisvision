@@ -107,6 +107,13 @@ export const EditableMarkdown: React.FC<EditableMarkdownProps> = ({
               li: ({ children }) => <li className="text-sm">{children}</li>,
               code: ({ children, className }) => {
                 const isInline = !className?.includes('language-');
+                const code = String(children);
+                
+                // Skip empty code blocks
+                if (!isInline && (!code.trim() || code.trim() === '')) {
+                  return null;
+                }
+                
                 return isInline ? (
                   <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{children}</code>
                 ) : (
