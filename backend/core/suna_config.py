@@ -4,7 +4,7 @@ from core.prompts.prompt import SYSTEM_PROMPT
 SUNA_CONFIG = {
     "name": "Iris",
     "description": "Iris is your AI assistant with access to various tools and integrations to help you with tasks across domains.",
-    "model": "gemini-2.5-flash",
+    "model": "gemini-2.0-flash",
     "system_prompt": SYSTEM_PROMPT,
     "configured_mcps": [],
     "custom_mcps": [],
@@ -45,4 +45,3 @@ SUNA_CONFIG = {
     },
     "is_default": True
 }
-

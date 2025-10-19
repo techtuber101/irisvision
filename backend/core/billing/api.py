@@ -740,7 +740,7 @@ async def get_available_models(
         from core.services.supabase import DBConnection
         # Use the implemented get_allowed_models_for_user function
 
-        VISIBLE_MODEL_IDS = {"gemini/gemini-2.5-flash"}
+        VISIBLE_MODEL_IDS = {"gemini/gemini-2.0-flash"}
         fallback_visible_if_missing = True
         def filter_visible(models: List[Dict]) -> List[Dict]:
             if not models:

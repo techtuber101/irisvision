@@ -144,7 +144,7 @@ export default function PricingPage() {
   } = useModelSelection();
 
   const [selectedModelId, setSelectedModelId] = useState<string>(
-    'gemini/gemini-2.5-flash',
+    'gemini/gemini-2.0-flash',
   );
   const [showAllTasks, setShowAllTasks] = useState<boolean>(false);
 

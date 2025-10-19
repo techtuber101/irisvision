@@ -545,7 +545,7 @@ export const startAgent = async (
     console.log(`[API] Starting agent for thread ${threadId}`);
 
     const defaultOptions = {
-      model_name: 'gemini/gemini-2.5-flash',
+      model_name: 'gemini/gemini-2.0-flash',
       enable_thinking: false,
       reasoning_effort: 'low',
       stream: true,

@@ -46,7 +46,7 @@ class BrowserAutomation {
                     logger: (logLine: LogLine) => {
                         console.log(`[${logLine.category}] ${logLine.message}`);
                     },
-                    modelName: "google/gemini-2.5-flash",
+                    modelName: "google/gemini-2.0-flash",
                     modelClientOptions: {
                         apiKey
                     },

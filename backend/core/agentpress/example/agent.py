@@ -148,6 +148,7 @@ Available tools:
             llm_model="gpt-5",
             processor_config=ProcessorConfig(
                 xml_tool_calling=True,
+                native_tool_calling=True,
                 execute_tools=True,
                 tool_execution_strategy="sequential"
             ),

@@ -462,7 +462,7 @@ When using the Task List system:
 **Creating Tasks:**
     <function_calls>
     <invoke name="create_tasks">
-    <parameter name="sections">[{"title": "Research Phase", "tasks": ["Research topic X", "Gather sources", "Analyze findings"]}, {"title": "Implementation", "tasks": ["Create outline", "Write content", "Review and edit"]}]</parameter>
+    <parameter name="sections">[{"title": "Research Phase", "task_contents": ["Research topic X", "Gather sources", "Analyze findings"]}, {"title": "Implementation", "task_contents": ["Create outline", "Write content", "Review and edit"]}]</parameter>
     </invoke>
     </function_calls>
 
@@ -1487,7 +1487,7 @@ When using the Task List system:
 **Creating Tasks:**
     <function_calls>
     <invoke name="create_tasks">
-    <parameter name="sections">[{"title": "Research Phase", "tasks": ["Research topic X", "Gather sources", "Analyze findings"]}, {"title": "Implementation", "tasks": ["Create outline", "Write content", "Review and edit"]}]</parameter>
+    <parameter name="sections">[{"title": "Research Phase", "task_contents": ["Research topic X", "Gather sources", "Analyze findings"]}, {"title": "Implementation", "task_contents": ["Create outline", "Write content", "Review and edit"]}]</parameter>
     </invoke>
     </function_calls>
 
@@ -2535,7 +2535,7 @@ When using the Task List system:
 **Creating Tasks:**
     <function_calls>
     <invoke name="create_tasks">
-    <parameter name="sections">[{"title": "Research Phase", "tasks": ["Research topic X", "Gather sources", "Analyze findings"]}, {"title": "Implementation", "tasks": ["Create outline", "Write content", "Review and edit"]}]</parameter>
+    <parameter name="sections">[{"title": "Research Phase", "task_contents": ["Research topic X", "Gather sources", "Analyze findings"]}, {"title": "Implementation", "task_contents": ["Create outline", "Write content", "Review and edit"]}]</parameter>
     </invoke>
     </function_calls>
 
@@ -3560,7 +3560,7 @@ When using the Task List system:
 **Creating Tasks:**
     <function_calls>
     <invoke name="create_tasks">
-    <parameter name="sections">[{"title": "Research Phase", "tasks": ["Research topic X", "Gather sources", "Analyze findings"]}, {"title": "Implementation", "tasks": ["Create outline", "Write content", "Review and edit"]}]</parameter>
+    <parameter name="sections">[{"title": "Research Phase", "task_contents": ["Research topic X", "Gather sources", "Analyze findings"]}, {"title": "Implementation", "task_contents": ["Create outline", "Write content", "Review and edit"]}]</parameter>
     </invoke>
     </function_calls>
 

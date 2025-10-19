@@ -25,7 +25,7 @@ genai.configure(api_key=config.GEMINI_API_KEY)
 
 class SimpleChatRequest(BaseModel):
     message: str
-    model: str = "gemini-2.5-flash"
+    model: str = "gemini-2.0-flash"
 
 class SimpleChatResponse(BaseModel):
     thread_id: str
@@ -153,7 +153,7 @@ async def simple_chat(
         logger.debug(f"Saved user message: {user_message_id}")
         
         # 4. Call Gemini API (direct call, no system prompt, no context)
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash")
         response = model.generate_content(message)
         assistant_response = response.text
         
@@ -229,7 +229,7 @@ async def continue_simple_chat(
         }).execute()
         
         # Call Gemini API
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash")
         response = model.generate_content(message)
         assistant_response = response.text
         
@@ -315,7 +315,7 @@ async def simple_chat_streaming(
             logger.debug(f"Saving user message asynchronously: {user_message_id}")
             
             # 5. Call Gemini API with streaming
-            model = genai.GenerativeModel("gemini-2.5-flash")
+            model = genai.GenerativeModel("gemini-2.0-flash")
             response = model.generate_content(message, stream=True)
             
             # 6. Stream response chunks
@@ -418,7 +418,7 @@ async def continue_simple_chat_streaming(
             logger.debug(f"Saving user message asynchronously: {user_message_id}")
             
             # Call Gemini API with true streaming
-            model = genai.GenerativeModel("gemini-2.5-flash")
+            model = genai.GenerativeModel("gemini-2.0-flash")
             chat = model.start_chat(history=history)
             response = chat.send_message(message, stream=True)
             full_response = ""
@@ -472,6 +472,6 @@ async def simple_chat_health():
     """Health check for simple chat"""
     return {
         "status": "ok",
-        "model": "gemini-2.5-flash",
+        "model": "gemini-2.0-flash",
         "api_key_configured": bool(config.GEMINI_API_KEY)
     }

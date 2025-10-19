@@ -712,7 +712,7 @@ export const startAgent = async (
     }
 
     const defaultOptions = {
-      model_name: 'gemini/gemini-2.5-flash',
+      model_name: 'gemini/gemini-2.0-flash',
     };
 
     const finalOptions = { ...defaultOptions, ...options };

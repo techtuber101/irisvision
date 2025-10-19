@@ -13,7 +13,7 @@ First, I'll create a structured task list to organize my approach:
 <parameter name="sections">[
   {
     "title": "Project Setup",
-    "tasks": [
+    "task_contents": [
       "Create basic project structure (HTML, CSS, JS files)",
       "Set up the HTML canvas element",
       "Create basic styling"
@@ -21,7 +21,7 @@ First, I'll create a structured task list to organize my approach:
   },
   {
     "title": "Core Game Implementation",
-    "tasks": [
+    "task_contents": [
       "Implement game canvas and rendering context",
       "Create the paddles (player and opponent)",
       "Create the ball with movement physics",
@@ -32,7 +32,7 @@ First, I'll create a structured task list to organize my approach:
   },
   {
     "title": "Enhancement & Polish",
-    "tasks": [
+    "task_contents": [
       "Add sound effects",
       "Implement start/restart game functionality",
       "Add visual effects (ball trails, paddle hits)",
@@ -42,7 +42,7 @@ First, I'll create a structured task list to organize my approach:
   },
   {
     "title": "Testing & Validation",
-    "tasks": [
+    "task_contents": [
       "Test game mechanics",
       "Test collision detection",
       "Test scoring",
