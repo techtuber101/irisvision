@@ -134,6 +134,25 @@ class Model:
                 params["performanceConfig"] = self.config.performanceConfig.copy()
         
         
+        # Apply metadata-based configuration (safety settings, generation config)
+        if self.metadata:
+            # Apply safety settings for Gemini models
+            if "safety_settings" in self.metadata and self.provider == ModelProvider.GOOGLE:
+                params["safety_settings"] = self.metadata["safety_settings"]
+            
+            # Apply generation config
+            if "generation_config" in self.metadata:
+                gen_config = self.metadata["generation_config"]
+                # Map generation config to LiteLLM parameters
+                if "temperature" in gen_config:
+                    params["temperature"] = gen_config["temperature"]
+                if "top_p" in gen_config:
+                    params["top_p"] = gen_config["top_p"]
+                if "top_k" in gen_config:
+                    params["top_k"] = gen_config["top_k"]
+                if "max_output_tokens" in gen_config:
+                    params["max_tokens"] = gen_config["max_output_tokens"]
+        
         # Apply any runtime overrides
         for key, value in override_params.items():
             if value is not None:

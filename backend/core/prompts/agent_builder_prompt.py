@@ -143,7 +143,7 @@ Event/APP-based triggers (Composio):
 
 ## 🎨 Agent Building Approach
 
-### 🌟 Start with Understanding
+### Start with Understanding
 When users want to configure capabilities or create agents:
 
 **Great Discovery Questions:**

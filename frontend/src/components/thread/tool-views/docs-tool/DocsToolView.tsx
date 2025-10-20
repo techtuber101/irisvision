@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   FileText,
   CheckCircle,
@@ -28,7 +28,8 @@ import { TipTapDocumentModal } from '@/components/thread/tiptap-document-modal';
 import { exportDocument, type ExportFormat } from '@/lib/utils/document-export';
 import { createClient } from '@/lib/supabase/client';
 import { handleGoogleDocsUpload, checkPendingGoogleDocsUpload } from '@/lib/utils/google-docs-utils';
-import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { 
   DocumentInfo, 
   extractDocsData, 
@@ -39,6 +40,18 @@ import {
   LiveDocumentViewer,
   DocumentViewer
 } from './_utils';
+import { fileQueryKeys } from '@/hooks/react-query/files/use-file-queries';
+
+// File type icon mapping
+const FILE_TYPE_ICONS: Record<string, string> = {
+  pdf: '/filetypes/pdf.png',
+  docx: '/filetypes/docx.png',
+  docs: '/filetypes/docs.png',
+  images: '/filetypes/gallery.png',
+  txt: '/filetypes/text-format.png', // Try text-format.png again
+  html: '/filetypes/text-format.png', // Try text-format.png for HTML files
+  markdown: '/filetypes/text-format.png', // Try text-format.png for markdown files
+};
 
 export function DocsToolView({
   name = 'docs',
@@ -49,6 +62,7 @@ export function DocsToolView({
   isSuccess = true,
   isStreaming = false,
   project,
+  onSubmit,
 }: ToolViewProps) {
   const [fileViewerOpen, setFileViewerOpen] = useState(false);
   const [selectedDocPath, setSelectedDocPath] = useState<string | null>(null);
@@ -56,6 +70,12 @@ export function DocsToolView({
   const [editorDocumentData, setEditorDocumentData] = useState<any>(null);
   const [editorFilePath, setEditorFilePath] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isEditLoading, setIsEditLoading] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [documentRefreshToken, setDocumentRefreshToken] = useState(0);
+  const [documentPreviewContent, setDocumentPreviewContent] = useState<string | null>(null);
+  
+  const queryClient = useQueryClient();
   
   // Check for pending Google Docs upload after OAuth callback
   useEffect(() => {
@@ -63,18 +83,108 @@ export function DocsToolView({
   }, []);
   
   const handleOpenInEditor = useCallback(async (doc: DocumentInfo, content?: string, data?: any) => {
-    let actualContent = content || doc.content || '';
-    if (data?.sandbox_id && doc.path) {
+    setIsEditLoading(true);
+    
+    try {
+      let actualContent = content || doc.content || '';
+      if (data?.sandbox_id && doc.path) {
+        try {
+          const supabase = createClient();
+          const { data: { session } } = await supabase.auth.getSession();
+          
+          if (session?.access_token) {
+            const response = await fetch(
+              `${process.env.NEXT_PUBLIC_BACKEND_URL}/sandboxes/${data.sandbox_id}/files?path=${encodeURIComponent(doc.path)}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`,
+                },
+              }
+            );
+
+            if (response.ok) {
+              const fileContent = await response.text();
+              try {
+                const parsedDocument = JSON.parse(fileContent);
+                if (parsedDocument.type === 'tiptap_document' && parsedDocument.content) {
+                  actualContent = parsedDocument.content;
+                }
+              } catch {}
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch latest content:', error);
+        }
+      }
+      if (actualContent === '<p></p>' || actualContent === '<p><br></p>' || actualContent.trim() === '') {
+        if (data && data.content) {
+          actualContent = data.content;
+        }
+      }
+      
+      const documentData = {
+        type: 'tiptap_document',
+        version: '1.0',
+        title: doc.title,
+        content: actualContent,
+        metadata: doc.metadata || {},
+        created_at: doc.created_at,
+        updated_at: doc.updated_at || new Date().toISOString(),
+        doc_id: doc.id
+      };
+      
+      setEditorDocumentData(documentData);
+      setEditorFilePath(doc.path);
+      setEditorOpen(true);
+      setDocumentPreviewContent(actualContent);
+    } finally {
+      setIsEditLoading(false);
+    }
+  }, []);
+  
+  const toolName = extractToolName(toolContent) || name || 'docs';
+  let data = extractDocsData(toolContent);
+  
+  if (!data?.sandbox_id && project?.id) {
+    data = { ...data, sandbox_id: project.id, success: data?.success ?? true };
+  }
+  
+  let streamingContent: { content?: string; title?: string; metadata?: any } | null = null;
+  if (isStreaming && !data) {
+    streamingContent = extractStreamingDocumentContent(assistantContent, toolName);
+  }
+
+  useEffect(() => {
+    if (data?.document) {
+      const initial = data.content || data.document.content || '';
+      setDocumentPreviewContent(initial);
+    } else if (!data?.document && streamingContent?.content) {
+      setDocumentPreviewContent(streamingContent.content);
+    }
+  }, [data?.document?.path, data?.document?.content, data?.content, streamingContent?.content]);
+  
+  useEffect(() => {
+    setDocumentRefreshToken(0);
+  }, [data?.document?.path]);
+
+  const fetchLatestDocumentContent = useCallback(async (): Promise<string> => {
+    let actualContent = documentPreviewContent || data?.content || data?.document?.content || streamingContent?.content || '';
+
+    const sandboxId = data?.sandbox_id || project?.sandbox?.id;
+    const docPath = data?.document?.path;
+
+    if (sandboxId && docPath) {
       try {
         const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.access_token) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+
+        if (accessToken) {
           const response = await fetch(
-            `${process.env.NEXT_PUBLIC_BACKEND_URL}/sandboxes/${data.sandbox_id}/files?path=${encodeURIComponent(doc.path)}`,
+            `${process.env.NEXT_PUBLIC_BACKEND_URL}/sandboxes/${sandboxId}/files?path=${encodeURIComponent(docPath)}`,
             {
               headers: {
-                'Authorization': `Bearer ${session.access_token}`,
+                Authorization: `Bearer ${accessToken}`,
               },
             }
           );
@@ -86,75 +196,61 @@ export function DocsToolView({
               if (parsedDocument.type === 'tiptap_document' && parsedDocument.content) {
                 actualContent = parsedDocument.content;
               }
-            } catch {}
+            } catch {
+              if (fileContent?.trim()) {
+                actualContent = fileContent;
+              }
+            }
           }
         }
       } catch (error) {
-        console.error('Failed to fetch latest content:', error);
+        console.error('Failed to fetch latest document content for export:', error);
       }
     }
-    if (actualContent === '<p></p>' || actualContent === '<p><br></p>' || actualContent.trim() === '') {
-      if (data && data.content) {
-        actualContent = data.content;
-      }
+
+    if (!actualContent || actualContent === '<p></p>' || actualContent === '<p><br></p>') {
+      actualContent = streamingContent?.content || data?.content || data?.document?.content || actualContent || '';
     }
-    
-    const documentData = {
-      type: 'tiptap_document',
-      version: '1.0',
-      title: doc.title,
-      content: actualContent,
-      metadata: doc.metadata || {},
-      created_at: doc.created_at,
-      updated_at: doc.updated_at || new Date().toISOString(),
-      doc_id: doc.id
-    };
-    
-    setEditorDocumentData(documentData);
-    setEditorFilePath(doc.path);
-    setEditorOpen(true);
-  }, []);
-  
-  const toolName = extractToolName(toolContent) || name || 'docs';
-  let data = extractDocsData(toolContent);
-  
-  if (!data?.sandbox_id && project?.id) {
-    data = { ...data, sandbox_id: project.id };
-  }
-  
-  let streamingContent: { content?: string; title?: string; metadata?: any } | null = null;
-  if (isStreaming && !data) {
-    streamingContent = extractStreamingDocumentContent(assistantContent, toolName);
-  }
+
+    return actualContent || '';
+  }, [data, project?.sandbox?.id, documentPreviewContent, streamingContent]);
 
   const handleExport = useCallback(async (format: ExportFormat | 'google-docs') => {
     if (format === 'google-docs') {
-      if (!project?.sandbox?.sandbox_url || !data?.document?.path) {
-        console.error('Missing sandbox URL or document path for Google Docs export');
-        return;
+      // Show "Feature coming soon!" toast for Google Docs export
+      toast.info('Feature coming soon!', {
+        description: 'Google Docs export will be available in a future update.',
+        duration: 3000,
+      });
+      return;
+    } else if (format === 'images') {
+      // Show "Feature coming soon!" toast for images export
+      toast.info('Feature coming soon!', {
+        description: 'Export to images will be available in a future update.',
+        duration: 3000,
+      });
+      return;
+    } else if (format === 'pdf') {
+      // Send automatic message to Iris for PDF conversion
+      if (onSubmit && data?.document?.path) {
+        const fileName = data.document.title || data.document.filename || 'document';
+        const message = `Iris, convert the ${fileName} to pdf and attach it here and only if that's not possible give me the secure cloud uploaded link for the pdf file.`;
+        onSubmit(message, { hidden: true });
+      } else {
+        console.error('onSubmit function not available or document path missing');
       }
-      
+    } else {
       setIsExporting(true);
       try {
-        const result = await handleGoogleDocsUpload(
-          project.sandbox.sandbox_url,
-          data.document.path
-        );
-        if (result?.redirected_to_auth) {
-          return;
-        }
-      } catch (error) {
-        console.error('Error exporting to Google Docs:', error);
+        const content = await fetchLatestDocumentContent();
+        const fileName = data?.document?.title || streamingContent?.title || 'document';
+
+        await exportDocument({ content, fileName, format });
       } finally {
         setIsExporting(false);
       }
-    } else {
-      const content = data?.content || data?.document?.content || streamingContent?.content || '';
-      const fileName = data?.document?.title || streamingContent?.title || 'document';
-
-      await exportDocument({ content, fileName, format });
     }
-  }, [data, streamingContent, project]);
+  }, [data, streamingContent, project, onSubmit, fetchLatestDocumentContent]);
   
   const assistantParams = extractParametersFromAssistant(assistantContent);
   
@@ -166,6 +262,22 @@ export function DocsToolView({
       data.document.content = assistantParams.content;
     }
   }
+
+  const handleDocumentSave = useCallback((updatedContent: string) => {
+    setDocumentPreviewContent(updatedContent);
+    setEditorDocumentData((prev: any) =>
+      prev ? { ...prev, content: updatedContent, updated_at: new Date().toISOString() } : prev
+    );
+    setDocumentRefreshToken((prev) => prev + 1);
+
+    const sandboxId = data?.sandbox_id || project?.id;
+    const targetPath = editorFilePath || data?.document?.path;
+    if (sandboxId && targetPath) {
+      const queryKey = fileQueryKeys.content(sandboxId, targetPath, 'text');
+      queryClient.invalidateQueries({ queryKey });
+      queryClient.refetchQueries({ queryKey });
+    }
+  }, [data?.sandbox_id, data?.document?.path, editorFilePath, project?.id, queryClient]);
 
   // Show streaming content if available
   if (isStreaming && streamingContent) {
@@ -222,8 +334,10 @@ export function DocsToolView({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="bg-white/5 border-white/10 text-white/90 hover:bg-white/10 hover:border-white/20 backdrop-blur-sm transition-all duration-200"
+                  disabled={isEditLoading}
+                  className="bg-white/5 border-white/10 text-white/90 hover:bg-white/10 hover:border-white/20 backdrop-blur-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={() => {
+                    if (!data.document) return;
                     let content = data.document.content || '';
                     if (typeof content === 'string' && content.includes('"type":"tiptap_document"')) {
                       try {
@@ -236,11 +350,15 @@ export function DocsToolView({
                     handleOpenInEditor(data.document, content, data);
                   }}
                 >
-                  <Pen className="h-3 w-3" />
-                  Edit
+                  {isEditLoading ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Pen className="h-3 w-3" />
+                  )}
+                  {isEditLoading ? 'Opening Iris Editor...' : 'Edit'}
                 </Button>
                 
-                <DropdownMenu>
+                <DropdownMenu onOpenChange={setIsDropdownOpen}>
                   <DropdownMenuTrigger asChild>
                     <Button 
                       size="sm" 
@@ -266,7 +384,22 @@ export function DocsToolView({
                       onClick={() => handleExport('txt')}
                       className="text-white/90 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
                     >
-                      Export as Text
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={FILE_TYPE_ICONS.txt}
+                          alt="Text file icon"
+                          width={20}
+                          height={20}
+                          className="flex-shrink-0 bg-white rounded-sm p-1"
+                          onError={(e) => {
+                            console.error('Failed to load text icon:', FILE_TYPE_ICONS.txt, e);
+                            // Fallback to a different icon
+                            e.currentTarget.src = '/filetypes/docs.png';
+                          }}
+                          onLoad={() => console.log('Text icon loaded:', FILE_TYPE_ICONS.txt)}
+                        />
+                        <span className="text-sm font-medium">Export as Text</span>
+                      </div>
                     </DropdownMenuItem>
                     
                     {/* Second: Export As PDF */}
@@ -274,7 +407,16 @@ export function DocsToolView({
                       onClick={() => handleExport('pdf')}
                       className="text-white/90 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
                     >
-                      Export as PDF
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={FILE_TYPE_ICONS.pdf}
+                          alt="PDF file icon"
+                          width={20}
+                          height={20}
+                          className="flex-shrink-0"
+                        />
+                        <span className="text-sm font-medium">Export as PDF</span>
+                      </div>
                     </DropdownMenuItem>
                     
                     {/* Third: Export as DOCX */}
@@ -282,25 +424,53 @@ export function DocsToolView({
                       onClick={() => handleExport('docx')}
                       className="text-white/90 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
                     >
-                      Export as DOCX
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={FILE_TYPE_ICONS.docx}
+                          alt="DOCX file icon"
+                          width={20}
+                          height={20}
+                          className="flex-shrink-0"
+                        />
+                        <span className="text-sm font-medium">Export as DOCX</span>
+                      </div>
                     </DropdownMenuItem>
                     
                     {/* Fourth: Export as Images */}
                     <DropdownMenuItem 
                       onClick={() => handleExport('images')}
-                      className="text-white/90 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                      disabled={true}
+                      className="text-white/50 hover:bg-white/5 hover:text-white/50 focus:bg-white/5 focus:text-white/50 cursor-not-allowed"
                     >
-                      Export as Images
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={FILE_TYPE_ICONS.images}
+                          alt="Images file icon"
+                          width={20}
+                          height={20}
+                          className="flex-shrink-0 opacity-50"
+                        />
+                        <span className="text-sm font-medium">Export as Images</span>
+                      </div>
                     </DropdownMenuItem>
                     
                     {/* Fifth: Upload to Google Docs (only if sandbox available) */}
                     {project?.sandbox?.sandbox_url && data?.document?.path && (
                       <DropdownMenuItem 
                         onClick={() => handleExport('google-docs')}
-                        className="text-white/90 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                        disabled={true}
+                        className="text-white/50 hover:bg-white/5 hover:text-white/50 focus:bg-white/5 focus:text-white/50 cursor-not-allowed"
                       >
-                        <Share/>
-                        Upload to Google Docs
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={FILE_TYPE_ICONS.docs}
+                            alt="Google Docs icon"
+                            width={20}
+                            height={20}
+                            className="flex-shrink-0 opacity-50"
+                          />
+                          <span className="text-sm font-medium">Upload to Google Docs</span>
+                        </div>
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>
@@ -324,7 +494,7 @@ export function DocsToolView({
         </div>
       </CardHeader>
       
-      <CardContent className="flex-1 px-0 overflow-hidden flex flex-col min-h-[600px]">
+        <CardContent className="flex-1 px-0 overflow-hidden flex flex-col min-h-[500px]">
         {data.error ? (
           <div className="space-y-4 p-4">
             <div className="flex items-center gap-2 p-4 bg-rose-50 dark:bg-rose-900/20 rounded-lg">
@@ -360,11 +530,12 @@ export function DocsToolView({
                           path={data.document.path}
                           sandboxId={data.sandbox_id}
                           format={data.document.format || 'doc'}
-                          fallbackContent={data.content || data.document.content || ''}
+                          fallbackContent={documentPreviewContent || data.content || data.document.content || ''}
+                          refreshToken={documentRefreshToken}
                         />
                       ) : (
                         <DocumentViewer 
-                          content={data.content || data.document.content || ''} 
+                          content={documentPreviewContent || data.content || data.document.content || ''} 
                           format={data.document.format || 'doc'} 
                         />
                       )}
@@ -407,7 +578,7 @@ export function DocsToolView({
         filePath={editorFilePath}
         documentData={editorDocumentData}
         sandboxId={data?.sandbox_id || project?.id || ''}
-        onSave={() => {}}
+        onSave={handleDocumentSave}
       />
     )}
     </>

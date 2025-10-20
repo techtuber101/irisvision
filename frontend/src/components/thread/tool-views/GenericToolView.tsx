@@ -281,7 +281,7 @@ export function GenericToolView({
               <Wrench className="h-10 w-10 text-zinc-400 dark:text-zinc-600" />
             </div>
             <h3 className="text-xl font-semibold mb-2 text-zinc-900 dark:text-zinc-100">
-              No Content Available
+              Loading...
             </h3>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center max-w-md">
               This tool execution did not produce any input or output content to display.

@@ -856,7 +856,10 @@ export function FileViewerModal({
   }, [selectedFilePath, textContentForRenderer, isDocumentFile, isTipTapDocumentContent]);
   
   // Handle document save from editor
-  const handleDocumentSave = useCallback(() => {
+  const handleDocumentSave = useCallback((updatedContent: string) => {
+    if (updatedContent) {
+      setTextContentForRenderer(updatedContent);
+    }
     // Refresh the file content after saving
     if (selectedFilePath) {
       // Clear cache for this file to force reload

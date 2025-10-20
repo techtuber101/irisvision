@@ -151,7 +151,22 @@ class ModelRegistry:
                 extra_headers={
                     "User-Agent": "Suna-AI-Agent/1.0"
                 }
-            )
+            ),
+            metadata={
+                # Vertex Gemini expects a list of category/threshold pairs
+                "safety_settings": [
+                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+                ],
+                "generation_config": {
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                    "top_k": 40,
+                    "max_output_tokens": 65536
+                }
+            }
         ))
         
         self.register(Model(

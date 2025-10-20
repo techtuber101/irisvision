@@ -33,7 +33,7 @@ interface TipTapDocumentModalProps {
     updated_at?: string;
   };
   sandboxId: string;
-  onSave?: () => void;
+  onSave?: (updatedContent: string) => void;
 }
 
 export function TipTapDocumentModal({
@@ -116,9 +116,7 @@ export function TipTapDocumentModal({
         throw new Error(error || 'Failed to save document');
       }
 
-      if (onSave) {
-        onSave();
-      }
+      onSave?.(content);
     } catch (error) {
       console.error('Auto-save error:', error);
       toast.error(`Auto-save failed: ${error instanceof Error ? error.message : 'Unknown error'}`);

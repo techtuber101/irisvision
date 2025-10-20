@@ -590,7 +590,7 @@ const ThreadItem: React.FC<{
                   disabled={isSummarizing}
                 >
                   <Sparkles className="w-4 h-4" />
-                  <span>{isSummarizing ? 'Summarising…' : 'Auto-Summarise'}</span>
+                  <span>{isSummarizing ? 'Summarising…' : 'Summarise'}</span>
                 </button>
               </div>
 

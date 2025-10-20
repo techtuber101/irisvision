@@ -89,7 +89,7 @@ export default function AgentsPage() {
   const [agentLimitError, setAgentLimitError] = useState<AgentCountLimitError | null>(null);
 
   const activeTab = useMemo(() => {
-    const tab = searchParams.get('tab');
+    const tab = searchParams?.get('tab');
     if (tab === 'marketplace') {
       return 'my-agents';
     }
@@ -97,7 +97,7 @@ export default function AgentsPage() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (searchParams.get('tab') === 'marketplace') {
+    if (searchParams?.get('tab') === 'marketplace') {
       const params = new URLSearchParams(searchParams.toString());
       params.set('tab', 'my-agents');
       router.replace(`${pathname}?${params.toString()}`);

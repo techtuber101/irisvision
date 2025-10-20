@@ -1,6 +1,8 @@
 import { toast } from 'sonner';
 import { saveAs } from 'file-saver';
 import html2pdf from 'html2pdf.js';
+import html2canvas from 'html2canvas';
+import JSZip from 'jszip';
 import TurndownService from 'turndown';
 import { gfm } from 'turndown-plugin-gfm';
 
@@ -15,17 +17,19 @@ export interface DocumentExportOptions {
 // Helper function to clean CSS for html2canvas compatibility
 function cleanCSSForCanvas(html: string): string {
   return html
-    // Remove oklch color functions
-    .replace(/oklch\([^)]+\)/g, '#ffffff')
+    // Remove oklch color functions (case-insensitive)
+    .replace(/oklch\s*\([^)]+\)/gi, '#ffffff')
+    .replace(/color:\s*oklch\s*\([^)]+\);?/gi, 'color: #222222;')
+    .replace(/background(?:-color)?:\s*oklch\s*\([^)]+\);?/gi, 'background: #ffffff;')
     // Remove CSS variables
-    .replace(/var\(--[^)]+\)/g, '#ffffff')
+    .replace(/var\(--[^)]+\)/gi, '#ffffff')
     // Remove backdrop-filter (not supported by html2canvas)
-    .replace(/backdrop-filter:[^;]+;?/g, '')
+    .replace(/backdrop-filter:[^;]+;?/gi, '')
     // Remove complex gradients that might cause issues
-    .replace(/background:[^;]*gradient[^;]+;?/g, 'background: #070a11;')
+    .replace(/background:[^;]*gradient[^;]+;?/gi, 'background: #ffffff;')
     // Clean up any remaining complex CSS
-    .replace(/filter:[^;]+;?/g, '')
-    .replace(/mix-blend-mode:[^;]+;?/g, '');
+    .replace(/filter:[^;]+;?/gi, '')
+    .replace(/mix-blend-mode:[^;]+;?/gi, '');
 }
 
 export async function exportDocument({ content, fileName, format }: DocumentExportOptions): Promise<void> {
@@ -37,90 +41,95 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
   // Clean the HTML content for canvas compatibility
   htmlContent = cleanCSSForCanvas(htmlContent);
 
+  const standardDocumentStyles = `
+    <style>
+      body { 
+        font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        line-height: 1.6;
+        color: #000;
+        background: #fff;
+        margin: 0;
+        padding: 0;
+      }
+      h1 { font-size: 2em; margin: 0.67em 0; }
+      h2 { font-size: 1.5em; margin: 0.83em 0; }
+      h3 { font-size: 1.17em; margin: 1em 0; }
+      h4 { font-size: 1.1em; margin: 1.33em 0; font-weight: 600; }
+      h5 { font-size: 1em; margin: 1.67em 0; font-weight: 600; }
+      h6 { font-size: 0.9em; margin: 2em 0; font-weight: 600; }
+      p { margin: 1em 0; }
+      ul, ol { margin: 1em 0; padding-left: 40px; }
+      li { margin-bottom: 0.5em; }
+      blockquote { 
+        margin: 1em 0; 
+        padding-left: 1em; 
+        border-left: 3px solid #ddd; 
+        color: #666; 
+        font-style: italic;
+      }
+      pre { 
+        background: #f4f4f4; 
+        padding: 1em; 
+        border-radius: 4px; 
+        overflow-x: auto; 
+        margin: 1em 0;
+        font-family: 'Geist Mono', 'SF Mono', Monaco, 'Courier New', monospace;
+        font-size: 0.9em;
+      }
+      code { 
+        background: #f4f4f4; 
+        padding: 0.2em 0.4em; 
+        border-radius: 3px; 
+        font-family: 'Geist Mono', 'SF Mono', Monaco, 'Courier New', monospace;
+        font-size: 0.9em;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+      }
+      table { 
+        border-collapse: collapse; 
+        width: 100%; 
+        margin: 1.5em 0; 
+      }
+      th, td { 
+        border: 1px solid #ddd; 
+        padding: 10px 12px; 
+        text-align: left; 
+      }
+      th { 
+        background-color: #f2f2f2; 
+        font-weight: 600;
+      }
+      tr:nth-child(even) {
+        background-color: #f8f9fa;
+      }
+      img { 
+        max-width: 100%; 
+        height: auto; 
+        display: block;
+        margin: 1em 0;
+      }
+      a { 
+        color: #0066cc; 
+        text-decoration: none; 
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      hr {
+        border: none;
+        border-top: 2px solid #e0e0e0;
+        margin: 2em 0;
+      }
+    </style>
+  `;
+
   try {
     switch (format) {
       case 'pdf': {
         const element = document.createElement('div');
-        element.innerHTML = `
-          <style>
-            body { 
-              font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              line-height: 1.6;
-              color: #000;
-            }
-            h1 { font-size: 2em; margin: 0.67em 0; }
-            h2 { font-size: 1.5em; margin: 0.83em 0; }
-            h3 { font-size: 1.17em; margin: 1em 0; }
-            h4 { font-size: 1.2em; margin: 1.33em 0; font-weight: 600; }
-            h5 { font-size: 1em; margin: 1.67em 0; font-weight: 600; }
-            h6 { font-size: 0.9em; margin: 2.33em 0; font-weight: 600; }
-            p { margin: 1em 0; }
-            ul, ol { margin: 1em 0; padding-left: 40px; }
-            li { margin-bottom: 0.5em; }
-            blockquote { 
-              margin: 1em 0; 
-              padding-left: 1em; 
-              border-left: 3px solid #ddd; 
-              color: #666; 
-              font-style: italic;
-            }
-            pre { 
-              background: #f4f4f4; 
-              padding: 1em; 
-              border-radius: 4px; 
-              overflow-x: auto; 
-              margin: 1em 0;
-              font-family: 'Geist Mono', 'SF Mono', Monaco, 'Courier New', monospace;
-              font-size: 0.9em;
-            }
-            code { 
-              background: #f4f4f4; 
-              padding: 0.2em 0.4em; 
-              border-radius: 3px; 
-              font-family: 'Geist Mono', 'SF Mono', Monaco, 'Courier New', monospace;
-              font-size: 0.9em;
-            }
-            pre code {
-              background: none;
-              padding: 0;
-            }
-            table { 
-              border-collapse: collapse; 
-              width: 100%; 
-              margin: 1em 0; 
-            }
-            th, td { 
-              border: 1px solid #ddd; 
-              padding: 8px; 
-              text-align: left; 
-            }
-            th { 
-              background-color: #f2f2f2; 
-            }
-            tr:nth-child(even) {
-              background-color: #f8f9fa;
-            }
-            img { 
-              max-width: 100%; 
-              height: auto; 
-              display: block;
-              margin: 1em 0;
-            }
-            a { 
-              color: #0066cc; 
-              text-decoration: none; 
-            }
-            a:hover {
-              text-decoration: underline;
-            }
-            hr {
-              border: none;
-              border-top: 2px solid #e0e0e0;
-              margin: 2em 0;
-            }
-          </style>
-          ${htmlContent}
-        `;
+        element.innerHTML = `${standardDocumentStyles}${htmlContent}`;
         
         const options = {
           margin: 1,
@@ -475,129 +484,73 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
       }
 
       case 'images': {
+        const container = document.createElement('div');
+        container.innerHTML = `${standardDocumentStyles}<div id="iris-document-export">${htmlContent}</div>`;
+
         const element = document.createElement('div');
-        element.innerHTML = `
-          <style>
-            body { 
-              font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              line-height: 1.6;
-              color: #ffffff;
-              margin: 0;
-              padding: 20px;
-              background: #070a11;
-            }
-            h1 { font-size: 2em; margin: 0.67em 0; }
-            h2 { font-size: 1.5em; margin: 0.83em 0; }
-            h3 { font-size: 1.17em; margin: 1em 0; }
-            h4 { font-size: 1.2em; margin: 1.33em 0; font-weight: 600; }
-            h5 { font-size: 1em; margin: 1.67em 0; font-weight: 600; }
-            h6 { font-size: 0.9em; margin: 2.33em 0; font-weight: 600; }
-            p { margin: 1em 0; }
-            ul, ol { margin: 1em 0; padding-left: 40px; }
-            li { margin-bottom: 0.5em; }
-            blockquote { 
-              margin: 1em 0; 
-              padding-left: 1em; 
-              border-left: 3px solid #ddd; 
-              color: #666; 
-              font-style: italic;
-            }
-            pre { 
-              background: #f4f4f4; 
-              padding: 1em; 
-              border-radius: 4px; 
-              overflow-x: auto; 
-              margin: 1em 0;
-              font-family: 'Geist Mono', 'SF Mono', Monaco, 'Courier New', monospace;
-              font-size: 0.9em;
-            }
-            code { 
-              background: #f4f4f4; 
-              padding: 0.2em 0.4em; 
-              border-radius: 3px; 
-              font-family: 'Geist Mono', 'SF Mono', Monaco, 'Courier New', monospace;
-              font-size: 0.9em;
-            }
-            pre code {
-              background: none;
-              padding: 0;
-            }
-            table { 
-              border-collapse: collapse; 
-              width: 100%; 
-              margin: 1em 0; 
-            }
-            th, td { 
-              border: 1px solid #ddd; 
-              padding: 8px; 
-              text-align: left; 
-            }
-            th { 
-              background-color: #f2f2f2; 
-            }
-            tr:nth-child(even) {
-              background-color: #f8f9fa;
-            }
-            img { 
-              max-width: 100%; 
-              height: auto; 
-              display: block;
-              margin: 1em 0;
-            }
-            a { 
-              color: #0066cc; 
-              text-decoration: none; 
-            }
-            a:hover {
-              text-decoration: underline;
-            }
-            hr {
-              border: none;
-              border-top: 2px solid #e0e0e0;
-              margin: 2em 0;
-            }
-          </style>
-          ${htmlContent}
-        `;
         element.style.cssText = `
           position: absolute;
           left: -9999px;
-          width: 800px;
-          background: #070a11;
-          padding: 20px;
-          font-family: 'Geist', sans-serif;
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 16px;
+          top: 0;
+          width: 794px;
+          background: #ffffff;
+          padding: 48px;
+          box-sizing: border-box;
+          color: #000000;
         `;
+        element.appendChild(container);
         document.body.appendChild(element);
 
-        // Split content into pages (simulate page breaks)
-        const pageHeight = 1000; // pixels per page
-        const totalHeight = element.scrollHeight;
-        const pages = Math.ceil(totalHeight / pageHeight);
-        
-        for (let i = 0; i < pages; i++) {
-          const pageElement = element.cloneNode(true) as HTMLElement;
-          pageElement.style.transform = `translateY(-${i * pageHeight}px)`;
-          pageElement.style.height = `${pageHeight}px`;
-          pageElement.style.overflow = 'hidden';
-          
-          document.body.appendChild(pageElement);
-          
-          const canvas = await html2pdf().from(pageElement).set({
-            image: { type: 'png', quality: 0.95 },
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'px', format: [800, pageHeight] }
-          }).output('canvas');
-          
-          const dataURL = canvas.toDataURL('image/png', 0.95);
-          const blob = await fetch(dataURL).then(res => res.blob());
-          saveAs(blob, `${fileName}_page_${i + 1}.png`);
-          
-          document.body.removeChild(pageElement);
+        try {
+          const scale = 2;
+          const canvas = await html2canvas(element, {
+            scale,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+          });
+
+          const pageHeightPx = Math.floor(1122 * scale);
+          const totalPages = Math.max(1, Math.ceil(canvas.height / pageHeightPx));
+          const zip = new JSZip();
+
+          for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
+            const startY = pageIndex * pageHeightPx;
+            const sliceHeight = Math.min(pageHeightPx, canvas.height - startY);
+            const pageCanvas = document.createElement('canvas');
+            pageCanvas.width = canvas.width;
+            pageCanvas.height = sliceHeight;
+            const ctx = pageCanvas.getContext('2d');
+            if (!ctx) continue;
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+            ctx.drawImage(
+              canvas,
+              0,
+              startY,
+              canvas.width,
+              sliceHeight,
+              0,
+              0,
+              canvas.width,
+              sliceHeight
+            );
+
+            const blob: Blob | null = await new Promise((resolve) =>
+              pageCanvas.toBlob((b) => resolve(b), 'image/png', 0.95)
+            );
+
+            if (blob) {
+              zip.file(`${fileName}_page_${pageIndex + 1}.png`, blob);
+            }
+          }
+
+          const zipBlob = await zip.generateAsync({ type: 'blob' });
+          saveAs(zipBlob, `${fileName}_images.zip`);
+          toast.success(`${totalPages} page${totalPages > 1 ? 's' : ''} exported as images`);
+        } finally {
+          document.body.removeChild(element);
         }
-        document.body.removeChild(element);
-        toast.success(`${pages} images exported successfully`);
         break;
       }
     }

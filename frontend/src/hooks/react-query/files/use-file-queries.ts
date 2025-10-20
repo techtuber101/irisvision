@@ -191,6 +191,9 @@ export function useFileContentQuery(
     enabled?: boolean;
     staleTime?: number;
     gcTime?: number;
+    refetchOnWindowFocus?: boolean;
+    refetchOnReconnect?: boolean;
+    refetchOnMount?: boolean | 'always';
   } = {}
 ) {
   const { session } = useAuth();
@@ -212,6 +215,9 @@ export function useFileContentQuery(
     enabled: Boolean(sandboxId && normalizedPath && (options.enabled !== false)),
     staleTime: options.staleTime || (effectiveContentType === 'blob' ? 5 * 60 * 1000 : 2 * 60 * 1000), // 5min for blobs, 2min for text
     gcTime: options.gcTime || 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: options.refetchOnWindowFocus ?? true,
+    refetchOnReconnect: options.refetchOnReconnect ?? true,
+    refetchOnMount: options.refetchOnMount ?? 'always',
     retry: (failureCount, error: any) => {
       // Don't retry on auth errors
       if (error?.message?.includes('401') || error?.message?.includes('403')) {

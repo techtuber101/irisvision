@@ -101,6 +101,8 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const [isSidePanelAnimating, setIsSidePanelAnimating] = useState(false);
   const [userInitiatedRun, setUserInitiatedRun] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [isUserAtBottom, setIsUserAtBottom] = useState(true);
+  const [newMessageCount, setNewMessageCount] = useState(0);
   const [showAgentLimitDialog, setShowAgentLimitDialog] = useState(false);
   const [agentLimitData, setAgentLimitData] = useState<{
     runningCount: number;
@@ -383,14 +385,17 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         setAutoOpenedPanel(false);
       }
 
-      // Auto-scroll to bottom (top: 0 in flex-col-reverse) when new messages arrive
+      // Only auto-scroll to bottom if user is at the bottom, otherwise increment counter
       setTimeout(() => {
-        if (scrollContainerRef.current) {
+        if (isUserAtBottom && scrollContainerRef.current) {
           scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (!isUserAtBottom) {
+          // User is scrolled up, increment new message count
+          setNewMessageCount(prev => prev + 1);
         }
       }, 100);
     },
-    [setMessages, setAutoOpenedPanel],
+    [setMessages, setAutoOpenedPanel, isUserAtBottom],
   );
 
   const handleStreamStatusChange = useCallback(
@@ -469,7 +474,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const handleSubmitMessage = useCallback(
     async (
       message: string,
-      options?: { model_name?: string; chat_mode?: 'chat' | 'execute' },
+      options?: { model_name?: string; chat_mode?: 'chat' | 'execute'; hidden?: boolean },
     ) => {
       if (!message.trim()) return;
       setIsSending(true);
@@ -480,7 +485,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         type: 'user',
         is_llm_message: false,
         content: message,
-        metadata: '{}',
+        metadata: JSON.stringify({ hidden: options?.hidden || false }),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -1198,6 +1203,15 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
       // Show button when scrollTop < -threshold (scrolled up enough from bottom)
       const shouldShow = scrollTop < -threshold && scrollHeight > clientHeight;
       setShowScrollToBottom(shouldShow);
+      
+      // Track if user is at bottom (within threshold)
+      const atBottom = scrollTop >= -threshold;
+      setIsUserAtBottom(atBottom);
+      
+      // Reset new message count when user scrolls to bottom
+      if (atBottom && newMessageCount > 0) {
+        setNewMessageCount(0);
+      }
     };
 
     const scrollContainer = scrollContainerRef.current;
@@ -1212,7 +1226,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         scrollContainer.removeEventListener('scroll', handleScroll);
       };
     }
-  }, [messages, initialLoadCompleted]);
+  }, [messages, initialLoadCompleted, newMessageCount]);
 
   if (!initialLoadCompleted || isLoading) {
     return <ThreadSkeleton isSidePanelOpen={isSidePanelOpen} compact={compact} />;
@@ -1522,6 +1536,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
               defaultShowSnackbar="tokens"
               showScrollToBottomIndicator={showScrollToBottom}
               onScrollToBottom={scrollToBottom}
+              newMessageCount={newMessageCount}
               initialChatMode={initialChatMode}
               onChatModeChange={handleChatModeChange}
             />

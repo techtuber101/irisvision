@@ -82,6 +82,7 @@ export interface ChatInputProps {
       model_name?: string;
       agent_id?: string;
       chat_mode?: ChatMode;
+      hidden?: boolean;
     },
   ) => void;
   placeholder?: string;
@@ -112,6 +113,7 @@ export interface ChatInputProps {
   showToLowCreditUsers?: boolean;
   showScrollToBottomIndicator?: boolean;
   onScrollToBottom?: () => void;
+  newMessageCount?: number;
   selectedMode?: string | null;
   onModeDeselect?: () => void;
   animatePlaceholder?: boolean;
@@ -163,6 +165,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
       showToLowCreditUsers = true,
       showScrollToBottomIndicator = false,
       onScrollToBottom,
+      newMessageCount = 0,
       selectedMode,
       onModeDeselect,
       animatePlaceholder = false,
@@ -634,14 +637,28 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
 
           {/* Scroll to bottom button */}
           {showScrollToBottomIndicator && onScrollToBottom && (
-            <button
-              onClick={onScrollToBottom}
-              className={`absolute cursor-pointer right-3 z-50 w-8 h-8 rounded-full bg-card border border-border transition-all duration-200 hover:scale-105 flex items-center justify-center ${showToolPreview || !!showSnackbar ? '-top-12' : '-top-5'
+            <div className="relative">
+              <button
+                onClick={onScrollToBottom}
+                className={`absolute cursor-pointer right-3 z-50 w-8 h-8 rounded-full bg-card border border-border transition-all duration-200 hover:scale-105 flex items-center justify-center ${
+                  showToolPreview || !!showSnackbar ? '-top-12' : '-top-5'
+                } ${
+                  newMessageCount > 0 
+                    ? 'animate-pulse shadow-lg shadow-blue-500/50 ring-2 ring-blue-500/30' 
+                    : ''
                 }`}
-              title="Scroll to bottom"
-            >
-              <ArrowDown className="w-4 h-4 text-muted-foreground" />
-            </button>
+                title={`Scroll to bottom${newMessageCount > 0 ? ` (${newMessageCount} new message${newMessageCount > 1 ? 's' : ''})` : ''}`}
+              >
+                <ArrowDown className="w-4 h-4 text-muted-foreground" />
+              </button>
+              
+              {/* Notification badge */}
+              {newMessageCount > 0 && (
+                <div className="absolute -top-1 -right-1 z-50 min-w-[18px] h-[18px] bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium animate-bounce">
+                  {newMessageCount > 99 ? '99+' : newMessageCount}
+                </div>
+              )}
+            </div>
           )}
           
           {/* New integrated chat container with glassmorphism */}

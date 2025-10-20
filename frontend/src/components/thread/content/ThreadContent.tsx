@@ -553,7 +553,20 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
     const displayMessages = useMemo(() => {
         // Use includes check to avoid type narrowing issues
         const displayableTypes = ['user', 'assistant', 'tool', 'system', 'status', 'browser_state'];
-        return allMessages.filter(msg => displayableTypes.includes(msg.type));
+        return allMessages.filter(msg => {
+            // Check if message type is displayable
+            if (!displayableTypes.includes(msg.type)) return false;
+            
+            // Check if message has hidden flag in metadata
+            try {
+                const metadata = JSON.parse(msg.metadata || '{}');
+                if (metadata.hidden === true) return false;
+            } catch (e) {
+                // If metadata parsing fails, continue with normal filtering
+            }
+            
+            return true;
+        });
     }, [allMessages]);
 
     // Helper function to get agent info robustly

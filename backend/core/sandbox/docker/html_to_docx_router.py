@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 import json
-import os
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
-import tempfile
 import re
 from io import BytesIO
+import copy
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
@@ -16,6 +16,9 @@ try:
     from docx.shared import Inches, Pt, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.enum.style import WD_STYLE_TYPE
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 except ImportError as e:
     raise ImportError(f"python-docx is not installed. Please install it with: pip install python-docx. Error: {e}")
 
@@ -45,6 +48,225 @@ class HTMLToDocxConverter:
         self.doc_path = Path(doc_path)
         self.doc_data = {}
         self.document = None
+        self.heading_style_map = {
+            'h1': 'Heading 1',
+            'h2': 'Heading 2',
+            'h3': 'Heading 3',
+            'h4': 'Heading 4',
+            'h5': 'Heading 5',
+            'h6': 'Heading 6'
+        }
+
+    def _setup_document_styles(self):
+        """Configure professional document styles inspired by world-class document formatting."""
+        section = self.document.sections[0]
+        section.top_margin = Inches(1.2)
+        section.bottom_margin = Inches(1.2)
+        section.left_margin = Inches(1.2)
+        section.right_margin = Inches(1.2)
+
+        styles = self.document.styles
+
+        # Enhanced Normal style with professional typography
+        normal_style = styles['Normal']
+        normal_font = normal_style.font
+        normal_font.name = 'Calibri'
+        normal_font.size = Pt(11)
+        normal_font.color.rgb = RGBColor(33, 37, 41)  # Professional dark gray
+        normal_style.paragraph_format.space_after = Pt(8)
+        normal_style.paragraph_format.space_before = Pt(0)
+        normal_style.paragraph_format.line_spacing = 1.6  # Improved readability
+
+        # Professional body text style
+        if 'IrisBodyText' not in styles:
+            body_style = styles.add_style('IrisBodyText', WD_STYLE_TYPE.PARAGRAPH)
+            body_style.base_style = normal_style
+            body_style.font.name = 'Calibri'
+            body_style.font.size = Pt(11)
+            body_style.font.color.rgb = RGBColor(33, 37, 41)
+            body_style.paragraph_format.space_after = Pt(10)
+            body_style.paragraph_format.space_before = Pt(0)
+            body_style.paragraph_format.line_spacing = 1.6
+        else:
+            body_style = styles['IrisBodyText']
+
+        # Enhanced blockquote with professional styling
+        if 'IrisBlockQuote' not in styles:
+            block_style = styles.add_style('IrisBlockQuote', WD_STYLE_TYPE.PARAGRAPH)
+            block_style.base_style = body_style
+            block_style.font.italic = True
+            block_style.font.color.rgb = RGBColor(73, 80, 87)  # Professional gray
+            block_style.paragraph_format.left_indent = Inches(0.5)
+            block_style.paragraph_format.right_indent = Inches(0.3)
+            block_style.paragraph_format.space_before = Pt(12)
+            block_style.paragraph_format.space_after = Pt(12)
+            block_style.paragraph_format.line_spacing = 1.5
+
+        # Professional code block styling
+        if 'IrisCodeBlock' not in styles:
+            code_style = styles.add_style('IrisCodeBlock', WD_STYLE_TYPE.PARAGRAPH)
+            code_style.base_style = body_style
+            code_style.font.name = 'Consolas'
+            code_style.font.size = Pt(10)
+            code_style.font.color.rgb = RGBColor(40, 44, 52)  # Dark code color
+            code_style.paragraph_format.left_indent = Inches(0.4)
+            code_style.paragraph_format.right_indent = Inches(0.4)
+            code_style.paragraph_format.space_before = Pt(8)
+            code_style.paragraph_format.space_after = Pt(8)
+            code_style.paragraph_format.line_spacing = 1.3
+
+        # Professional table header styling
+        if 'IrisTableHeader' not in styles:
+            table_header = styles.add_style('IrisTableHeader', WD_STYLE_TYPE.PARAGRAPH)
+            table_header.font.name = 'Calibri'
+            table_header.font.size = Pt(11)
+            table_header.font.bold = True
+            table_header.font.color.rgb = RGBColor(33, 37, 41)
+            table_header.paragraph_format.space_after = Pt(6)
+            table_header.paragraph_format.space_before = Pt(6)
+
+        # Professional subtitle styling
+        if 'IrisSubtitle' not in styles:
+            subtitle = styles.add_style('IrisSubtitle', WD_STYLE_TYPE.PARAGRAPH)
+            subtitle.font.name = 'Calibri'
+            subtitle.font.size = Pt(12)
+            subtitle.font.color.rgb = RGBColor(73, 80, 87)
+            subtitle.paragraph_format.space_after = Pt(6)
+
+        # Professional list styles
+        if 'IrisListBullet' not in styles:
+            list_bullet = styles.add_style('IrisListBullet', WD_STYLE_TYPE.PARAGRAPH)
+            list_bullet.base_style = body_style
+            list_bullet.font.name = 'Calibri'
+            list_bullet.font.size = Pt(11)
+            list_bullet.font.color.rgb = RGBColor(33, 37, 41)
+            list_bullet.paragraph_format.space_after = Pt(6)
+            list_bullet.paragraph_format.space_before = Pt(0)
+            list_bullet.paragraph_format.left_indent = Inches(0.3)
+
+        if 'IrisListNumber' not in styles:
+            list_number = styles.add_style('IrisListNumber', WD_STYLE_TYPE.PARAGRAPH)
+            list_number.base_style = body_style
+            list_number.font.name = 'Calibri'
+            list_number.font.size = Pt(11)
+            list_number.font.color.rgb = RGBColor(33, 37, 41)
+            list_number.paragraph_format.space_after = Pt(6)
+            list_number.paragraph_format.space_before = Pt(0)
+            list_number.paragraph_format.left_indent = Inches(0.3)
+
+        # Professional heading hierarchy with improved typography
+        heading_styles = {
+            'Heading 1': {
+                'color': RGBColor(17, 24, 39),  # Very dark gray
+                'size': Pt(24),
+                'space_before': Pt(24),
+                'space_after': Pt(12),
+                'bold': True
+            },
+            'Heading 2': {
+                'color': RGBColor(31, 41, 55),  # Dark gray
+                'size': Pt(20),
+                'space_before': Pt(20),
+                'space_after': Pt(10),
+                'bold': True
+            },
+            'Heading 3': {
+                'color': RGBColor(55, 65, 81),  # Medium dark gray
+                'size': Pt(16),
+                'space_before': Pt(16),
+                'space_after': Pt(8),
+                'bold': True
+            },
+            'Heading 4': {
+                'color': RGBColor(75, 85, 99),  # Medium gray
+                'size': Pt(14),
+                'space_before': Pt(14),
+                'space_after': Pt(6),
+                'bold': True
+            },
+            'Heading 5': {
+                'color': RGBColor(107, 114, 128),  # Light gray
+                'size': Pt(12),
+                'space_before': Pt(12),
+                'space_after': Pt(6),
+                'bold': True
+            },
+            'Heading 6': {
+                'color': RGBColor(156, 163, 175),  # Very light gray
+                'size': Pt(11),
+                'space_before': Pt(10),
+                'space_after': Pt(4),
+                'bold': True
+            }
+        }
+
+        for heading_name, style_config in heading_styles.items():
+            if heading_name in styles:
+                heading_style = styles[heading_name]
+                heading_style.font.name = 'Calibri'
+                heading_style.font.color.rgb = style_config['color']
+                heading_style.font.size = style_config['size']
+                heading_style.font.bold = style_config['bold']
+                heading_style.paragraph_format.space_before = style_config['space_before']
+                heading_style.paragraph_format.space_after = style_config['space_after']
+                heading_style.paragraph_format.line_spacing = 1.2
+
+    def _add_document_header(self):
+        title = self.doc_data.get('title', 'Document')
+        
+        # Professional title styling - use proper Heading 1 style
+        title_paragraph = self.document.add_paragraph(title, style='Heading 1')
+        title_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        title_paragraph.paragraph_format.space_after = Pt(12)
+
+        # Professional date styling
+        date_paragraph = self.document.add_paragraph(
+            datetime.now().strftime('%B %d, %Y'),
+            style='IrisSubtitle'
+        )
+        date_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        date_paragraph.paragraph_format.space_after = Pt(6)
+
+        # Professional branding
+        created_by_paragraph = self.document.add_paragraph(
+            'Created by Iris Intelligence Exclusively for You',
+            style='IrisSubtitle'
+        )
+        created_by_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        created_by_paragraph.paragraph_format.space_after = Pt(18)
+
+        # Professional separator line
+        separator = self.document.add_paragraph()
+        separator.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        separator_run = separator.add_run('─' * 50)
+        separator_run.font.color.rgb = RGBColor(229, 231, 235)  # Very light gray
+        separator_run.font.size = Pt(10)
+        separator.paragraph_format.space_before = Pt(6)
+        separator.paragraph_format.space_after = Pt(12)
+
+    def _get_heading_color(self, level):
+        """Get professional heading color based on level."""
+        colors = {
+            1: RGBColor(17, 24, 39),   # Very dark gray
+            2: RGBColor(31, 41, 55),   # Dark gray
+            3: RGBColor(55, 65, 81),  # Medium dark gray
+            4: RGBColor(75, 85, 99), # Medium gray
+            5: RGBColor(107, 114, 128), # Light gray
+            6: RGBColor(156, 163, 175) # Very light gray
+        }
+        return colors.get(level, RGBColor(17, 24, 39))
+
+    def _get_heading_size(self, level):
+        """Get professional heading size based on level."""
+        sizes = {
+            1: Pt(24),
+            2: Pt(20),
+            3: Pt(16),
+            4: Pt(14),
+            5: Pt(12),
+            6: Pt(11)
+        }
+        return sizes.get(level, Pt(16))
         
     def load_document(self):
         if not self.doc_path.exists():
@@ -66,6 +288,8 @@ class HTMLToDocxConverter:
     
     def create_docx(self) -> Document:
         self.document = Document()
+        self._setup_document_styles()
+        self._add_document_header()
 
         html_content = self.doc_data.get('content', '')
         self.convert_html_to_docx(html_content)
@@ -78,150 +302,303 @@ class HTMLToDocxConverter:
             
         soup = BeautifulSoup(html_content, 'html.parser')
         
-        for element in soup.children:
+        for element in soup.contents:
+            if getattr(element, 'name', None) is None and not str(element).strip():
+                continue
             self.process_element(element)
     
+    def apply_run_formatting(self, run, formatting: Dict):
+        if formatting.get('bold') is not None:
+            run.bold = formatting['bold']
+        if formatting.get('italic') is not None:
+            run.italic = formatting['italic']
+        if formatting.get('underline') is not None:
+            run.underline = formatting['underline']
+        if formatting.get('strike') is not None:
+            run.font.strike = formatting['strike']
+        if formatting.get('font_name'):
+            run.font.name = formatting['font_name']
+        if formatting.get('font_size'):
+            run.font.size = formatting['font_size']
+        if formatting.get('color'):
+            run.font.color.rgb = formatting['color']
+
+    def _set_cell_background(self, cell, hex_color: str):
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        shd = OxmlElement('w:shd')
+        shd.set(qn('w:fill'), hex_color)
+        shd.set(qn('w:color'), 'auto')
+        shd.set(qn('w:val'), 'clear')
+        tcPr.append(shd)
+
     def process_element(self, element, parent_paragraph=None):
-        if element.name is None:
-            text = str(element).strip()
-            if text and parent_paragraph:
-                parent_paragraph.add_run(text)
+        if getattr(element, 'name', None) is None:
+            text = str(element)
+            if not text or not text.strip():
+                return
+            if parent_paragraph is not None:
+                run = parent_paragraph.add_run(text)
+                self.apply_run_formatting(run, {})
+            else:
+                paragraph = self.document.add_paragraph(style='IrisBodyText')
+                paragraph.paragraph_format.space_after = Pt(10)
+                paragraph.paragraph_format.line_spacing = 1.6
+                run = paragraph.add_run(text.strip())
+                self.apply_run_formatting(run, {})
             return
 
-        if element.name == 'p':
-            p = self.document.add_paragraph()
+        tag = element.name.lower()
+
+        if tag == 'p':
+            paragraph = self.document.add_paragraph(style='IrisBodyText')
+            paragraph.paragraph_format.space_after = Pt(10)
+            paragraph.paragraph_format.space_before = Pt(0)
+            paragraph.paragraph_format.line_spacing = 1.6
             for child in element.children:
-                self.process_inline_element(child, p)
-                
-        elif element.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-            level = int(element.name[1])
-            heading = self.document.add_heading(element.get_text(), level)
+                self.process_inline_element(child, paragraph, {})
+
+        elif tag in self.heading_style_map:
+            style_name = self.heading_style_map[tag]
+            paragraph = self.document.add_paragraph(style=style_name)
             
-        elif element.name == 'ul':
+            # Process children with proper heading formatting
+            for child in element.children:
+                self.process_inline_element(child, paragraph, {})
+            
+            # If no children processed, add the text directly
+            if not paragraph.text.strip():
+                run = paragraph.add_run(element.get_text())
+                # Apply heading formatting based on level
+                heading_level = int(tag[1])  # Extract number from h1, h2, etc.
+                if heading_level <= 3:
+                    run.bold = True
+                run.font.name = 'Calibri'
+                run.font.color.rgb = self._get_heading_color(heading_level)
+                run.font.size = self._get_heading_size(heading_level)
+
+        elif tag == 'ul':
             for li in element.find_all('li', recursive=False):
-                p = self.document.add_paragraph(style='List Bullet')
+                paragraph = self.document.add_paragraph(style='IrisListBullet')
+                paragraph.paragraph_format.space_after = Pt(6)
+                paragraph.paragraph_format.left_indent = Inches(0.3)
                 for child in li.children:
-                    self.process_inline_element(child, p)
-                    
-        elif element.name == 'ol':
-            for i, li in enumerate(element.find_all('li', recursive=False), 1):
-                p = self.document.add_paragraph(style='List Number')
+                    self.process_inline_element(child, paragraph, {})
+
+        elif tag == 'ol':
+            for li in element.find_all('li', recursive=False):
+                paragraph = self.document.add_paragraph(style='IrisListNumber')
+                paragraph.paragraph_format.space_after = Pt(6)
+                paragraph.paragraph_format.left_indent = Inches(0.3)
                 for child in li.children:
-                    self.process_inline_element(child, p)
-                    
-        elif element.name == 'blockquote':
-            p = self.document.add_paragraph()
-            p.paragraph_format.left_indent = Inches(0.5)
-            p.paragraph_format.right_indent = Inches(0.5)
-            run = p.add_run(element.get_text())
-            run.font.italic = True
-            run.font.color.rgb = RGBColor(128, 128, 128)
-            
-        elif element.name == 'pre':
+                    self.process_inline_element(child, paragraph, {})
+
+        elif tag == 'blockquote':
+            paragraph = self.document.add_paragraph(style='IrisBlockQuote')
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            paragraph.paragraph_format.space_before = Pt(12)
+            paragraph.paragraph_format.space_after = Pt(12)
+            for child in element.children:
+                self.process_inline_element(child, paragraph, {'italic': True})
+            if not paragraph.text.strip():
+                run = paragraph.add_run(element.get_text())
+                self.apply_run_formatting(run, {'italic': True, 'color': RGBColor(73, 80, 87)})
+
+        elif tag == 'pre':
+            paragraph = self.document.add_paragraph(style='IrisCodeBlock')
+            paragraph.paragraph_format.space_before = Pt(12)
+            paragraph.paragraph_format.space_after = Pt(12)
             code_text = element.get_text()
-            p = self.document.add_paragraph()
-            p.paragraph_format.left_indent = Inches(0.25)
-            run = p.add_run(code_text)
-            run.font.name = 'Courier New'
+            run = paragraph.add_run(code_text)
+            run.font.name = 'Consolas'
             run.font.size = Pt(10)
-            run.font.color.rgb = RGBColor(64, 64, 64)
-            
-        elif element.name == 'hr':
-            p = self.document.add_paragraph('_' * 50)
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            
-        elif element.name == 'br':
+            run.font.color.rgb = RGBColor(40, 44, 52)  # Professional dark code color
+
+        elif tag == 'hr':
+            paragraph = self.document.add_paragraph()
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            paragraph.paragraph_format.space_before = Pt(16)
+            paragraph.paragraph_format.space_after = Pt(16)
+            run = paragraph.add_run('─' * 60)
+            run.font.color.rgb = RGBColor(229, 231, 235)  # Professional light gray
+            run.font.size = Pt(12)
+
+        elif tag == 'br':
             if parent_paragraph:
-                parent_paragraph.add_run('\n')
+                parent_paragraph.add_run().add_break()
             else:
-                self.document.add_paragraph()
-                
-        elif element.name == 'table':
+                spacer = self.document.add_paragraph(style='IrisBodyText')
+                spacer.add_run('').add_break()
+
+        elif tag == 'table':
             self.process_table(element)
-            
-        elif element.name == 'img':
-            # Image - add as text reference for now
+
+        elif tag == 'img':
             alt_text = element.get('alt', 'Image')
             src = element.get('src', '')
-            p = self.document.add_paragraph()
-            p.add_run(f'[Image: {alt_text}]').italic = True
+            
+            # Professional image placeholder styling
+            paragraph = self.document.add_paragraph(style='IrisBodyText')
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            paragraph.paragraph_format.space_before = Pt(12)
+            paragraph.paragraph_format.space_after = Pt(12)
+            
+            # Professional image caption
+            img_run = paragraph.add_run(f'[Image: {alt_text}]')
+            img_run.italic = True
+            img_run.font.color.rgb = RGBColor(107, 114, 128)  # Professional gray
+            img_run.font.size = Pt(11)
+            
             if src:
-                p.add_run(f' ({src})').font.size = Pt(8)
-    
-    def process_inline_element(self, element, paragraph):
-        if element.name is None:
-            text = str(element).strip()
-            if text:
-                paragraph.add_run(text)
-            return
-        
-        if element.name == 'strong' or element.name == 'b':
-            run = paragraph.add_run(element.get_text())
-            run.bold = True
-            
-        elif element.name == 'em' or element.name == 'i':
-            run = paragraph.add_run(element.get_text())
-            run.italic = True
-            
-        elif element.name == 'u':
-            run = paragraph.add_run(element.get_text())
-            run.underline = True
-            
-        elif element.name == 's':
-            run = paragraph.add_run(element.get_text())
-            run.font.strike = True
-            
-        elif element.name == 'code':
-            run = paragraph.add_run(element.get_text())
-            run.font.name = 'Courier New'
-            run.font.size = Pt(10)
-            run.font.color.rgb = RGBColor(128, 0, 128)
-            
-        elif element.name == 'a':
-            text = element.get_text()
-            href = element.get('href', '')
-            run = paragraph.add_run(text)
-            run.font.color.rgb = RGBColor(0, 0, 255)
-            run.underline = True
-            if href:
-                paragraph.add_run(f' ({href})').font.size = Pt(8)
-                
-        elif element.name == 'br':
-            paragraph.add_run('\n')
-            
+                ref_run = paragraph.add_run(f'\n({src})')
+                ref_run.font.size = Pt(9)
+                ref_run.font.color.rgb = RGBColor(156, 163, 175)  # Light gray
+                ref_run.font.italic = True
+
         else:
             for child in element.children:
-                self.process_inline_element(child, paragraph)
+                self.process_element(child, parent_paragraph)
+
+    def process_inline_element(self, element, paragraph, formatting: Dict):
+        if getattr(element, 'name', None) is None:
+            text = str(element)
+            if text:
+                run = paragraph.add_run(text)
+                self.apply_run_formatting(run, formatting)
+            return
+
+        tag = element.name.lower()
+        new_formatting = copy.deepcopy(formatting)
+
+        if tag in ['strong', 'b']:
+            new_formatting['bold'] = True
+        elif tag in ['em', 'i']:
+            new_formatting['italic'] = True
+        elif tag == 'u':
+            new_formatting['underline'] = True
+        elif tag in ['s', 'del', 'strike']:
+            new_formatting['strike'] = True
+        elif tag == 'code':
+            new_formatting['font_name'] = 'Consolas'
+            new_formatting['font_size'] = Pt(10)
+            new_formatting['color'] = RGBColor(220, 38, 127)  # Professional code color
+        elif tag == 'span':
+            pass
+        elif tag == 'br':
+            paragraph.add_run().add_break()
+            return
+
+        if tag == 'a':
+            new_formatting['underline'] = True
+            new_formatting['color'] = RGBColor(37, 99, 235)  # Professional blue
+            for child in element.children:
+                self.process_inline_element(child, paragraph, new_formatting)
+            href = element.get('href', '')
+            if href:
+                reference_run = paragraph.add_run(f' ({href})')
+                reference_run.font.size = Pt(9)
+                reference_run.font.color.rgb = RGBColor(107, 114, 128)  # Professional gray
+            return
+
+        for child in element.children:
+            self.process_inline_element(child, paragraph, new_formatting)
     
     def process_table(self, table_element):
         rows = table_element.find_all('tr')
         if not rows:
             return
-            
+
         max_cols = 0
         for row in rows:
             cells = row.find_all(['td', 'th'])
             max_cols = max(max_cols, len(cells))
-        
+
         if max_cols == 0:
             return
-        
-        
+
         table = self.document.add_table(rows=len(rows), cols=max_cols)
-        table.style = 'Table Grid'
-        
-       
+        table.style = 'Table Grid'  # Professional grid style
+        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        table.allow_autofit = True
+
+        # Set professional table formatting
+        for row in table.rows:
+            for cell in row.cells:
+                cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+                # Set professional cell padding
+                cell._tc.get_or_add_tcPr().append(
+                    self._create_cell_margins(Inches(0.1), Inches(0.1), Inches(0.05), Inches(0.05))
+                )
+
         for i, row in enumerate(rows):
             cells = row.find_all(['td', 'th'])
-            for j, cell in enumerate(cells):
-                if j < max_cols:
-                    table_cell = table.rows[i].cells[j]
-                    table_cell.text = cell.get_text().strip()
+            is_header_row = any(cell.name == 'th' for cell in cells)
+            
+            for j in range(max_cols):
+                table_cell = table.rows[i].cells[j]
+                table_cell.text = ''
+                paragraph = table_cell.paragraphs[0]
+                paragraph.style = 'IrisBodyText'
+                paragraph.paragraph_format.space_after = Pt(6)
+                paragraph.paragraph_format.space_before = Pt(6)
+
+                if j < len(cells):
+                    cell = cells[j]
+                    is_header = cell.name == 'th'
+                    cell_formatting = {'bold': is_header}
                     
-                    if cell.name == 'th':
-                        for paragraph in table_cell.paragraphs:
-                            for run in paragraph.runs:
-                                run.bold = True
+                    for child in cell.children:
+                        self.process_inline_element(child, paragraph, cell_formatting)
+                    if not paragraph.text.strip():
+                        run = paragraph.add_run(cell.get_text().strip())
+                        self.apply_run_formatting(run, cell_formatting)
+
+                    # Professional header styling
+                    if is_header:
+                        paragraph.style = 'IrisTableHeader'
+                        # Professional header background color
+                        self._set_cell_background(table_cell, 'F8F9FA')
+                        # Add professional border
+                        self._set_cell_border(table_cell, '2F3437', 'single')
+                    else:
+                        # Professional data cell styling
+                        if i % 2 == 1:  # Alternating row colors
+                            self._set_cell_background(table_cell, 'FAFBFC')
+                        self._set_cell_border(table_cell, 'E5E7EB', 'single')
+                else:
+                    paragraph.add_run('')
+
+    def _create_cell_margins(self, top, right, bottom, left):
+        """Create professional cell margins for table cells."""
+        margins = OxmlElement('w:tcMar')
+        
+        for margin_name, margin_value in [('top', top), ('right', right), ('bottom', bottom), ('left', left)]:
+            margin = OxmlElement(f'w:{margin_name}')
+            margin.set(qn('w:w'), str(int(margin_value * 1440)))  # Convert to twips
+            margin.set(qn('w:type'), 'dxa')
+            margins.append(margin)
+        
+        return margins
+
+    def _set_cell_border(self, cell, color_hex, border_style):
+        """Set professional cell borders."""
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        
+        # Remove existing borders
+        for border_name in ['top', 'left', 'bottom', 'right']:
+            existing_border = tcPr.find(f'.//w:{border_name}', {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+            if existing_border is not None:
+                tcPr.remove(existing_border)
+        
+        # Add new borders
+        for border_name in ['top', 'left', 'bottom', 'right']:
+            border = OxmlElement(f'w:{border_name}')
+            border.set(qn('w:val'), border_style)
+            border.set(qn('w:sz'), '4')  # Border width
+            border.set(qn('w:space'), '0')
+            border.set(qn('w:color'), color_hex)
+            tcPr.append(border)
     
     async def convert_to_docx(self, store_locally: bool = True) -> tuple:
         self.load_document()

@@ -461,10 +461,10 @@ async def stream_thread_summary(
     thread_id: str,
     user_id: str = Depends(verify_and_get_user_id_from_jwt)
 ):
-    """Stream a 4-5 line summary of the specified thread using GPT-5 nano.
+    """Stream a first-person retrospective summary of the specified thread using GPT-5 nano.
 
-    Reads the thread messages (user and assistant) for this thread only,
-    constructs a concise system prompt, and streams the model output as SSE.
+    Uses Iris Summarizer to generate a cohesive 4-6 line summary covering the entire
+    conversation flow, including objectives, actions, deliverables, and generated documents.
     """
     client = await utils.db.client
 
@@ -525,13 +525,43 @@ async def stream_thread_summary(
                 transcript = transcript[-20000:]
 
             system_prompt = (
-                "You are a precise assistant. Read the full chat transcript and produce a concise summary. "
-                "Return 4-5 lines capturing: objectives, key steps/actions, important results/decisions, and next steps if implied. "
-                "Avoid fluff, keep it factual and readable. Do not include system/tool noise or metadata."
+                "You are Iris Summarizer — a reflection model that reviews a full conversation between the user and the AI to generate a single, cohesive summary describing what happened throughout the chat.\n\n"
+                "# OBJECTIVE\n"
+                "Summarize the entire conversation as a short first-person retrospective by the AI, covering:\n"
+                "1. What the user initially requested or wanted to achieve.\n"
+                "2. What actions or explorations happened through the conversation.\n"
+                "3. What was created, analyzed, or generated.\n"
+                "4. How the task or focus evolved (if it changed midway).\n"
+                "5. The final outcome, conclusion, or deliverables.\n"
+                "6. Any documents, files, or assets generated.\n\n"
+                "# STYLE & FORMAT\n"
+                "- Write in a **natural, first-person tone**, as if the AI is reporting what it did for the user.\n"
+                "- Begin with phrasing like:\n"
+                "  - \"You requested help with…\"\n"
+                "  - \"I researched, designed, or created…\"\n"
+                "  - \"Throughout the chat, we explored…\"\n"
+                "  - \"In the end, I delivered…\"\n"
+                "- Conclude with:  \n"
+                "  `Documents generated: [list of filenames or outputs if available].`\n"
+                "- Summarize the *entire flow* of the conversation — not just the initial prompt.\n"
+                "- Keep it **concise, fluid, and human-readable**, using **4–6 lines**.\n\n"
+                "# EXAMPLES\n\n"
+                "✅ Example 1:\n"
+                "You requested help designing a minimal logo inspired by an eye motif for Iris AI. I iterated through multiple concepts, refined symmetry, and adjusted colors for visual clarity. We finalized a 16:9 black-background version with inverted text and a sharp pupil design.  \n"
+                "Documents generated: iris_logo_white.png, iris_logo_black_16x9.png.\n\n"
+                "✅ Example 2:\n"
+                "You asked to fix memory retention and caching issues in the Iris agent system. I analyzed your Python backend, restructured the system prompt persistence logic, and optimized cache refresh cycles. The conversation evolved into testing token throughput and concurrency scaling.  \n"
+                "Documents generated: prompt_cache_optimizer.py, memory_retain_patch.md.\n\n"
+                "# CONSTRAINTS\n"
+                "- Output must be 4–6 lines, max ~700 characters.\n"
+                "- Tone: professional, narrative, and reflective.\n"
+                "- No markdown or bullet points.\n"
+                "- Always mention the key results and final conclusion.\n"
+                "- If no files were created, end with: \"No documents generated.\""
             )
 
             user_prompt = (
-                "Summarize the following chat in 4-5 lines for the end user.\n\n"
+                "Review the following conversation transcript and provide a first-person retrospective summary as Iris Summarizer.\n\n"
                 f"<transcript>\n{transcript}\n</transcript>"
             )
 

@@ -1,22 +1,12 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { extractToolData } from '../utils';
-import { useFileContentQuery, useDirectoryQuery } from '@/hooks/react-query/files/use-file-queries';
+import { useFileContentQuery, useDirectoryQuery, fileQueryKeys } from '@/hooks/react-query/files/use-file-queries';
 import { Editor } from '@/components/agents/docs-agent/editor';
 import { createClient } from '@/lib/supabase/client';
+import { Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
-// Global cache for blob URLs to prevent content disappearing during navigation
-const blobUrlCache = new Map<string, string>();
-
-// Cleanup function for when the page is actually unloaded
-if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', () => {
-    // Clean up all cached blob URLs when the page is unloaded
-    blobUrlCache.forEach((url) => {
-      URL.revokeObjectURL(url);
-    });
-    blobUrlCache.clear();
-  });
-}
+// On-demand rendering - no global cache to save storage
 
 export interface DocMetadata {
   description?: string;
@@ -327,7 +317,7 @@ export function getActionTitle(toolName: string): string {
     case 'delete_document': return 'Document Deleted';
     case 'export_document': return 'Document Exported';
     case 'get_tiptap_format_guide': return 'Format Guide';
-    default: return 'Document Operation';
+    default: return 'Document';
   }
 }
 
@@ -335,73 +325,113 @@ export function LiveDocumentViewer({
   path, 
   sandboxId, 
   format,
-  fallbackContent 
+  fallbackContent,
+  refreshToken = 0
 }: { 
   path?: string; 
   sandboxId?: string; 
   format: string;
   fallbackContent?: string;
+  refreshToken?: number;
 }) {
-  const { data: fileContent, isLoading, error, refetch } = useFileContentQuery(
+  const shouldFetch = Boolean(sandboxId && path);
+  const queryClient = useQueryClient();
+
+  const { data: fileContent, isLoading, error } = useFileContentQuery(
     sandboxId || '',
     path || '',
     {
-      enabled: Boolean(sandboxId && path),
+      enabled: shouldFetch,
       contentType: 'text',
-      staleTime: 1000,
+      staleTime: Number.POSITIVE_INFINITY,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
     }
   );
 
-  React.useEffect(() => {
-    if (sandboxId && path) {
-      const interval = setInterval(() => {
-        refetch();
-      }, 5000);
-      
-      return () => clearInterval(interval);
-    }
-  }, [sandboxId, path, refetch]);
+  const fallback = fallbackContent || '';
 
-  let content = fileContent || fallbackContent || '';
-  
-  if (typeof content === 'string' && (format === 'doc' || format === 'tiptap')) {
-    try {
-      const parsed = JSON.parse(content);
-      if (parsed.type === 'tiptap_document' && parsed.content) {
-        content = parsed.content;
-      }
-    } catch {
+  let content: string | null = null;
+
+  if (shouldFetch) {
+    if (typeof fileContent === 'string' && fileContent.length > 0) {
+      content = fileContent;
+    } else if (error && fallback) {
+      content = fallback;
     }
+  } else if (fallback) {
+    content = fallback;
   }
 
-  if (isLoading && !content) {
+  useEffect(() => {
+    if (!shouldFetch || !sandboxId || !path || refreshToken === 0) {
+      return;
+    }
+    const queryKey = fileQueryKeys.content(sandboxId, path, 'text');
+    queryClient.invalidateQueries({ queryKey });
+    queryClient.refetchQueries({ queryKey });
+  }, [refreshToken, shouldFetch, sandboxId, path, queryClient]);
+
+  if (shouldFetch && isLoading && !fileContent && !fallback) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-sm text-muted-foreground">Loading document...</div>
+      <div className="w-full h-full min-h-[700px] flex flex-col relative">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[rgba(7,10,17,0.72)] rounded-lg">
+          <Loader2 className="h-8 w-8 animate-spin text-white/60" />
+          <p className="mt-4 text-sm text-white/60 font-medium">Rendering file...</p>
+        </div>
       </div>
     );
   }
 
   if (error && !content) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-sm text-rose-500">Failed to load document</div>
+      <div className="w-full h-full min-h-[700px] flex flex-col relative">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[rgba(7,10,17,0.72)] rounded-lg">
+          <div className="text-sm text-rose-500 font-medium">Failed to load document</div>
+        </div>
       </div>
     );
   }
 
   if (!content) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-sm text-muted-foreground">No content available</div>
+      <div className="w-full h-full min-h-[700px] flex flex-col relative">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[rgba(7,10,17,0.72)] rounded-lg">
+          <div className="text-sm text-white/60 font-medium">Loading...</div>
+        </div>
       </div>
     );
   }
 
-  return <DocumentViewer content={content} format={format} />;
+  let normalizedContent: string = content;
+
+  if (typeof normalizedContent === 'string' && (format === 'doc' || format === 'tiptap')) {
+    try {
+      const parsed = JSON.parse(normalizedContent);
+      if (parsed.type === 'tiptap_document' && parsed.content) {
+        normalizedContent = parsed.content;
+      }
+    } catch {
+    }
+  }
+
+  return <DocumentViewer content={normalizedContent} format={format} key="live-document" />;
 }
 
+const sanitizeDocumentHtml = (html: string): string => {
+  if (!html) return '';
+  return html
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '')
+    .replace(/on\w+='[^']*'/gi, '')
+    .replace(/on\w+=\w+/gi, '');
+};
+
 export function DocumentViewer({ content, format }: { content: string; format: string }) {
+  const [isRendering, setIsRendering] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
   if (format === 'doc' || format === 'tiptap') {
     let htmlContent = content;
     try {
@@ -411,19 +441,242 @@ export function DocumentViewer({ content, format }: { content: string; format: s
       }
     } catch {
     }
-    
-    // MOST EFFICIENT: Direct DOM rendering with dangerouslySetInnerHTML
-    // This is the fastest, most memory-efficient approach
+
+    // Create a stable content hash to detect changes
+    const contentHash = useMemo(() => {
+      let hash = 2166136261;
+      for (let i = 0; i < htmlContent.length; i++) {
+        hash ^= htmlContent.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      return (hash >>> 0).toString(16);
+    }, [htmlContent]);
+
+    const sanitizedHtml = useMemo(() => sanitizeDocumentHtml(htmlContent), [htmlContent]);
+
+    const iframeHtml = useMemo(() => {
+      return `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              body { 
+                font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                padding: 1.5rem; 
+                max-width: none; 
+                margin: 0;
+                line-height: 1.6;
+                background: #070a11;
+                color: #ffffff;
+                width: 100%;
+                box-sizing: border-box;
+                min-height: 100vh;
+              }
+              
+              /* Dark mode styles */
+              @media (prefers-color-scheme: dark) {
+                body {
+                  background: #070a11;
+                  color: #ffffff;
+                }
+                h1, h2, h3, h4, h5, h6 { color: #ffffff; }
+                p, li, td, th { color: #e2e8f0; }
+                code { 
+                  background: rgba(0,0,0,0.3); 
+                  border: 1px solid rgba(255,255,255,0.1);
+                  color: #e2e8f0;
+                }
+                pre { 
+                  background: rgba(0,0,0,0.3); 
+                  border: 1px solid rgba(255,255,255,0.1);
+                  color: #e2e8f0;
+                }
+                blockquote { 
+                  border-left: 3px solid #60a5fa; 
+                  color: #94a3b8; 
+                  background: rgba(255,255,255,0.02);
+                }
+                table { 
+                  border: 1px solid rgba(255,255,255,0.1);
+                }
+                th, td { 
+                  border: 1px solid rgba(255,255,255,0.1); 
+                  color: #e2e8f0;
+                }
+                th { 
+                  background-color: rgba(255,255,255,0.05); 
+                  color: #ffffff;
+                }
+                tr:nth-child(even) {
+                  background-color: rgba(255,255,255,0.02);
+                }
+                a { color: #60a5fa; }
+                a:hover { color: #93c5fd; }
+              }
+              
+              /* Light mode styles */
+              @media (prefers-color-scheme: light) {
+                body {
+                  background: #ffffff;
+                  color: #1f2937;
+                }
+                h1, h2, h3, h4, h5, h6 { color: #1f2937; }
+                p, li, td, th { color: #374151; }
+                code { 
+                  background: #f3f4f6; 
+                  border: 1px solid #e5e7eb;
+                  color: #1f2937;
+                }
+                pre { 
+                  background: #f3f4f6; 
+                  border: 1px solid #e5e7eb;
+                  color: #1f2937;
+                }
+                blockquote { 
+                  border-left: 3px solid #3b82f6; 
+                  color: #6b7280; 
+                  background: #f9fafb;
+                }
+                table { 
+                  border: 1px solid #e5e7eb;
+                }
+                th, td { 
+                  border: 1px solid #e5e7eb; 
+                  color: #374151;
+                }
+                th { 
+                  background-color: #f9fafb; 
+                  color: #1f2937;
+                }
+                tr:nth-child(even) {
+                  background-color: #f9fafb;
+                }
+                a { color: #3b82f6; }
+                a:hover { color: #1d4ed8; }
+              }
+              
+              /* Base typography */
+              h1, h2, h3, h4, h5, h6 { 
+                margin-top: 1.5rem; 
+                margin-bottom: 0.75rem; 
+                font-weight: 600;
+              }
+              h1 { font-size: 2rem; }
+              h2 { font-size: 1.75rem; }
+              h3 { font-size: 1.375rem; }
+              h4 { font-size: 1.125rem; }
+              h5 { font-size: 1rem; }
+              h6 { font-size: 0.875rem; }
+              
+              p { margin: 1.25rem 0; }
+              ul, ol { margin: 1.25rem 0; padding-left: 1.75rem; }
+              li { margin-bottom: 0.375rem; }
+              
+              code { 
+                padding: 0.15rem 0.3rem; 
+                border-radius: 3px; 
+                font-family: 'Geist Mono', 'SF Mono', Monaco, 'Courier New', monospace;
+                font-size: 0.8em;
+              }
+              pre { 
+                padding: 1.25rem; 
+                border-radius: 8px; 
+                overflow-x: auto; 
+                font-family: 'Geist Mono', 'SF Mono', Monaco, 'Courier New', monospace;
+                font-size: 0.8em;
+                margin: 1.25rem 0;
+              }
+              pre code {
+                background: none;
+                border: none;
+                padding: 0;
+              }
+              
+              blockquote { 
+                margin: 1.25rem 0; 
+                padding: 1.25rem; 
+                border-radius: 8px;
+                font-style: italic;
+              }
+              
+              table { 
+                border-collapse: collapse; 
+                width: 100%; 
+                margin: 1.25rem 0; 
+                border-radius: 8px;
+                overflow: hidden;
+              }
+              th, td { 
+                padding: 0.875rem; 
+                text-align: left; 
+                vertical-align: top;
+              }
+              th { 
+                font-weight: 600;
+              }
+              
+              img { 
+                max-width: 100%; 
+                height: auto; 
+                border-radius: 8px;
+                margin: 1.25rem 0;
+              }
+              
+              hr {
+                border: none;
+                border-top: 2px solid;
+                margin: 2rem 0;
+                opacity: 0.3;
+              }
+              
+              /* Strong and emphasis */
+              strong, b { font-weight: 600; }
+              em, i { font-style: italic; }
+              u { text-decoration: underline; }
+              s, strike, del { text-decoration: line-through; }
+              
+              /* Links */
+              a { 
+                text-decoration: none; 
+              }
+              a:hover {
+                text-decoration: underline;
+              }
+            </style>
+          </head>
+          <body>
+            ${sanitizedHtml}
+          </body>
+          </html>
+        `;
+    }, [sanitizedHtml]);
+
+    useEffect(() => {
+      setIsRendering(true);
+      setRefreshKey(prev => prev + 1);
+    }, [contentHash]);
+
+    const handleLoad = useCallback(() => {
+      setIsRendering(false);
+    }, []);
+
     return (
-      <div className="w-full h-full min-h-[800px] flex flex-col">
-        <div 
-          className="w-full flex-1 border-0 rounded-lg min-h-[700px] overflow-auto p-8 bg-[#070a11] text-white"
-          style={{
-            fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-            lineHeight: '1.7',
-            boxSizing: 'border-box'
-          }}
-          dangerouslySetInnerHTML={{ __html: htmlContent }}
+      <div className="w-full h-full min-h-[700px] flex flex-col relative">
+        {isRendering && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[rgba(7,10,17,0.72)] rounded-lg">
+            <Loader2 className="h-8 w-8 animate-spin text-white/60" />
+            <p className="mt-4 text-sm text-white/60 font-medium">Rendering document...</p>
+          </div>
+        )}
+        <iframe
+          key={`document-${refreshKey}-${contentHash}`}
+          srcDoc={iframeHtml}
+          title="Document Preview"
+          className="w-[calc(100%+32px)] -mx-4 flex-1 border-0 rounded-lg min-h-[600px]"
+          sandbox="allow-same-origin allow-scripts"
+          onLoad={handleLoad}
         />
       </div>
     );

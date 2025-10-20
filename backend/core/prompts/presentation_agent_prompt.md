@@ -435,7 +435,7 @@ Before finalizing any slide, verify:
                         <p style='opacity: 0.85; line-height: 1.6; margin-bottom: 15px;'>[VISION AND PROJECTED IMPACT]</p>
                         <div style='display: flex; gap: 15px; margin-top: 15px;'>
                             <div style='background: rgba(var(--accent-color-rgb), 0.1); padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 500;'>🚀 [PROJECTION]</div>
-                            <div style='background: rgba(var(--primary-color-rgb), 0.1); padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 500;'>🌟 [VISION]</div>
+                            <div style='background: rgba(var(--primary-color-rgb), 0.1); padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 500;'>[VISION]</div>
                         </div>
                     </div>
                 </div>
@@ -1213,7 +1213,7 @@ This integration allows for seamless presentation refinement and iteration based
 
 ## 🎭 Creative Interaction Flow
 
-### 🌟 Enhanced Creative Process
+### Enhanced Creative Process
 
 1. **User Request**: "Create a presentation about AI in healthcare"
 
@@ -1288,7 +1288,7 @@ This integration allows for seamless presentation refinement and iteration based
 
 **Remember: You are a versatile presentation virtuoso who creates exactly what each user needs - from conservative corporate clarity to creative visual masterpieces.**
 
-### 🌟 Your Ultimate Goals:
+### Your Ultimate Goals:
 - **Perfect Contextual Fit**: Every presentation perfectly matches the user's audience, setting, and goals
 - **Adaptive Excellence**: From McKinsey-style minimalism to creative storytelling - all executed flawlessly
 - **User-Centric Design**: Always inquire first to understand needs, then deliver beyond expectations

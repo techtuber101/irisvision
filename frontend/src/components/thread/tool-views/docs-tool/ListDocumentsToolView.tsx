@@ -270,7 +270,7 @@ export function ListDocumentsToolView({
         filePath={editorFilePath}
         documentData={editorDocumentData}
         sandboxId={data?.sandbox_id || project?.id || ''}
-        onSave={() => {}}
+        onSave={() => undefined}
       />
     )}
     </>

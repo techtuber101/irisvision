@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -37,6 +38,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { HexColorPicker } from 'react-colorful';
 
+// File type icon mapping
+const FILE_TYPE_ICONS: Record<string, string> = {
+  pdf: '/filetypes/pdf.png',
+  docx: '/filetypes/docx.png',
+  docs: '/filetypes/docs.png',
+  images: '/filetypes/gallery.png',
+  txt: '/filetypes/text-format.png', // Using text-format.png for text files
+  html: '/filetypes/text-format.png', // Using text-format.png for HTML files
+  markdown: '/filetypes/text-format.png', // Using text-format.png for markdown files
+};
+
 interface AdvancedToolbarProps {
   editor: Editor;
   onExport?: (format: 'pdf' | 'docx' | 'html' | 'markdown' | 'txt') => void;
@@ -56,6 +68,7 @@ export function AdvancedToolbar({
   const [showFindReplace, setShowFindReplace] = useState(false);
   const [findText, setFindText] = useState('');
   const [replaceText, setReplaceText] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const ToolbarButton = ({ 
     onClick, 
@@ -206,7 +219,7 @@ export function AdvancedToolbar({
     <div className="border-b -mt-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
       <div className="px-4 py-2 flex items-center gap-1 flex-wrap">
         <div className="flex items-center gap-1">
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={setIsDropdownOpen}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="gap-1">
                 <FileText className="h-4 w-4" />
@@ -223,10 +236,28 @@ export function AdvancedToolbar({
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
                   <DropdownMenuItem onClick={() => onExport?.('docx')}>
-                    Word Document
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={FILE_TYPE_ICONS.docx}
+                        alt="DOCX file icon"
+                        width={20}
+                        height={20}
+                        className="flex-shrink-0"
+                      />
+                      <span className="text-sm font-medium">Word Document</span>
+                    </div>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onExport?.('txt')}>
-                    Plain Text
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={FILE_TYPE_ICONS.txt}
+                        alt="Text file icon"
+                        width={20}
+                        height={20}
+                        className="flex-shrink-0 bg-white rounded-sm p-1"
+                      />
+                      <span className="text-sm font-medium">Plain Text</span>
+                    </div>
                   </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
