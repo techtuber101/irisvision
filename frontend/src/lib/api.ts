@@ -3,7 +3,8 @@ import { handleApiError } from './error-handler';
 import posthog from 'posthog-js';
 
 // Get backend URL from environment variables
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
+// Default to local dev backend with /api prefix
+const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000/api';
 
 // Set to keep track of agent runs that are known to be non-running
 const nonRunningAgentRuns = new Set<string>();
@@ -188,6 +189,170 @@ export type Thread = {
   created_at: string;
   updated_at: string;
   [key: string]: any; // Allow additional properties to handle database fields
+};
+
+export const streamThreadSummary = async (
+  threadId: string,
+  callbacks: {
+    onContent?: (chunk: string) => void;
+    onDone?: () => void;
+    onError?: (error: string) => void;
+  }
+): Promise<void> => {
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    throw new NoAccessTokenAvailableError();
+  }
+
+  if (!API_URL) {
+    throw new Error(
+      'Backend URL is not configured. Set NEXT_PUBLIC_BACKEND_URL in your environment.',
+    );
+  }
+
+  const normalizeBase = (base: string) => base.replace(/\/+$/, '');
+  const trimmedBase = normalizeBase(API_URL);
+
+  const candidateBases = Array.from(
+    new Set(
+      trimmedBase.endsWith('/api')
+        ? [trimmedBase, normalizeBase(trimmedBase.replace(/\/api$/, ''))]
+        : [trimmedBase, normalizeBase(`${trimmedBase}/api`)]
+    ),
+  ).filter(Boolean);
+
+  type AttemptResult = {
+    base: string;
+    status: number;
+    detail?: string;
+  };
+
+  const attempts: AttemptResult[] = [];
+  let resolvedBase: string | null = null;
+
+  for (const base of candidateBases) {
+    const testEndpoint = `${base}/threads/${threadId}/summarize/test`;
+    const res = await fetch(testEndpoint, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    let detail: string | undefined;
+    try {
+      const body = await res.json();
+      if (typeof body === 'string') {
+        detail = body;
+      } else if (body?.detail) {
+        detail = body.detail;
+      } else if (body?.error) {
+        detail = body.error;
+      }
+    } catch {
+      // ignore JSON parse errors (likely HTML 404)
+    }
+
+    attempts.push({
+      base,
+      status: res.status,
+      detail,
+    });
+
+    if (res.ok) {
+      resolvedBase = base;
+      break;
+    }
+  }
+
+  if (!resolvedBase) {
+    const summary = attempts
+      .map((attempt) => {
+        const extra = attempt.detail ? ` (${attempt.detail})` : '';
+        return `${attempt.base} -> ${attempt.status}${extra}`;
+      })
+      .join(' | ');
+    const message = summary
+      ? `Failed to start summary stream for thread ${threadId}: ${summary}`
+      : `Failed to start summary stream for thread ${threadId}.`;
+    callbacks.onError?.(message);
+    throw new Error(message);
+  }
+
+  if (resolvedBase !== trimmedBase) {
+    console.debug(
+      `[streamThreadSummary] Using API base ${resolvedBase} (initially ${trimmedBase})`,
+    );
+  }
+
+  const streamEndpoint = `${resolvedBase}/threads/${threadId}/summarize/stream`;
+  const response = await fetch(streamEndpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      Accept: 'text/event-stream',
+    },
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Failed to start summary stream (status ${response.status})`;
+    try {
+      const err = await response.json();
+      if (err?.detail) {
+        errorMessage = err.detail;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+    } catch {
+      // ignore parse errors
+    }
+    callbacks.onError?.(errorMessage);
+    throw new Error(errorMessage);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    callbacks.onError?.('No response body');
+    return;
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const data = JSON.parse(line.slice(6));
+          if (data.type === 'content') {
+            callbacks.onContent?.(data.content);
+          } else if (data.type === 'done') {
+            callbacks.onDone?.();
+            return;
+          } else if (data.type === 'error') {
+            callbacks.onError?.(data.error || 'Streaming error');
+            return;
+          }
+        } catch (e) {
+          // ignore parse errors for stray lines
+        }
+      }
+    }
+  } catch (e) {
+    callbacks.onError?.(e instanceof Error ? e.message : 'Streaming error');
+  }
 };
 
 export type Message = {

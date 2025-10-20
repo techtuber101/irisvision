@@ -211,7 +211,8 @@ export function NavUserWithTeams({
               {/* Iris Header */}
               <header className="mb-4 flex items-center gap-2">
                 <div className="h-6 w-6 rounded-full bg-black/10 ring-1 ring-black/20 flex items-center justify-center dark:bg-white/10 dark:ring-white/20">
-                  <img src="/irissymbolwhite.png" alt="Iris Logo" className="h-4 w-4 brightness-0 dark:invert" />
+                  <img src="/irislogoblack.png" alt="Iris Logo" className="h-4 w-4 dark:hidden" />
+                  <img src="/irissymbolwhite.png" alt="Iris Logo" className="h-4 w-4 hidden dark:block" />
                 </div>
                 <h3 className="text-sm font-medium text-black/80 dark:text-white/80">Iris</h3>
               </header>

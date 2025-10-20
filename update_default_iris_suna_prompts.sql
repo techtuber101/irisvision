@@ -1,6 +1,13 @@
-import datetime
+-- Purpose: Synchronize default agent prompts with backend's SYSTEM_PROMPT (backend/core/prompts/prompt.py)
+-- Strategy: Update stored prompts for default agents across supported schemas to match backend value
+-- Safe for mixed schemas (guards for table/column existence).
 
-SYSTEM_PROMPT = """
+BEGIN;
+
+DO $$
+DECLARE
+  v_prompt text := $IRIS_PROMPT$
+
 You are Iris, an autonomous personal AI for you.
 
 # 1. CORE IDENTITY & CAPABILITIES
@@ -1285,8 +1292,88 @@ When someone says:
 - Provide ongoing agent management
 - Enable true AI workforce automation
 
-"""
 
+$IRIS_PROMPT$;
+BEGIN
+  -- Update versioned agent configs if present
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'agents' AND column_name = 'current_version_id'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_name = 'agent_versions'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'agent_versions' AND column_name = 'config'
+  ) THEN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'agent_versions' AND column_name = 'agent_version_id'
+    ) THEN
+      UPDATE agent_versions av
+      SET config = jsonb_set(
+        COALESCE(av.config, '{}'::jsonb),
+        '{system_prompt}',
+        to_jsonb(v_prompt),
+        true
+      )
+      FROM agents a
+      WHERE av.agent_version_id = a.current_version_id
+        AND a.is_default = true
+        AND lower(a.name) = ANY (ARRAY['iris', 'suna']);
+    ELSIF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'agent_versions' AND column_name = 'id'
+    ) THEN
+      UPDATE agent_versions av
+      SET config = jsonb_set(
+        COALESCE(av.config, '{}'::jsonb),
+        '{system_prompt}',
+        to_jsonb(v_prompt),
+        true
+      )
+      FROM agents a
+      WHERE av.id = a.current_version_id
+        AND a.is_default = true
+        AND lower(a.name) = ANY (ARRAY['iris', 'suna']);
+    END IF;
+  END IF;
 
-def get_system_prompt():
-    return SYSTEM_PROMPT
+  -- Update agents.config fallback if column exists
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'agents' AND column_name = 'config'
+  ) THEN
+    UPDATE agents
+    SET config = jsonb_set(
+      COALESCE(config, '{}'::jsonb),
+      '{system_prompt}',
+      to_jsonb(v_prompt),
+      true
+    )
+    WHERE is_default = true
+    AND lower(name) = ANY (ARRAY['iris', 'suna']);
+  END IF;
+
+  -- Update legacy agents.system_prompt if column exists
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'agents' AND column_name = 'system_prompt'
+  ) THEN
+    UPDATE agents
+    SET system_prompt = v_prompt
+    WHERE is_default = true
+    AND lower(name) = ANY (ARRAY['iris', 'suna']);
+  END IF;
+END
+$$;
+
+COMMIT;
+
+-- Optional verification
+-- SELECT agent_id, name, is_default,
+--        config->>'system_prompt' AS config_prompt,
+--        system_prompt AS legacy_prompt
+-- FROM agents
+-- WHERE is_default = true
+--   AND lower(name) = ANY (ARRAY['iris', 'suna']);

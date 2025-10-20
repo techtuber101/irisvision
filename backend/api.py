@@ -20,6 +20,7 @@ from pydantic import BaseModel
 import uuid
 
 from core import api as core_api
+from core.threads import stream_thread_summary, test_thread_summary_route
 
 from core.sandbox import api as sandbox_api
 from core.billing.api import router as billing_router
@@ -224,6 +225,40 @@ async def health_check_docker():
 
 
 app.include_router(api_router, prefix="/api")
+app.include_router(api_router)
+
+# Provide root-level access for select endpoints that are frequently called without the /api prefix
+app.add_api_route(
+    "/threads/{thread_id}/summarize/stream",
+    stream_thread_summary,
+    methods=["POST"],
+    name="stream_thread_summary_root",
+    tags=["threads"],
+)
+app.add_api_route(
+    "/threads/{thread_id}/summarize/test",
+    test_thread_summary_route,
+    methods=["GET"],
+    name="test_thread_summary_route_root",
+    tags=["threads"],
+)
+
+# Debug route inspector (safe in local/staging)
+@app.get("/api/debug/routes")
+async def list_routes():
+    try:
+        from fastapi.routing import APIRoute
+        routes = []
+        for route in app.router.routes:
+            if isinstance(route, APIRoute):
+                routes.append({
+                    "path": route.path,
+                    "methods": sorted(list(route.methods or [])),
+                    "name": route.name,
+                })
+        return {"routes": routes}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 if __name__ == "__main__":

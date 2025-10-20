@@ -18,6 +18,7 @@ import { isLocalMode } from '@/lib/config';
 import { ThreadContent } from '@/components/thread/content/ThreadContent';
 import { ThreadSkeleton } from '@/components/thread/content/ThreadSkeleton';
 import { useAddUserMessageMutation, useAddAssistantMessageMutation } from '@/hooks/react-query/threads/use-messages';
+import { useSidebarRefresh } from '@/hooks/use-sidebar-refresh';
 import {
   useStartAgentMutation,
   useStopAgentMutation,
@@ -65,6 +66,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const isMobile = useIsMobile();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+  const { refreshSidebar } = useSidebarRefresh();
 
   // State
   const [newMessage, setNewMessage] = useState('');
@@ -1131,6 +1133,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
               method: 'POST',
               body: formData
             });
+            
+            // Refresh sidebar to show the new title
+            refreshSidebar();
           }
         }
       }

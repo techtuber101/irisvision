@@ -198,8 +198,8 @@ export function DocsToolView({
   
   return (
     <>
-    <Card className="gap-0 flex border shadow-none border-t border-b-0 border-x-0 p-0 rounded-none flex-col h-full overflow-hidden bg-card">
-      <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
+    <Card className="gap-0 flex border shadow-none border-t border-b-0 border-x-0 p-0 rounded-none flex-col h-full overflow-hidden bg-[rgba(7,10,17,0.95)] backdrop-blur-xl">
+      <CardHeader className="h-14 bg-[rgba(7,10,17,0.95)] backdrop-blur-xl border-b border-white/10 p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="relative p-2 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-600/10 border border-blue-500/20">
@@ -222,6 +222,7 @@ export function DocsToolView({
                 <Button
                   size="sm"
                   variant="outline"
+                  className="bg-white/5 border-white/10 text-white/90 hover:bg-white/10 hover:border-white/20 backdrop-blur-sm transition-all duration-200"
                   onClick={() => {
                     let content = data.document.content || '';
                     if (typeof content === 'string' && content.includes('"type":"tiptap_document"')) {
@@ -241,7 +242,12 @@ export function DocsToolView({
                 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="outline" disabled={isExporting}>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      disabled={isExporting}
+                      className="bg-white/5 border-white/10 text-white/90 hover:bg-white/10 hover:border-white/20 backdrop-blur-sm transition-all duration-200 disabled:opacity-50"
+                    >
                       {isExporting ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
                       ) : (
@@ -251,26 +257,52 @@ export function DocsToolView({
                       <ChevronDown className="h-3 w-3" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {project?.sandbox?.sandbox_url && data?.document?.path && (
-                      <>
-                        <DropdownMenuItem onClick={() => handleExport('google-docs')}>
-                          <Share/>
-                          Upload to Google Docs
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleExport('docx')}>
-                          Export as DOCX
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                    {!project?.sandbox?.sandbox_url && (
-                      <DropdownMenuItem onClick={() => handleExport('docx')}>
-                        Export as DOCX
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onClick={() => handleExport('txt')}>
+                  <DropdownMenuContent 
+                    align="end"
+                    className="bg-[rgba(7,10,17,0.95)] border-white/10 backdrop-blur-xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)]"
+                  >
+                    {/* First: Export As Text */}
+                    <DropdownMenuItem 
+                      onClick={() => handleExport('txt')}
+                      className="text-white/90 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                    >
                       Export as Text
                     </DropdownMenuItem>
+                    
+                    {/* Second: Export As PDF */}
+                    <DropdownMenuItem 
+                      onClick={() => handleExport('pdf')}
+                      className="text-white/90 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                    >
+                      Export as PDF
+                    </DropdownMenuItem>
+                    
+                    {/* Third: Export as DOCX */}
+                    <DropdownMenuItem 
+                      onClick={() => handleExport('docx')}
+                      className="text-white/90 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                    >
+                      Export as DOCX
+                    </DropdownMenuItem>
+                    
+                    {/* Fourth: Export as Images */}
+                    <DropdownMenuItem 
+                      onClick={() => handleExport('images')}
+                      className="text-white/90 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                    >
+                      Export as Images
+                    </DropdownMenuItem>
+                    
+                    {/* Fifth: Upload to Google Docs (only if sandbox available) */}
+                    {project?.sandbox?.sandbox_url && data?.document?.path && (
+                      <DropdownMenuItem 
+                        onClick={() => handleExport('google-docs')}
+                        className="text-white/90 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                      >
+                        <Share/>
+                        Upload to Google Docs
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </>
@@ -292,7 +324,7 @@ export function DocsToolView({
         </div>
       </CardHeader>
       
-      <CardContent className="flex-1 px-0 overflow-hidden flex flex-col">
+      <CardContent className="flex-1 px-0 overflow-hidden flex flex-col min-h-[600px]">
         {data.error ? (
           <div className="space-y-4 p-4">
             <div className="flex items-center gap-2 p-4 bg-rose-50 dark:bg-rose-900/20 rounded-lg">
@@ -315,14 +347,14 @@ export function DocsToolView({
             {data.document && !data.documents ? (
               <div className="flex-1 min-h-0">
                 {(data.document.path || data.content || data.document.content) && (
-                  <div className="h-full overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+                  <div className="h-full overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
                     {isStreaming && (
                       <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         <span>Content is streaming...</span>
                       </div>
                     )}
-                    <div className="w-full max-w-none">
+                    <div className="w-full max-w-none flex-1 min-h-0">
                       {data.document.path && data.sandbox_id && !isStreaming ? (
                         <LiveDocumentViewer 
                           path={data.document.path}

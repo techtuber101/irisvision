@@ -113,7 +113,7 @@ export function SidebarLeft({
           .select('role')
           .eq('user_id', data.user.id)
           .in('role', ['admin', 'super_admin']);
-        const isAdmin = roleData && roleData.length > 0;
+        const isAdmin = !!(roleData && roleData.length > 0);
 
         setUser({
           name:
@@ -181,7 +181,19 @@ export function SidebarLeft({
         <div className="flex h-[48px] items-center px-1 relative">
           <Link href="/dashboard" className="flex-shrink-0" onClick={() => isMobile && setOpenMobile(false)}>
             {state === 'collapsed' ? (
-              <KortixLogo size={24} />
+              <Image
+                src={!mounted 
+                  ? '/irissymbolblack.png'
+                  : resolvedTheme === 'dark'
+                    ? '/irissymbolwhite.png'
+                    : '/irissymbolblack.png'
+                }
+                alt="Iris Symbol"
+                width={48}
+                height={48}
+                className="w-12 h-12"
+                priority
+              />
             ) : (
               <Image
                 src={!mounted 
@@ -191,9 +203,9 @@ export function SidebarLeft({
                     : '/irislogoblack.png'
                 }
                 alt="Iris Logo"
-                width={100}
-                height={18}
-                className="h-5 w-auto"
+                width={resolvedTheme === 'dark' ? 180 : 260}
+                height={resolvedTheme === 'dark' ? 32 : 46}
+                className={resolvedTheme === 'dark' ? "h-8 w-auto" : "h-12 w-auto"}
                 priority
               />
             )}
@@ -235,7 +247,7 @@ export function SidebarLeft({
           {(
             <SidebarMenu>
               <Collapsible
-                defaultOpen={true}
+                defaultOpen={false}
                 className="group/collapsible"
               >
                 <SidebarMenuItem>
@@ -266,7 +278,7 @@ export function SidebarLeft({
                       </SidebarMenuSubItem> */}
                       <SidebarMenuSubItem>
                         <SidebarMenuSubButton className={cn('pl-3 touch-manipulation', {
-                          'bg-accent text-accent-foreground font-medium': pathname === '/agents' && (searchParams.get('tab') === 'my-agents' || searchParams.get('tab') === null),
+                          'bg-accent text-accent-foreground font-medium': pathname === '/agents' && ((searchParams?.get('tab') === 'my-agents') || (searchParams?.get('tab') === null)),
                         })} asChild>
                           <Link href="/agents?tab=my-agents" onClick={() => isMobile && setOpenMobile(false)}>
                             <span>Added Personalities</span>

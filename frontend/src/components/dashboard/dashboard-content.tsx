@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState, Suspense, useCallback, useEffect } from 'react';
+import React, { useState, Suspense, useCallback, useEffect, useRef } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ChatInput,
@@ -33,11 +35,12 @@ import { AgentRunLimitDialog } from '@/components/thread/agent-run-limit-dialog'
 import { CustomAgentsSection } from './custom-agents-section';
 import { toast } from 'sonner';
 import { ReleaseBadge } from '../auth/release-badge';
-import { Calendar, MessageSquare, Plus, Sparkles, Zap } from 'lucide-react';
+import { Calendar, MessageSquare, Plus, Sparkles, Zap, Circle, Settings, Home, Bell, Sun, Moon, Lightbulb } from 'lucide-react';
 import { AgentConfigurationDialog } from '@/components/agents/agent-configuration-dialog';
 import { fastGeminiChat } from '@/lib/fast-gemini-chat';
 import { addAssistantMessage } from '@/lib/api';
 import { simpleChat, simpleChatStream } from '@/lib/simple-chat';
+import { useTheme } from 'next-themes';
 
 const PENDING_PROMPT_KEY = 'pendingAgentPrompt';
 
@@ -56,6 +59,10 @@ export function DashboardContent() {
   const [selectedOutputFormat, setSelectedOutputFormat] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [chatMode, setChatMode] = useState<'chat' | 'execute'>('execute');
+  const [showControlMenu, setShowControlMenu] = useState(false);
+  const [menuAnimate, setMenuAnimate] = useState(false);
+  const controlMenuRef = useRef<HTMLDivElement>(null);
+  const { theme, resolvedTheme, setTheme } = useTheme();
   
   // Update time every minute
   React.useEffect(() => {
@@ -125,8 +132,35 @@ export function DashboardContent() {
     }
   }, [agents, initializeFromAgents, setSelectedAgent]);
 
+  // Handle staggered animation trigger for radial menu
   React.useEffect(() => {
-    const agentIdFromUrl = searchParams.get('agent_id');
+    if (showControlMenu) {
+      const t = setTimeout(() => setMenuAnimate(true), 0);
+      return () => clearTimeout(t);
+    } else {
+      setMenuAnimate(false);
+    }
+  }, [showControlMenu]);
+
+  // Handle click outside to close control menu
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showControlMenu && controlMenuRef.current && !controlMenuRef.current.contains(event.target as Node)) {
+        // Start reverse animation
+        setMenuAnimate(false);
+        // Close menu after animation completes (match opening animation timing)
+        setTimeout(() => setShowControlMenu(false), 480);
+      }
+    };
+
+    if (showControlMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showControlMenu]);
+
+  React.useEffect(() => {
+    const agentIdFromUrl = searchParams?.get('agent_id');
     if (agentIdFromUrl && agentIdFromUrl !== selectedAgentId) {
       setSelectedAgent(agentIdFromUrl);
       const newUrl = new URL(window.location.href);
@@ -315,8 +349,103 @@ export function DashboardContent() {
 
             {/* Date and Time - Top Right (fixed position) */}
             {viewMode === 'super-worker' && (
-              <div className="fixed top-8 right-8 text-[16px] text-foreground/75 font-medium z-10" style={{ fontFamily: 'Geist, -apple-system, BlinkMacSystemFont, sans-serif' }}>
+              <div className="fixed top-8 right-8 z-10" style={{ fontFamily: 'Geist, -apple-system, BlinkMacSystemFont, sans-serif' }}>
+                <div className="flex items-center gap-3">
+                  <div className="relative" ref={controlMenuRef}>
+                    <TooltipProvider delayDuration={0}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div
+                            className="h-8 w-8 rounded-xl border border-white/10 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5),inset_0_1px_0_0_rgba(255,255,255,0.06)] flex items-center justify-center text-white/90 light:text-black/80 light:border-black/10 light:bg-[rgba(255,255,255,0.25)]"
+                          >
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 cursor-pointer text-inherit"
+                              aria-label="Control Center"
+                              onClick={() => {
+                                if (showControlMenu) {
+                                  // Start reverse animation
+                                  setMenuAnimate(false);
+                                  // Close menu after animation completes (match opening animation timing)
+                                  setTimeout(() => setShowControlMenu(false), 480);
+                                } else {
+                                  setShowControlMenu(true);
+                                }
+                              }}
+                            >
+                              <Circle className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p>Control Center</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    {showControlMenu && (
+                      <div className="absolute z-20 left-1/2 top-full -translate-x-1/2 mt-2 w-40 h-40 pointer-events-none">
+                        {/* Radial menu container centered just below the control button */}
+                        <div className="absolute left-1/2 top-0 -translate-x-1/2 w-40 h-40">
+                                {(() => {
+                                  const ThemeIcon = resolvedTheme === 'dark' ? Sun : Moon;
+                                  const items = [
+                                    { key: 'home', Icon: Home, label: 'Homepage', onClick: () => router.push('/') },
+                                    { key: 'notifications', Icon: Bell, label: 'Notifications', onClick: () => router.push('/notifications') },
+                                    { key: 'personalisation', Icon: Lightbulb, label: 'Personalisation', onClick: () => router.push('/personalisation') },
+                                    { key: 'theme', Icon: ThemeIcon, label: 'Theme', onClick: () => setTheme(resolvedTheme === 'light' ? 'dark' : 'light') },
+                                    { key: 'settings', Icon: Settings, label: 'Settings', onClick: () => router.push('/settings') },
+                                  ];
+                                  return items.slice().reverse();
+                                })().map(({ Icon, label, onClick }, i, arr) => {
+                                  // Place buttons on a bottom arc (20° to 160°) so they open below
+                                  const start = 20; // degrees
+                                  const end = 160; // degrees
+                                  const step = arr.length > 1 ? (end - start) / (arr.length - 1) : 0;
+                                  const angleDeg = start + i * step;
+                                  const radius = 80; // px distance from center (more spacing)
+                                  const rad = (angleDeg * Math.PI) / 180;
+                                  const x = Math.cos(rad) * radius;
+                                  const y = Math.sin(rad) * radius;
+                                  return (
+                                    <div
+                                      key={i}
+                                      className="absolute left-1/2 top-0"
+                                      style={{ transform: `translate(calc(-50% + ${x}px), ${y}px)` }}
+                                    >
+                                      <TooltipProvider delayDuration={0}>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <button
+                                              className={`h-[34px] w-[34px] rounded-xl border border-white/10 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5),inset_0_1px_0_0_rgba(255,255,255,0.06)] flex items-center justify-center text-white/90 hover:text-white transition-all duration-200 cursor-pointer light:text-black/80 light:hover:text-black light:border-black/10 light:bg-[rgba(255,255,255,0.25)] pointer-events-auto ${menuAnimate ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}
+                                              aria-label={label}
+                                              onClick={() => { 
+                                                setMenuAnimate(false);
+                                                setTimeout(() => setShowControlMenu(false), 480);
+                                                onClick(); 
+                                              }}
+                                              style={{ transitionDelay: `${i * 70}ms` }}
+                                            >
+                                              <Icon className="h-[18px] w-[18px]" />
+                                            </button>
+                                          </TooltipTrigger>
+                                          <TooltipContent side="bottom">
+                                            <p>{label}</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    </div>
+                                  );
+                                })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-[16px] text-foreground/75 font-medium h-8 flex items-center">
                 {currentTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} • {currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -469,6 +598,8 @@ export function DashboardContent() {
           }}
         />
       )}
+
+      
     </>
   );
 }

@@ -549,21 +549,19 @@ At the start of every task involving tool calls, research, web search, or docume
 - "Sure! Researching AI trends is a great way to stay current with technology developments. I am going to do the following things for you:
   • Research the latest AI trends and developments
   • Analyze market data and statistics
-  • Create a comprehensive report with tables and statistics
-  • Provide you with a PDF document"
+  • Create a comprehensive report with tables and statistics"
 
 - "Absolutely! Renewable energy is a very important topic in today''s sustainability efforts. I am going to do the following things for you:
   • Search for information about renewable energy
   • Gather statistics and figures
-  • Create a detailed analysis document with data tables
-  • Convert it to PDF format"
+  • Create a detailed analysis document with data tables"
 
 ## 5.7 DEFAULT DOCUMENT CREATION PROTOCOL
-**AUTOMATIC DOCUMENT GENERATION:**
-For ANY task involving research, web search, information gathering, or tool calls where users expect documentation, you MUST:
+**DOCUMENT CREATION GUIDELINES:**
+For tasks involving research, web search, information gathering, or tool calls where users expect documentation:
 
-1. **DEFAULT BEHAVIOR:** Create a document using `create_document` and convert to PDF using `convert_to_pdf` BY DEFAULT
-2. **NO USER PERMISSION NEEDED:** Do this automatically unless the user specifically says "don''t create a document" or "no PDF needed"
+1. **CREATE DOCUMENTS WHEN APPROPRIATE:** Use `create_document` to organize and present information clearly
+2. **USER PREFERENCE:** Ask users if they want documents created and in what format
 3. **COMPREHENSIVE DOCUMENTATION:** Include all research findings, analysis, and results in the document
 4. **PROFESSIONAL FORMAT:** Structure the document with clear sections, headings, and proper formatting
 
@@ -1574,21 +1572,19 @@ At the start of every task involving tool calls, research, web search, or docume
 - "Sure! Researching AI trends is a great way to stay current with technology developments. I am going to do the following things for you:
   • Research the latest AI trends and developments
   • Analyze market data and statistics
-  • Create a comprehensive report with tables and statistics
-  • Provide you with a PDF document"
+  • Create a comprehensive report with tables and statistics"
 
 - "Absolutely! Renewable energy is a very important topic in today''s sustainability efforts. I am going to do the following things for you:
   • Search for information about renewable energy
   • Gather statistics and figures
-  • Create a detailed analysis document with data tables
-  • Convert it to PDF format"
+  • Create a detailed analysis document with data tables"
 
 ## 5.7 DEFAULT DOCUMENT CREATION PROTOCOL
-**AUTOMATIC DOCUMENT GENERATION:**
-For ANY task involving research, web search, information gathering, or tool calls where users expect documentation, you MUST:
+**DOCUMENT CREATION GUIDELINES:**
+For tasks involving research, web search, information gathering, or tool calls where users expect documentation:
 
-1. **DEFAULT BEHAVIOR:** Create a document using `create_document` and convert to PDF using `convert_to_pdf` BY DEFAULT
-2. **NO USER PERMISSION NEEDED:** Do this automatically unless the user specifically says "don''t create a document" or "no PDF needed"
+1. **CREATE DOCUMENTS WHEN APPROPRIATE:** Use `create_document` to organize and present information clearly
+2. **USER PREFERENCE:** Ask users if they want documents created and in what format
 3. **COMPREHENSIVE DOCUMENTATION:** Include all research findings, analysis, and results in the document
 4. **PROFESSIONAL FORMAT:** Structure the document with clear sections, headings, and proper formatting
 
@@ -2622,21 +2618,19 @@ At the start of every task involving tool calls, research, web search, or docume
 - "Sure! Researching AI trends is a great way to stay current with technology developments. I am going to do the following things for you:
   • Research the latest AI trends and developments
   • Analyze market data and statistics
-  • Create a comprehensive report with tables and statistics
-  • Provide you with a PDF document"
+  • Create a comprehensive report with tables and statistics"
 
 - "Absolutely! Renewable energy is a very important topic in today''s sustainability efforts. I am going to do the following things for you:
   • Search for information about renewable energy
   • Gather statistics and figures
-  • Create a detailed analysis document with data tables
-  • Convert it to PDF format"
+  • Create a detailed analysis document with data tables"
 
 ## 5.7 DEFAULT DOCUMENT CREATION PROTOCOL
-**AUTOMATIC DOCUMENT GENERATION:**
-For ANY task involving research, web search, information gathering, or tool calls where users expect documentation, you MUST:
+**DOCUMENT CREATION GUIDELINES:**
+For tasks involving research, web search, information gathering, or tool calls where users expect documentation:
 
-1. **DEFAULT BEHAVIOR:** Create a document using `create_document` and convert to PDF using `convert_to_pdf` BY DEFAULT
-2. **NO USER PERMISSION NEEDED:** Do this automatically unless the user specifically says "don''t create a document" or "no PDF needed"
+1. **CREATE DOCUMENTS WHEN APPROPRIATE:** Use `create_document` to organize and present information clearly
+2. **USER PREFERENCE:** Ask users if they want documents created and in what format
 3. **COMPREHENSIVE DOCUMENTATION:** Include all research findings, analysis, and results in the document
 4. **PROFESSIONAL FORMAT:** Structure the document with clear sections, headings, and proper formatting
 
@@ -3647,21 +3641,19 @@ At the start of every task involving tool calls, research, web search, or docume
 - "Sure! Researching AI trends is a great way to stay current with technology developments. I am going to do the following things for you:
   • Research the latest AI trends and developments
   • Analyze market data and statistics
-  • Create a comprehensive report with tables and statistics
-  • Provide you with a PDF document"
+  • Create a comprehensive report with tables and statistics"
 
 - "Absolutely! Renewable energy is a very important topic in today''s sustainability efforts. I am going to do the following things for you:
   • Search for information about renewable energy
   • Gather statistics and figures
-  • Create a detailed analysis document with data tables
-  • Convert it to PDF format"
+  • Create a detailed analysis document with data tables"
 
 ## 5.7 DEFAULT DOCUMENT CREATION PROTOCOL
-**AUTOMATIC DOCUMENT GENERATION:**
-For ANY task involving research, web search, information gathering, or tool calls where users expect documentation, you MUST:
+**DOCUMENT CREATION GUIDELINES:**
+For tasks involving research, web search, information gathering, or tool calls where users expect documentation:
 
-1. **DEFAULT BEHAVIOR:** Create a document using `create_document` and convert to PDF using `convert_to_pdf` BY DEFAULT
-2. **NO USER PERMISSION NEEDED:** Do this automatically unless the user specifically says "don''t create a document" or "no PDF needed"
+1. **CREATE DOCUMENTS WHEN APPROPRIATE:** Use `create_document` to organize and present information clearly
+2. **USER PREFERENCE:** Ask users if they want documents created and in what format
 3. **COMPREHENSIVE DOCUMENTATION:** Include all research findings, analysis, and results in the document
 4. **PROFESSIONAL FORMAT:** Structure the document with clear sections, headings, and proper formatting
 

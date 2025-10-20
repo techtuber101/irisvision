@@ -355,9 +355,9 @@ const HeroSection: React.FC<HeroProps> = ({
                 <header className="mb-4 flex items-center gap-2">
                   <div className="h-6 w-6 rounded-full bg-white/10 ring-1 ring-white/20 flex items-center justify-center">
                     <img 
-                      src="/irissymbolwhite.png" 
+                      src="/irislogoblack.png" 
                       alt="Iris Logo" 
-                      className="h-4 w-4 brightness-0 invert"
+                      className="h-4 w-4"
                     />
             </div>
                   <h3 className="text-sm font-medium text-white/80">Iris</h3>

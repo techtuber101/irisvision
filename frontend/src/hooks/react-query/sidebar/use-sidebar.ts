@@ -14,8 +14,9 @@ export const useProjects = createQueryHook(
     return data as Project[];
   },
   {
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: 2 * 60 * 1000, // 2 minutes - reasonable for project data
+    refetchOnWindowFocus: true, // Only refetch when user returns to tab
+    refetchInterval: false, // Disable automatic polling
   }
 );
 
@@ -26,8 +27,9 @@ export const useThreads = createQueryHook(
     return data as Thread[];
   },
   {
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: 2 * 60 * 1000, // 2 minutes - reasonable for thread data
+    refetchOnWindowFocus: true, // Only refetch when user returns to tab
+    refetchInterval: false, // Disable automatic polling
   }
 );
 

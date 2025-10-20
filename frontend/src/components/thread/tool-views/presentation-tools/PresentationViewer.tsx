@@ -34,6 +34,7 @@ import { constructHtmlPreviewUrl } from '@/lib/utils/url';
 import { CodeBlockCode } from '@/components/ui/code-block';
 import { LoadingState } from '../shared/LoadingState';
 import { FullScreenPresentationViewer } from './FullScreenPresentationViewer';
+import { TypewriterText } from '@/components/ui/typewriter-text';
 
 interface SlideMetadata {
   title: string;

@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Form, Query
+from fastapi.responses import StreamingResponse
 
 from core.utils.auth_utils import verify_and_get_user_id_from_jwt, verify_and_authorize_thread_access, require_thread_access, AuthorizedThreadAccess
 from core.utils.logger import logger
@@ -11,6 +12,7 @@ from core.sandbox.sandbox import create_sandbox, delete_sandbox
 
 from .api_models import CreateThreadResponse, MessageCreateRequest
 from . import core_utils as utils
+from core.services.llm import make_llm_api_call, LLMError
 
 router = APIRouter(tags=["threads"])
 
@@ -452,3 +454,156 @@ async def generate_project_title(
     except Exception as e:
         logger.error(f"Error generating title for project {project_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate title: {str(e)}")
+
+
+@router.post("/threads/{thread_id}/summarize/stream", summary="Stream Chat Summary (GPT-5 nano)", operation_id="stream_thread_summary")
+async def stream_thread_summary(
+    thread_id: str,
+    user_id: str = Depends(verify_and_get_user_id_from_jwt)
+):
+    """Stream a 4-5 line summary of the specified thread using GPT-5 nano.
+
+    Reads the thread messages (user and assistant) for this thread only,
+    constructs a concise system prompt, and streams the model output as SSE.
+    """
+    client = await utils.db.client
+
+    # Verify access
+    await verify_and_authorize_thread_access(client, thread_id, user_id)
+
+    async def event_stream():
+        try:
+            # Fetch conversation messages ordered oldest -> newest
+            messages_result = await client.table('messages') \
+                .select('content, type, created_at') \
+                .eq('thread_id', thread_id) \
+                .in_('type', ['user', 'assistant']) \
+                .order('created_at', desc=False) \
+                .execute()
+
+            def _extract_text(payload) -> str:
+                try:
+                    if isinstance(payload, dict):
+                        # Common shapes: {role, content} or may contain nested parts
+                        content = payload.get('content')
+                        if isinstance(content, str):
+                            return content
+                        # Fallback: try common nesting keys
+                        for key in ("text", "value"):
+                            if isinstance(payload.get(key), str):
+                                return payload.get(key) or ""
+                    elif isinstance(payload, str):
+                        return payload
+                except Exception:
+                    return ""
+                return ""
+
+            chat_transcript_parts = []
+            for row in (messages_result.data or []):
+                raw = row.get('content')
+                role = 'user' if row.get('type') == 'user' else 'assistant'
+                text = ""
+                if isinstance(raw, dict):
+                    text = _extract_text(raw)
+                else:
+                    # Stored as JSON string or plain string
+                    try:
+                        import json as _json
+                        parsed = _json.loads(raw) if isinstance(raw, str) else {}
+                        text = _extract_text(parsed)
+                        if not text and isinstance(parsed, dict):
+                            text = str(parsed.get('content') or "")
+                    except Exception:
+                        text = str(raw or "")
+                text = (text or "").strip()
+                if text:
+                    chat_transcript_parts.append(f"[{role}] {text}")
+
+            # Truncate transcript to avoid excessive context
+            transcript = "\n".join(chat_transcript_parts)
+            if len(transcript) > 20000:
+                transcript = transcript[-20000:]
+
+            system_prompt = (
+                "You are a precise assistant. Read the full chat transcript and produce a concise summary. "
+                "Return 4-5 lines capturing: objectives, key steps/actions, important results/decisions, and next steps if implied. "
+                "Avoid fluff, keep it factual and readable. Do not include system/tool noise or metadata."
+            )
+
+            user_prompt = (
+                "Summarize the following chat in 4-5 lines for the end user.\n\n"
+                f"<transcript>\n{transcript}\n</transcript>"
+            )
+
+            llm_messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+
+            # Make streaming call to GPT-5 nano
+            try:
+                llm_response = await make_llm_api_call(
+                    messages=llm_messages,
+                    model_name="openai/gpt-5-nano",
+                    temperature=0.2,
+                    max_tokens=400,
+                    stream=True,
+                )
+            except LLMError as e:
+                yield f"data: {{\"type\": \"error\", \"error\": {json.dumps(str(e))} }}\n\n"
+                return
+
+            # Stream chunks as SSE content events
+            async for chunk in llm_response:
+                try:
+                    # LiteLLM chunk variants handling
+                    text_piece = None
+                    if isinstance(chunk, dict):
+                        choices = chunk.get("choices") or []
+                        if choices:
+                            delta = choices[0].get("delta") or {}
+                            text_piece = delta.get("content") or delta.get("text")
+                            if not text_piece:
+                                message_obj = choices[0].get("message") or {}
+                                text_piece = message_obj.get("content")
+                        if not text_piece:
+                            text_piece = chunk.get("content") or chunk.get("text")
+                    if not text_piece and hasattr(chunk, 'choices'):
+                        try:
+                            first = getattr(chunk, 'choices')[0]
+                            delta = getattr(first, 'delta', None)
+                            if delta and hasattr(delta, 'content'):
+                                text_piece = delta.content
+                        except Exception:
+                            pass
+                    if text_piece:
+                        yield f"data: {json.dumps({'type': 'content', 'content': text_piece})}\n\n"
+                except Exception:
+                    # If a single chunk fails to parse, skip it
+                    continue
+
+            # Completion signal
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+        except Exception as e:
+            logger.error(f"Summary streaming error for thread {thread_id}: {e}\n{traceback.format_exc()}")
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+
+    import json  # local import to keep top clean
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+# Lightweight test endpoint to verify router path is reachable
+@router.get("/threads/{thread_id}/summarize/test", summary="Test Summarize Route Reachability", operation_id="test_thread_summary_route")
+async def test_thread_summary_route(thread_id: str, user_id: str = Depends(verify_and_get_user_id_from_jwt)):
+    client = await utils.db.client
+    await verify_and_authorize_thread_access(client, thread_id, user_id)
+    return {"ok": True, "thread_id": thread_id}

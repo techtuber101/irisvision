@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from "@/components/ui/button"
-import { FolderOpen, ExternalLink, Monitor, Copy, Check } from "lucide-react"
+import { FolderOpen, ExternalLink, Monitor, Copy, Check, Circle } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -10,7 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useState, useRef, KeyboardEvent } from "react"
+import { useState, useRef, KeyboardEvent, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { useUpdateProject } from "@/hooks/react-query"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -20,6 +20,7 @@ import { ShareModal } from "@/components/sidebar/share-modal"
 import { useQueryClient } from "@tanstack/react-query";
 import { projectKeys } from "@/hooks/react-query/sidebar/keys";
 import { threadKeys } from "@/hooks/react-query/threads/keys";
+import { TypewriterText } from "@/components/ui/typewriter-text";
 
 interface ThreadSiteHeaderProps {
   threadId?: string;
@@ -52,9 +53,30 @@ export function SiteHeader({
   const [showKnowledgeBase, setShowKnowledgeBase] = useState(false);
   const [copied, setCopied] = useState(false);
   const queryClient = useQueryClient();
+  
+  // State for typewriter effect
+  const [previousProjectName, setPreviousProjectName] = useState(projectName);
+  const [showTypewriter, setShowTypewriter] = useState(false);
+  const [typewriterKey, setTypewriterKey] = useState(0);
 
   const isMobile = useIsMobile() || isMobileView
   const updateProjectMutation = useUpdateProject()
+
+  // Detect when project name changes and trigger typewriter effect
+  useEffect(() => {
+    if (projectName !== previousProjectName && projectName && projectName !== 'Project') {
+      setShowTypewriter(true);
+      setTypewriterKey(prev => prev + 1);
+      setPreviousProjectName(projectName);
+    }
+  }, [projectName, previousProjectName]);
+
+  const handleTypewriterComplete = () => {
+    // Hide typewriter effect after completion
+    setTimeout(() => {
+      setShowTypewriter(false);
+    }, 1000); // Keep cursor blinking for 1 second after completion
+  };
 
   const openShareModal = () => {
     setShowShareModal(true)
@@ -169,7 +191,18 @@ export function SiteHeader({
               onClick={startEditing}
               title="Click to rename project"
             >
-              {projectName}
+              {showTypewriter ? (
+                <TypewriterText
+                  key={typewriterKey}
+                  text={projectName}
+                  speed={40} // Rapid typing - 40ms per character
+                  onComplete={handleTypewriterComplete}
+                  showCursor={true}
+                  cursorBlinkSpeed={500}
+                />
+              ) : (
+                projectName
+              )}
             </div>
           )}
         </div>
@@ -183,7 +216,7 @@ export function SiteHeader({
           )}
 
           {/* Show all buttons on both mobile and desktop - responsive tooltips */}
-          <TooltipProvider>
+          <TooltipProvider delayDuration={0}>
             {variant === 'shared' ? (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -210,6 +243,22 @@ export function SiteHeader({
                 <span>Share</span>
               </Button>
             )}
+
+            {/* Control Center */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 cursor-pointer"
+                >
+                  <Circle className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side={isMobile ? "bottom" : "bottom"}>
+                <p>control center</p>
+              </TooltipContent>
+            </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>

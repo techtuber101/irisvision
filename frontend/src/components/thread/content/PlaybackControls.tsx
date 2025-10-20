@@ -13,6 +13,7 @@ import { safeJsonParse } from '@/components/thread/utils';
 import Link from 'next/link';
 import { parseXmlToolCalls } from '../tool-views/xml-parser';
 import { HIDE_STREAMING_XML_TAGS } from '@/components/thread/utils';
+import { TypewriterText } from '@/components/ui/typewriter-text';
 
 export interface PlaybackControlsProps {
   messages: UnifiedMessage[];
@@ -62,6 +63,27 @@ export const PlaybackControls = ({
     isStreamingText: false,
     currentToolCall: null,
   });
+
+  // State for typewriter effect
+  const [previousProjectName, setPreviousProjectName] = useState(projectName);
+  const [showTypewriter, setShowTypewriter] = useState(false);
+  const [typewriterKey, setTypewriterKey] = useState(0);
+
+  // Detect when project name changes and trigger typewriter effect
+  useEffect(() => {
+    if (projectName !== previousProjectName && projectName && projectName !== 'Shared Conversation') {
+      setShowTypewriter(true);
+      setTypewriterKey(prev => prev + 1);
+      setPreviousProjectName(projectName);
+    }
+  }, [projectName, previousProjectName]);
+
+  const handleTypewriterComplete = () => {
+    // Hide typewriter effect after completion
+    setTimeout(() => {
+      setShowTypewriter(false);
+    }, 1000); // Keep cursor blinking for 1 second after completion
+  };
 
   // Extract state variables for easier access
   const {
@@ -491,7 +513,18 @@ export const PlaybackControls = ({
               </div>
               <h1>
                 <span className="font-medium text-foreground">
-                  {projectName}
+                  {showTypewriter ? (
+                    <TypewriterText
+                      key={typewriterKey}
+                      text={projectName}
+                      speed={40} // Rapid typing - 40ms per character
+                      onComplete={handleTypewriterComplete}
+                      showCursor={true}
+                      cursorBlinkSpeed={500}
+                    />
+                  ) : (
+                    projectName
+                  )}
                 </span>
               </h1>
             </div>

@@ -16,17 +16,17 @@ export function KortixLogo({ size = 24 }: KortixLogoProps) {
     setMounted(true);
   }, []);
 
-  const shouldInvert = mounted && (
+  const shouldUseBlackSymbol = mounted && (
     theme === 'light' || (theme === 'system' && systemTheme === 'light')
   );
 
   return (
     <Image
-        src="/irissymbolwhite.png"
+        src={shouldUseBlackSymbol ? "/irislogoblack.png" : "/irissymbolwhite.png"}
         alt="Iris"
         width={size}
         height={size}
-        className={`${shouldInvert ? 'invert' : ''} flex-shrink-0`}
+        className="flex-shrink-0"
         style={{ width: size, height: size, minWidth: size, minHeight: size }}
       />
   );

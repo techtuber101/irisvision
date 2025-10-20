@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Cpu, Search, Check, ChevronDown, Plus, ExternalLink, Loader2, WandSparkles } from 'lucide-react';
+import { Cpu, Search, Check, ChevronDown, Plus, ExternalLink, Loader2 } from 'lucide-react';
 import { useAgents } from '@/hooks/react-query/agents/use-agents';
 import { KortixLogo } from '@/components/sidebar/kortix-logo';
 import type { ModelOption } from '@/hooks/use-model-selection';
@@ -30,7 +30,6 @@ import { NewAgentDialog } from '@/components/agents/new-agent-dialog';
 import { AgentAvatar } from '@/components/thread/content/agent-avatar';
 import { AgentModelSelector } from '@/components/agents/config/model-selector';
 import { AgentConfigurationDialog } from '@/components/agents/agent-configuration-dialog';
-import { simpleChatStream } from '@/lib/simple-chat';
 
 type UnifiedConfigMenuProps = {
     isLoggedIn?: boolean;
@@ -71,46 +70,7 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [allAgents, setAllAgents] = useState<any[]>([]);
-    const [isEnhancing, setIsEnhancing] = useState(false);
     const searchContainerRef = useRef<HTMLDivElement>(null);
-
-    const handleEnhanceVision = useCallback(async () => {
-        if (!currentInputValue.trim() || !onInputChange) {
-            return;
-        }
-
-        setIsEnhancing(true);
-        let enhancedContent = '';
-
-        try {
-            const enhancementPrompt = `please generate an enhanced prompt of the following prompt, answer directly only the prompt, make prompt 10 lines. After the initial paragraph, write in bullet points.\n\n${currentInputValue}`;
-
-            await simpleChatStream(enhancementPrompt, {
-                onContent: (content: string) => {
-                    enhancedContent += content;
-                    // Stream the enhanced content back to the input
-                    onInputChange(enhancedContent);
-                },
-                onDone: () => {
-                    setIsEnhancing(false);
-                    // Keep the popup open - don't close it automatically
-                },
-                onError: (error: string) => {
-                    console.error('Enhancement error:', error);
-                    setIsEnhancing(false);
-                    // Reset to original content on error
-                    onInputChange(currentInputValue);
-                    // Keep the popup open even on error
-                }
-            });
-        } catch (error) {
-            console.error('Enhancement failed:', error);
-            setIsEnhancing(false);
-            // Reset to original content on error
-            onInputChange(currentInputValue);
-            // Keep the popup open even on error
-        }
-    }, [currentInputValue, onInputChange]);
     const [integrationsOpen, setIntegrationsOpen] = useState(false);
     const [showNewAgentDialog, setShowNewAgentDialog] = useState(false);
     const searchInputRef = useRef<HTMLInputElement>(null);
@@ -393,47 +353,6 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
                     
                     {/* Special Capabilities */}
                     <div className="px-3">
-                        <div className="px-3 py-2 text-[11px] font-medium text-black/60 dark:text-white/60">Special Capabilities</div>
-                        <div className="px-3 pb-2">
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <div>
-                                            <DropdownMenuItem
-                                                className={cn(
-                                                    "text-sm px-3 py-2 mx-0 my-0.5 flex items-center gap-2 cursor-pointer rounded-xl bg-gradient-to-r from-white/20 via-white/10 to-white/20 dark:from-white/5 dark:via-white/2 dark:to-white/5 border border-black/20 dark:border-white/10 hover:bg-gradient-to-r hover:from-white/25 hover:via-white/15 hover:to-white/25 dark:hover:from-white/8 dark:hover:via-white/4 dark:hover:to-white/8 hover:border-black/30 dark:hover:border-white/20 backdrop-blur-sm transition-all duration-200 relative overflow-hidden",
-                                                    (!currentInputValue.trim() || !onInputChange) && "opacity-50 cursor-not-allowed",
-                                                    isEnhancing && "cursor-wait"
-                                                )}
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    handleEnhanceVision();
-                                                }}
-                                                disabled={!currentInputValue.trim() || !onInputChange || isEnhancing}
-                                            >
-                                                {isEnhancing ? (
-                                                    <>
-                                                        <Loader2 className="h-4 w-4 text-black/80 dark:text-white/80 flex-shrink-0 animate-spin" />
-                                                        <span className="font-medium text-black/90 dark:text-white/90">Enhancing Your Vision...</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <WandSparkles className="h-4 w-4 text-black/80 dark:text-white/80 flex-shrink-0" />
-                                                        <span className="font-medium text-black/90 dark:text-white/90">Enhance Your Vision</span>
-                                                    </>
-                                                )}
-                                            </DropdownMenuItem>
-                                        </div>
-                                    </TooltipTrigger>
-                                    {(!currentInputValue.trim() || !onInputChange) && (
-                                        <TooltipContent side="top" className="text-xs max-w-xs">
-                                            <p>Write some text in the chat input to enhance your prompt</p>
-                                        </TooltipContent>
-                                    )}
-                                </Tooltip>
-                            </TooltipProvider>
-                        </div>
                     </div>
                     
                     <DropdownMenuSeparator className="mx-3" />

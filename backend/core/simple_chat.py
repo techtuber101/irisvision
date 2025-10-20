@@ -152,9 +152,13 @@ async def simple_chat(
         
         logger.debug(f"Saved user message: {user_message_id}")
         
-        # 4. Call Gemini API (direct call, no system prompt, no context)
+        # 4. Call Gemini API with minimal system instructions
         model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(message)
+        
+        # Minimal system instructions for quick chat mode
+        system_instructions = """You are Iris Intelligence. Never mention Google/LLM. Use rich formatting: H1-H6 headings, tables, lists. Especially H1 which for big answers must always be used. You are chat mode of an agentic AI. Give amazing answers always."""
+        
+        response = model.generate_content(f"System Instructions: {system_instructions}\n\nUser: {message}")
         assistant_response = response.text
         
         elapsed_ms = (time.time() - start_time) * 1000
@@ -228,9 +232,13 @@ async def continue_simple_chat(
             "created_at": datetime.now(timezone.utc).isoformat()
         }).execute()
         
-        # Call Gemini API
+        # Call Gemini API with minimal system instructions
         model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(message)
+        
+        # Minimal system instructions for quick chat mode
+        system_instructions = """You are Iris Intelligence. Never mention Google/LLM. Use rich formatting: H1-H6 headings, tables, lists. Quick chat mode."""
+        
+        response = model.generate_content(f"System Instructions: {system_instructions}\n\nUser: {message}")
         assistant_response = response.text
         
         elapsed_ms = (time.time() - start_time) * 1000
@@ -314,9 +322,13 @@ async def simple_chat_streaming(
             
             logger.debug(f"Saving user message asynchronously: {user_message_id}")
             
-            # 5. Call Gemini API with streaming
+            # 5. Call Gemini API with streaming and minimal system instructions
             model = genai.GenerativeModel("gemini-2.0-flash")
-            response = model.generate_content(message, stream=True)
+            
+            # Minimal system instructions for quick chat mode
+            system_instructions = """You are a helpful AI assistant. Provide clear, concise, and helpful responses. Be conversational and friendly."""
+            
+            response = model.generate_content(f"System Instructions: {system_instructions}\n\nUser: {message}", stream=True)
             
             # 6. Stream response chunks
             full_response = ""
@@ -391,6 +403,18 @@ async def continue_simple_chat_streaming(
             
             # Build chat history from prior messages (before the new user message)
             history: List[Dict[str, Any]] = []
+            
+            # Add minimal system instructions at the beginning
+            system_instructions = """You are Iris Intelligence. Never mention Google/LLM. Use rich formatting: H1-H6 headings, tables, lists. Quick chat mode."""
+            history.append({
+                "role": "user",
+                "parts": [f"System Instructions: {system_instructions}"]
+            })
+            history.append({
+                "role": "model", 
+                "parts": ["I understand. I'll follow these system instructions."]
+            })
+            
             existing_messages = await client.table('messages') \
                 .select('content, type, metadata, created_at') \
                 .eq('thread_id', thread_id) \

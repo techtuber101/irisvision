@@ -28,7 +28,7 @@ export const Markdown: React.FC<MarkdownProps> = React.memo(({
           ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
           li: ({ children }) => <li className="text-sm">{children}</li>,
           code: ({ children, className }) => {
-            const match = /language-(\w+)/.exec(className || '');
+            const match = /language-([\w-]+)/.exec(className || '');
             const language = match ? match[1] : '';
             const code = String(children);
             const isInline = !className?.includes('language-');
@@ -36,6 +36,21 @@ export const Markdown: React.FC<MarkdownProps> = React.memo(({
             // Skip empty code blocks
             if (!isInline && (!code.trim() || code.trim() === '')) {
               return null;
+            }
+
+            if (!isInline && language.startsWith('tool_')) {
+              const trimmed = code.trim();
+              if (!trimmed) {
+                return null;
+              }
+              return (
+                <span
+                  data-tool-block
+                  className="block whitespace-pre-wrap text-sm leading-6 text-foreground"
+                >
+                  {trimmed}
+                </span>
+              );
             }
 
             if (isInline) {
@@ -53,7 +68,47 @@ export const Markdown: React.FC<MarkdownProps> = React.memo(({
               </code>
             );
           },
-          pre: ({ children }) => <pre className="bg-muted p-2 rounded text-xs font-mono overflow-x-auto mb-2">{children}</pre>,
+          pre: ({ children }) => {
+            const childArray = React.Children.toArray(children);
+
+            const toolChild = childArray.find((child) => React.isValidElement(child) && child.props?.['data-tool-block']);
+            if (toolChild && React.isValidElement(toolChild)) {
+              const toolContent = React.Children.toArray(toolChild.props.children)
+                .map((child) => (typeof child === 'string' ? child : ''))
+                .join('')
+                .trim();
+
+              if (!toolContent) {
+                return null;
+              }
+
+              return toolChild;
+            }
+
+            const hasContent = childArray.some((child) => {
+              if (typeof child === 'string') {
+                return child.trim().length > 0;
+              }
+
+              if (React.isValidElement(child)) {
+                const grandChildren = React.Children.toArray(child.props?.children ?? []);
+                return grandChildren.some((grandChild) => {
+                  if (typeof grandChild === 'string') {
+                    return grandChild.trim().length > 0;
+                  }
+                  return React.isValidElement(grandChild);
+                });
+              }
+
+              return false;
+            });
+
+            if (!hasContent) {
+              return null;
+            }
+
+            return <pre className="bg-muted p-2 rounded text-xs font-mono overflow-x-auto mb-2">{children}</pre>;
+          },
           blockquote: ({ children }) => <blockquote className="border-l-4 border-muted-foreground/20 pl-4 italic mb-2">{children}</blockquote>,
           strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
           em: ({ children }) => <em className="italic">{children}</em>,

@@ -18,7 +18,7 @@ import { handleFiles, FileUploadHandler } from './file-upload-handler';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Loader2, ArrowUp, X, Image as ImageIcon, Presentation, BarChart3, FileText, Search, Users, Code2, Sparkles, Sparkle, Brain as BrainIcon, MessageSquare, Zap as ZapIcon } from 'lucide-react';
+import { Loader2, ArrowUp, X, Image as ImageIcon, Presentation, BarChart3, FileText, Search, Users, Code2, Sparkles, Sparkle, Brain as BrainIcon, MessageSquare, Zap as ZapIcon, WandSparkles } from 'lucide-react';
 import { VoiceRecorder } from './voice-recorder';
 import { UnifiedConfigMenu } from './unified-config-menu';
 import { AttachmentGroup } from '../attachment-group';
@@ -38,8 +38,10 @@ import { useSubscriptionData } from '@/contexts/SubscriptionContext';
 import { isStagingMode, isLocalMode } from '@/lib/config';
 import { BillingModal } from '@/components/billing/billing-modal';
 import { AgentConfigurationDialog } from '@/components/agents/agent-configuration-dialog';
+import { AnimatedLoadingText } from '@/components/ui/animated-loading-text';
 
 import posthog from 'posthog-js';
+import { simpleChatStream } from '@/lib/simple-chat';
 
 // Helper function to get the icon for each mode
 const getModeIcon = (mode: string) => {
@@ -201,11 +203,50 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
     // Detect macOS for keyboard shortcut labels
     const isMac = typeof window !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
     
+    // Enhance vision state
+    const [isEnhancing, setIsEnhancing] = useState(false);
+    
     // Handle chat mode changes
     const handleChatModeChange = useCallback((mode: ChatMode) => {
       setChatMode(mode);
       onChatModeChange?.(mode);
     }, [onChatModeChange]);
+    
+    // Handle enhance vision
+    const handleEnhanceVision = useCallback(async () => {
+      if (!value.trim() || !controlledOnChange) {
+        return;
+      }
+
+      setIsEnhancing(true);
+      let enhancedContent = '';
+
+      try {
+        const enhancementPrompt = `please generate an enhanced prompt of the following prompt, answer directly only the prompt, make prompt 10 lines. After the initial paragraph, write in bullet points.\n\n${value}`;
+
+        await simpleChatStream(enhancementPrompt, {
+          onContent: (content: string) => {
+            enhancedContent += content;
+            // Stream the enhanced content back to the input
+            controlledOnChange(enhancedContent);
+          },
+          onDone: () => {
+            setIsEnhancing(false);
+          },
+          onError: (error: string) => {
+            console.error('Enhancement error:', error);
+            setIsEnhancing(false);
+            // Reset to original content on error
+            controlledOnChange(value);
+          }
+        });
+      } catch (error) {
+        console.error('Enhancement failed:', error);
+        setIsEnhancing(false);
+        // Reset to original content on error
+        controlledOnChange(value);
+      }
+    }, [value, controlledOnChange]);
 
     // Sync chat mode with initialChatMode prop changes
     useEffect(() => {
@@ -917,11 +958,65 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       {isLoggedIn && <VoiceRecorder
                         onTranscription={handleTranscription}
                         disabled={loading || (disabled && !isAgentRunning)}
                       />}
+
+                      {/* Enhance Vision Button */}
+                      <TooltipProvider>
+                        <Tooltip open={isEnhancing ? true : undefined}>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={handleEnhanceVision}
+                              disabled={!value.trim() || isEnhancing}
+                              className={cn(
+                                "p-1.5 rounded-lg transition-all duration-200 cursor-pointer",
+                                (!value.trim() || isEnhancing) 
+                                  ? "opacity-50 cursor-not-allowed" 
+                                  : "text-white/70 hover:text-white light:text-black/70 light:hover:text-black"
+                              )}
+                            >
+                              {isEnhancing ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <WandSparkles className="w-4 h-4" />
+                              )}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <div className="space-y-1">
+                              <p className="font-medium flex items-center gap-1.5">
+                                {isEnhancing ? (
+                                  <span className="animate-spin">⏳</span>
+                                ) : (
+                                  <WandSparkles className="w-3 h-3" />
+                                )}
+                                Enhance the vision
+                              </p>
+                              <p className="text-xs text-muted-foreground light:text-white/80">
+                                {isEnhancing ? (
+                                  <AnimatedLoadingText
+                                    messages={[
+                                      "Reading your prompt",
+                                      "Understanding you",
+                                      "Analyzing your vision",
+                                      "Enhancing your prompt"
+                                    ]}
+                                    interval={1500}
+                                  />
+                                ) : !value.trim() ? (
+                                  "Enter a task in the input field!"
+                                ) : (
+                                  "Improve your prompt with AI assistance"
+                                )}
+                              </p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
 
                       <Button
                       type="submit"
@@ -933,7 +1028,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                         isUploading
                       }
                       className={cn(
-                        'h-9 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm px-4 text-sm font-medium text-white/90 shadow-[0_2px_8px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-200 hover:border-white/30 hover:bg-white/15 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] active:scale-[0.98] light:border-black/10 light:bg-black/5 light:text-black/90 light:shadow-[0_2px_8px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(0,0,0,0.1)] light:hover:border-black/15 light:hover:bg-black/8 light:hover:shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(0,0,0,0.15)]',
+                        'h-9 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm px-4 text-sm font-medium text-white/90 shadow-[0_2px_8px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-200 hover:border-white/30 hover:bg-white/15 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] active:scale-[0.98] ml-2 light:border-black/10 light:bg-black/5 light:text-black/90 light:shadow-[0_2px_8px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(0,0,0,0.1)] light:hover:border-black/15 light:hover:bg-black/8 light:hover:shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(0,0,0,0.15)]',
                         ((!value.trim() && uploadedFiles.length === 0 && !isAgentRunning) ||
                           loading ||
                           (disabled && !isAgentRunning) ||

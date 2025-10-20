@@ -1,8 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { extractToolData } from '../utils';
 import { useFileContentQuery, useDirectoryQuery } from '@/hooks/react-query/files/use-file-queries';
 import { Editor } from '@/components/agents/docs-agent/editor';
 import { createClient } from '@/lib/supabase/client';
+
+// Global cache for blob URLs to prevent content disappearing during navigation
+const blobUrlCache = new Map<string, string>();
+
+// Cleanup function for when the page is actually unloaded
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    // Clean up all cached blob URLs when the page is unloaded
+    blobUrlCache.forEach((url) => {
+      URL.revokeObjectURL(url);
+    });
+    blobUrlCache.clear();
+  });
+}
 
 export interface DocMetadata {
   description?: string;
@@ -398,17 +412,18 @@ export function DocumentViewer({ content, format }: { content: string; format: s
     } catch {
     }
     
+    // MOST EFFICIENT: Direct DOM rendering with dangerouslySetInnerHTML
+    // This is the fastest, most memory-efficient approach
     return (
-      <div className="w-full">
-        <Editor 
-          content={htmlContent}
-          readOnly={true}
-          useStore={false}
-          showWordCount={false}
-          autoSave={false}
-          minHeight="0"
-          className="w-full"
-          editorClassName="focus:outline-none bg-transparent border-0 w-full prose prose-sm dark:prose-invert max-w-none prose-img:max-w-none prose-img:w-full prose-img:h-auto"
+      <div className="w-full h-full min-h-[800px] flex flex-col">
+        <div 
+          className="w-full flex-1 border-0 rounded-lg min-h-[700px] overflow-auto p-8 bg-[#070a11] text-white"
+          style={{
+            fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+            lineHeight: '1.7',
+            boxSizing: 'border-box'
+          }}
+          dangerouslySetInnerHTML={{ __html: htmlContent }}
         />
       </div>
     );
