@@ -9,8 +9,21 @@ import json
 import datetime
 import asyncio
 import logging
+from typing import Optional
 
 # TODO: add subpages, etc... in filters as sometimes its necessary 
+
+class TavilyRateLimitError(Exception):
+    """Custom exception for Tavily API rate limit errors"""
+    def __init__(self, message: str, retry_after: Optional[int] = None):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+class TavilyAPIError(Exception):
+    """Custom exception for general Tavily API errors"""
+    def __init__(self, message: str, status_code: Optional[int] = None):
+        super().__init__(message)
+        self.status_code = status_code
 
 @tool_metadata(
     display_name="Web Search",
@@ -39,6 +52,119 @@ class SandboxWebSearchTool(SandboxToolsBase):
 
         # Tavily asynchronous search client
         self.tavily_client = AsyncTavilyClient(api_key=self.tavily_api_key)
+        
+        # Rate limiting configuration
+        self.max_retries = 3
+        self.base_delay = 1.0  # Base delay in seconds
+        
+        # API usage tracking
+        self._usage_count = 0
+        self._last_reset_time = datetime.datetime.now()
+
+    def _track_api_usage(self):
+        """Track API usage and log warnings if approaching limits"""
+        self._usage_count += 1
+        current_time = datetime.datetime.now()
+        
+        # Reset counter every hour
+        if (current_time - self._last_reset_time).total_seconds() > 3600:
+            self._usage_count = 1
+            self._last_reset_time = current_time
+        
+        # Log usage every 10 requests
+        if self._usage_count % 10 == 0:
+            logging.info(f"Tavily API usage: {self._usage_count} requests in the last hour")
+        
+        # Warning at 50 requests (assuming free tier limit is around 100/hour)
+        if self._usage_count == 50:
+            logging.warning(f"Tavily API usage approaching limit: {self._usage_count} requests in the last hour")
+
+    async def _tavily_search_with_retry(self, query: str, max_results: int) -> dict:
+        """
+        Execute Tavily search with retry logic and proper error handling.
+        
+        Args:
+            query: Search query
+            max_results: Maximum number of results to return
+            
+        Returns:
+            Search response from Tavily API
+            
+        Raises:
+            TavilyRateLimitError: When rate limit is exceeded
+            TavilyAPIError: For other API errors
+        """
+        last_exception = None
+        
+        for attempt in range(self.max_retries + 1):
+            try:
+                # Track API usage
+                self._track_api_usage()
+                
+                logging.info(f"Executing Tavily search (attempt {attempt + 1}/{self.max_retries + 1}) for query: '{query}'")
+                
+                search_response = await self.tavily_client.search(
+                    query=query,
+                    max_results=max_results,
+                    include_images=True,
+                    include_answer="advanced",
+                    search_depth="advanced",
+                )
+                
+                logging.info(f"Tavily search successful for query: '{query}'")
+                return search_response
+                
+            except Exception as e:
+                last_exception = e
+                error_message = str(e)
+                error_lower = error_message.lower()
+                
+                logging.warning(f"Tavily search attempt {attempt + 1} failed: {error_message}")
+                
+                # Check for rate limit errors
+                if any(keyword in error_lower for keyword in ['rate limit', 'quota exceeded', 'too many requests', '429']):
+                    if attempt < self.max_retries:
+                        # Calculate exponential backoff delay
+                        delay = self.base_delay * (2 ** attempt)
+                        logging.warning(f"Rate limit detected, retrying in {delay} seconds...")
+                        await asyncio.sleep(delay)
+                        continue
+                    else:
+                        # Max retries exceeded
+                        raise TavilyRateLimitError(
+                            f"Tavily API rate limit exceeded after {self.max_retries + 1} attempts. "
+                            f"Please try again later. Error: {error_message}"
+                        )
+                
+                # Check for authentication errors
+                elif any(keyword in error_lower for keyword in ['unauthorized', '401', 'invalid api key', 'authentication']):
+                    raise TavilyAPIError(
+                        f"Tavily API authentication failed: {error_message}",
+                        status_code=401
+                    )
+                
+                # Check for other HTTP errors
+                elif any(keyword in error_lower for keyword in ['400', 'bad request', 'invalid request']):
+                    raise TavilyAPIError(
+                        f"Invalid request to Tavily API: {error_message}",
+                        status_code=400
+                    )
+                
+                # For other errors, retry if we haven't exceeded max attempts
+                elif attempt < self.max_retries:
+                    delay = self.base_delay * (2 ** attempt)
+                    logging.warning(f"API error detected, retrying in {delay} seconds...")
+                    await asyncio.sleep(delay)
+                    continue
+                else:
+                    # Max retries exceeded for other errors
+                    raise TavilyAPIError(
+                        f"Tavily API error after {self.max_retries + 1} attempts: {error_message}"
+                    )
+        
+        # This should never be reached, but just in case
+        if last_exception:
+            raise TavilyAPIError(f"Unexpected error in Tavily search: {str(last_exception)}")
 
     @openapi_schema({
         "type": "function",
@@ -88,15 +214,9 @@ class SandboxWebSearchTool(SandboxToolsBase):
             else:
                 num_results = 20
 
-            # Execute the search with Tavily
+            # Execute the search with Tavily using retry logic
             logging.info(f"Executing web search for query: '{query}' with {num_results} results")
-            search_response = await self.tavily_client.search(
-                query=query,
-                max_results=num_results,
-                include_images=True,
-                include_answer="advanced",
-                search_depth="advanced",
-            )
+            search_response = await self._tavily_search_with_retry(query, num_results)
             
             # Check if we have actual results or an answer
             results = search_response.get('results', [])
@@ -120,9 +240,33 @@ class SandboxWebSearchTool(SandboxToolsBase):
                     output=json.dumps(search_response, ensure_ascii=False)
                 )
         
+        except TavilyRateLimitError as e:
+            error_message = str(e)
+            logging.error(f"Tavily rate limit exceeded for query '{query}': {error_message}")
+            return self.fail_response(
+                f"Web search rate limit exceeded. Please try again in a few minutes. "
+                f"Error: {error_message}"
+            )
+        
+        except TavilyAPIError as e:
+            error_message = str(e)
+            logging.error(f"Tavily API error for query '{query}': {error_message}")
+            if e.status_code == 401:
+                return self.fail_response(
+                    "Web search authentication failed. Please check API key configuration."
+                )
+            elif e.status_code == 400:
+                return self.fail_response(
+                    f"Invalid search request: {error_message}"
+                )
+            else:
+                return self.fail_response(
+                    f"Web search API error: {error_message}"
+                )
+        
         except Exception as e:
             error_message = str(e)
-            logging.error(f"Error performing web search for '{query}': {error_message}")
+            logging.error(f"Unexpected error performing web search for '{query}': {error_message}")
             simplified_message = f"Error performing web search: {error_message[:200]}"
             if len(error_message) > 200:
                 simplified_message += "..."
