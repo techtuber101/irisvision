@@ -32,7 +32,7 @@ BASE_BACKOFF_SECONDS = 1.0
 MAX_BACKOFF_SECONDS = 8.0
 provider_router = None
 MODEL_FALLBACKS = {
-    "gemini/gemini-2.0-flash": [
+    "gemini/gemini-2.5-flash": [
         "gemini/gemini-2.5-flash",
         "gemini/gemini-2.5-flash-lite",
         "gemini/gemini-2.5-pro",
@@ -275,7 +275,7 @@ if __name__ == "__main__":
     setup_api_keys()
 
     response = completion(
-        model="gemini/gemini-2.0-flash",
+        model="gemini/gemini-2.5-flash",
         messages=[{"role": "user", "content": "Hello! Testing Iris Pro pipeline."}],
         max_tokens=100,
     )

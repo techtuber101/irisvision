@@ -15,7 +15,7 @@ export const changeLogData: ChangelogData[] = [
         "Version Control for Agents - Track changes, create versions, and rollback safely",
         "Enterprise-Grade Security - Encrypted credential management and secure agent execution"
       ],
-      image: "/thumbnail-dark.png",
+      image: "/Comingsoon.png",
       button: {
         url: "/agents",
         text: "Explore Agents",

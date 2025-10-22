@@ -31,7 +31,7 @@ TIERS: Dict[str, Tier] = {
         monthly_credits=Decimal('0.00'),
         display_name='No Plan',
         can_purchase_credits=False,
-        models=['gemini/gemini-2.0-flash'],
+        models=['gemini/gemini-2.5-flash'],
         project_limit=0
     ),
     'free': Tier(
@@ -40,7 +40,7 @@ TIERS: Dict[str, Tier] = {
         monthly_credits=Decimal('0.00'),
         display_name='Free Tier (Discontinued)',
         can_purchase_credits=False,
-        models=['gemini/gemini-2.0-flash'],
+        models=['gemini/gemini-2.5-flash'],
         project_limit=0
     ),
     'tier_2_20': Tier(

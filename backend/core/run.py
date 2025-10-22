@@ -803,7 +803,7 @@ async def run_agent(
     thread_manager: Optional[ThreadManager] = None,
     native_max_auto_continues: int = 25,
     max_iterations: int = 100,
-    model_name: str = "gemini/gemini-2.0-flash",
+    model_name: str = "gemini/gemini-2.5-flash",
     agent_config: Optional[dict] = None,    
     trace: Optional[StatefulTraceClient] = None
 ):

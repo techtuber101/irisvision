@@ -25,7 +25,7 @@ genai.configure(api_key=config.GEMINI_API_KEY)
 
 class SimpleChatRequest(BaseModel):
     message: str
-    model: str = "gemini-2.0-flash"
+    model: str = "gemini-2.5-flash"
 
 class SimpleChatResponse(BaseModel):
     thread_id: str
@@ -153,7 +153,7 @@ async def simple_chat(
         logger.debug(f"Saved user message: {user_message_id}")
         
         # 4. Call Gemini API with minimal system instructions
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         
         # Minimal system instructions for quick chat mode
         system_instructions = """You are Iris Intelligence. Never mention Google/LLM. Use rich formatting: H1-H6 headings, tables, lists. Especially H1 which for big answers must always be used. You are chat mode of an agentic AI. Give amazing answers always."""
@@ -233,7 +233,7 @@ async def continue_simple_chat(
         }).execute()
         
         # Call Gemini API with minimal system instructions
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         
         # Minimal system instructions for quick chat mode
         system_instructions = """You are Iris Intelligence. Never mention Google/LLM. Use rich formatting: H1-H6 headings, tables, lists. Quick chat mode."""
@@ -323,7 +323,7 @@ async def simple_chat_streaming(
             logger.debug(f"Saving user message asynchronously: {user_message_id}")
             
             # 5. Call Gemini API with streaming and minimal system instructions
-            model = genai.GenerativeModel("gemini-2.0-flash")
+            model = genai.GenerativeModel("gemini-2.5-flash")
             
             # Minimal system instructions for quick chat mode
             system_instructions = """You are a helpful AI assistant. Provide clear, concise, and helpful responses. Be conversational and friendly."""
@@ -442,7 +442,7 @@ async def continue_simple_chat_streaming(
             logger.debug(f"Saving user message asynchronously: {user_message_id}")
             
             # Call Gemini API with true streaming
-            model = genai.GenerativeModel("gemini-2.0-flash")
+            model = genai.GenerativeModel("gemini-2.5-flash")
             chat = model.start_chat(history=history)
             response = chat.send_message(message, stream=True)
             full_response = ""
@@ -496,6 +496,6 @@ async def simple_chat_health():
     """Health check for simple chat"""
     return {
         "status": "ok",
-        "model": "gemini-2.0-flash",
+        "model": "gemini-2.5-flash",
         "api_key_configured": bool(config.GEMINI_API_KEY)
     }

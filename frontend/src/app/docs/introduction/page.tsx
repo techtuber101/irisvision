@@ -26,10 +26,10 @@ export default function IntroductionPage() {
   }, []);
 
   const imageSrc = !mounted
-    ? '/thumbnail-light.png'
+    ? '/Comingsoon.png'
     : resolvedTheme === 'dark'
-      ? '/thumbnail-dark.png'
-      : '/thumbnail-light.png';
+      ? '/Comingsoon.png'
+      : '/Comingsoon.png';
 
   return (
     <>
