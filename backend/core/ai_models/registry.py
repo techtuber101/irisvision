@@ -2,13 +2,13 @@ from typing import Dict, List, Optional, Set
 from .ai_models import Model, ModelProvider, ModelCapability, ModelPricing, ModelConfig
 from core.utils.config import config, EnvMode
 
-FREE_MODEL_ID = "gemini/gemini-2.0-flash"
+FREE_MODEL_ID = "gemini/gemini-2.5-flash"
 
 # Set premium model ID based on environment
 if config.ENV_MODE == EnvMode.LOCAL:
-    PREMIUM_MODEL_ID = "gemini/gemini-2.0-flash"
+    PREMIUM_MODEL_ID = "gemini/gemini-2.5-flash"
 else:  # STAGING or PRODUCTION
-    PREMIUM_MODEL_ID = "gemini/gemini-2.0-flash"
+    PREMIUM_MODEL_ID = "gemini/gemini-2.5-flash"
 
 is_local = config.ENV_MODE == EnvMode.LOCAL
 
@@ -120,14 +120,14 @@ class ModelRegistry:
         ))
         
         self.register(Model(
-            id="gemini/gemini-2.0-flash",
+            id="gemini/gemini-2.5-flash",
             name="Iris Pro",
             provider=ModelProvider.GOOGLE,
             aliases=[
                 "iris-pro",
                 "Iris Pro",
-                "gemini-2.0-flash",
-                "Gemini 2.0 Flash",
+                "gemini-2.5-flash",
+                "Gemini 2.5 Flash",
             ],
             context_window=1_000_000,
             max_output_tokens=65_536,

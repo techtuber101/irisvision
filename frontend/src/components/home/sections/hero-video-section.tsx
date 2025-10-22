@@ -8,14 +8,14 @@ export function HeroVideoSection() {
           className="block dark:hidden"
           animationStyle="from-center"
           videoSrc="https://www.youtube.com/embed/Jnxq0osSg2c?si=k8ddEM8h8lver20s"
-          thumbnailSrc="/thumbnail-light.png"
+          thumbnailSrc="/Comingsoon.png"
           thumbnailAlt="Hero Video"
         />
         <HeroVideoDialog
           className="hidden dark:block"
           animationStyle="from-center"
           videoSrc="https://www.youtube.com/embed/Jnxq0osSg2c?si=k8ddEM8h8lver20s"
-          thumbnailSrc="/thumbnail-dark.png"
+          thumbnailSrc="/Comingsoon.png"
           thumbnailAlt="Hero Video"
         />
       </div>

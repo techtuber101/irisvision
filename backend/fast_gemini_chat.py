@@ -20,7 +20,7 @@ genai.configure(api_key=config.GEMINI_API_KEY)
 
 class ChatRequest(BaseModel):
     message: str
-    model: str = "gemini-2.0-flash"  # Default to stable Gemini model
+    model: str = "gemini-2.5-flash"  # Default to stable Gemini model
     system_instructions: Optional[str] = None
     chat_context: Optional[List[Dict[str, str]]] = None
 
@@ -176,6 +176,6 @@ async def health_check():
     """Quick health check"""
     return {
         "status": "ok",
-        "model": "gemini-2.0-flash",
+        "model": "gemini-2.5-flash",
         "api_key_configured": bool(config.GEMINI_API_KEY)
     }

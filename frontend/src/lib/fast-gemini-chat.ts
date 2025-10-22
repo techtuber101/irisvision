@@ -37,7 +37,7 @@ export interface FastGeminiStreamCallbacks {
  */
 export async function fastGeminiChat(
   message: string,
-  model: string = 'gemini-2.0-flash',
+  model: string = 'gemini-2.5-flash',
   systemInstructions?: string,
   chatContext?: Array<{ role: string; content: string }>
 ): Promise<FastGeminiChatResponse> {
@@ -73,7 +73,7 @@ export async function fastGeminiChat(
 export async function fastGeminiChatStream(
   message: string,
   callbacks: FastGeminiStreamCallbacks,
-  model: string = 'gemini-2.0-flash',
+  model: string = 'gemini-2.5-flash',
   systemInstructions?: string,
   chatContext?: Array<{ role: string; content: string }>
 ): Promise<void> {

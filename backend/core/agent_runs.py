@@ -113,9 +113,8 @@ async def start_agent(
             agent_data = await loader.load_agent(effective_agent_id, user_id, load_config=True)
             logger.debug(f"Using agent {agent_data.name} ({effective_agent_id}) version {agent_data.version_name}")
         except (HTTPException, ValueError) as e:
-            if body.agent_id:
-                raise  # Explicit agent not found - fail
-            logger.warning(f"Stored agent_id {effective_agent_id} not found, falling back to default")
+            logger.warning(f"Agent {effective_agent_id} not found: {e}, falling back to default")
+            agent_data = None
     
     # Fall back to default agent
     if not agent_data:
@@ -608,7 +607,7 @@ async def initiate_agent_with_files(
             agent_data = await loader.load_agent(agent_id, user_id, load_config=True)
             logger.debug(f"Using agent {agent_data.name} ({agent_id}) version {agent_data.version_name}")
         except ValueError as e:
-            logger.warning(f"Specified agent {agent_id} not found: {e}")
+            logger.warning(f"Agent {agent_id} not found: {e}, falling back to default")
             agent_data = None
     
     # Fall back to default agent if specified agent not found or not provided

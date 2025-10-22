@@ -168,7 +168,7 @@ export function AgentModelSelector({
   const hasSingleOption = enhancedModelOptions.length <= 1;
 
   if (hasSingleOption) {
-    const fallbackModelId = enhancedModelOptions[0]?.id || selectedModel || 'gemini/gemini-2.0-flash';
+    const fallbackModelId = enhancedModelOptions[0]?.id || selectedModel || 'gemini/gemini-2.5-flash';
     const fallbackLabel = enhancedModelOptions[0]?.label || selectedModelDisplay || 'Iris Pro';
 
     return (
