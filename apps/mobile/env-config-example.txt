@@ -1,0 +1,10 @@
+# Mobile App Environment Configuration
+# Add this to your mobile app's .env.local file
+
+# Backend server configuration
+EXPO_PUBLIC_BACKEND_URL=http://192.168.29.94:8000/api
+EXPO_PUBLIC_SERVER_IP=192.168.29.94
+
+# Supabase configuration (replace with your actual values)
+EXPO_PUBLIC_SUPABASE_URL=your_supabase_url_here
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here

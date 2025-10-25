@@ -1,10 +1,19 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { focusManager, onlineManager, QueryClient } from '@tanstack/react-query';
 import { persistQueryClient } from '@tanstack/react-query-persist-client';
 import type { AppStateStatus } from 'react-native';
 import { AppState, Platform } from 'react-native';
+
+// Conditionally import AsyncStorage only for React Native
+let AsyncStorage: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    AsyncStorage = require('@react-native-async-storage/async-storage').default;
+  } catch (error) {
+    console.warn('AsyncStorage not available for query persistence:', error);
+  }
+}
 
 // Network status management
 onlineManager.setEventListener(setOnline => {
@@ -55,15 +64,20 @@ export const queryClient = new QueryClient({
 });
 
 // Async storage persister for file manifests and rehydratable data
-const asyncStoragePersister = createAsyncStoragePersister({
+const asyncStoragePersister = AsyncStorage ? createAsyncStoragePersister({
   storage: AsyncStorage,
-  key: 'SUNA_QUERY_CACHE',
+  key: 'IRIS_QUERY_CACHE',
   serialize: JSON.stringify,
   deserialize: JSON.parse,
-});
+}) : null;
 
 // Persist query client with selective persistence
 export const initializePersistence = async () => {
+  if (!asyncStoragePersister) {
+    console.warn('AsyncStorage not available, skipping query persistence');
+    return;
+  }
+  
   await persistQueryClient({
     queryClient,
     persister: asyncStoragePersister,

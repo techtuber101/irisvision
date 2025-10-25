@@ -1,0 +1,140 @@
+import React from 'react';
+import { ToolViewProps } from '../types';
+import { formatTimestamp, getToolTitle } from '../utils';
+import { getToolIcon } from '../../utils';
+import { CircleDashed, CheckCircle, AlertTriangle } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+export interface ToolViewWrapperProps extends ToolViewProps {
+  children: React.ReactNode;
+  headerContent?: React.ReactNode;
+  footerContent?: React.ReactNode;
+  className?: string;
+  contentClassName?: string;
+  headerClassName?: string;
+  footerClassName?: string;
+  showStatus?: boolean;
+  customStatus?: {
+    success?: string;
+    failure?: string;
+    streaming?: string;
+  };
+}
+
+export function ToolViewWrapper({
+  name = 'unknown',
+  isSuccess = true,
+  isStreaming = false,
+  assistantTimestamp,
+  toolTimestamp,
+  children,
+  headerContent,
+  footerContent,
+  className,
+  contentClassName,
+  headerClassName,
+  footerClassName,
+  showStatus = true,
+  customStatus,
+}: ToolViewWrapperProps) {
+  const toolTitle = getToolTitle(name);
+  const Icon = getToolIcon(name);
+
+  return (
+    <div className={cn("flex flex-col h-full p-4 md:p-5", className)}>
+      <div className="relative flex-1 overflow-hidden rounded-[28px] border border-white/10 bg-[rgba(7,10,17,0.85)] p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)] transition-all duration-300 light:border-white/30 light:bg-white/25 light:p-6 light:shadow-[0_35px_80px_-45px_rgba(15,23,42,0.15),inset_0_1px_0_rgba(255,255,255,0.4)] light:backdrop-blur-3xl">
+        {/* Gradient rim */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-3xl" style={{
+          background: 'linear-gradient(180deg, rgba(173,216,255,0.10), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.10) 85%, rgba(255,255,255,0.06))',
+          WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+          WebkitMaskComposite: 'xor',
+          maskComposite: 'exclude',
+          padding: '1px',
+          borderRadius: '24px'
+        }} 
+        data-light-gradient="linear-gradient(180deg, rgba(255,255,255,0.75), rgba(255,255,255,0.25) 35%, rgba(255,255,255,0.50) 85%, rgba(255,255,255,0.35))"
+        data-dark-gradient="linear-gradient(180deg, rgba(173,216,255,0.10), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.10) 85%, rgba(255,255,255,0.06))"
+        />
+
+        {/* Specular streak */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-24 rounded-t-3xl" style={{
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+          filter: 'blur(6px)',
+          mixBlendMode: 'screen'
+        }} 
+        data-light-streak="linear-gradient(180deg, rgba(255,255,255,0.80), rgba(255,255,255,0.30) 45%, rgba(255,255,255,0) 100%)"
+        data-dark-streak="linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)"
+        />
+
+        {/* Fine noise */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20 light:opacity-50" style={{
+          backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+          backgroundSize: '100px 100px',
+          mixBlendMode: 'overlay'
+        }} />
+
+        <div className="relative flex h-full flex-col">
+          {(headerContent || showStatus) && (
+            <div className={cn(
+              "mb-3 flex items-center justify-between",
+              headerClassName
+            )}>
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/20 light:bg-white/80 light:ring-white/70 light:shadow-[0_10px_25px_-18px_rgba(15,23,42,0.45)]">
+                  {Icon && <Icon className="h-3.5 w-3.5 text-white/90 light:text-zinc-700" />}
+                </div>
+                <h3 className="text-sm font-medium text-white/80 light:text-zinc-800">{toolTitle}</h3>
+              </div>
+              {headerContent}
+            </div>
+          )}
+
+          <div className={cn("relative flex-1 overflow-y-auto rounded-xl text-white/90 light:bg-white/20 light:text-zinc-700 light:shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]", contentClassName)}>
+            {children}
+          </div>
+
+          {(footerContent || showStatus) && (
+            <div className={cn(
+              "sticky bottom-0 mt-3 pt-3 border-t border-white/5 light:border-white/70",
+              footerClassName
+            )}>
+              <div className="flex items-center justify-between text-xs text-white/70 light:text-zinc-600">
+                {!isStreaming && showStatus && (
+                  <div className="flex items-center gap-2">
+                    {isSuccess ? (
+                      <CheckCircle className="h-3.5 w-3.5 text-emerald-400 light:text-emerald-500" />
+                    ) : (
+                      <AlertTriangle className="h-3.5 w-3.5 text-red-400 light:text-rose-500" />
+                    )}
+                    <span>
+                      {isSuccess
+                        ? customStatus?.success || "Completed successfully"
+                        : customStatus?.failure || "Execution failed"}
+                    </span>
+                  </div>
+                )}
+
+                {isStreaming && showStatus && (
+                  <div className="flex items-center gap-2">
+                    <CircleDashed className="h-3.5 w-3.5 text-blue-400 light:text-blue-500 animate-spin" />
+                    <span>{customStatus?.streaming || "Processing..."}</span>
+                  </div>
+                )}
+
+                <div className="text-xs text-white/60 light:text-zinc-500">
+                  {toolTimestamp && !isStreaming
+                    ? formatTimestamp(toolTimestamp)
+                    : assistantTimestamp
+                      ? formatTimestamp(assistantTimestamp)
+                      : ""}
+                </div>
+
+                {footerContent}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+} 

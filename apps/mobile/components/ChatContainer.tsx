@@ -1,7 +1,7 @@
+import { Message } from '@/api/chat-api';
 import { commonStyles } from '@/constants/CommonStyles';
-import { useChatSession, useNewChatSession } from '@/hooks/useChatHooks';
 import { useThemedStyles } from '@/hooks/useThemeColor';
-import { useIsNewChatMode, useSelectedProject } from '@/stores/ui-store';
+import { Project } from '@/stores/ui-store';
 import { UploadedFile } from '@/utils/file-upload';
 import React, { useEffect, useState } from 'react';
 import { Keyboard, KeyboardEvent, Platform, View } from 'react-native';
@@ -11,44 +11,39 @@ import { SkeletonText } from './Skeleton';
 import { Body } from './Typography';
 
 interface ChatContainerProps {
-    className?: string;
+    messages: Message[];
+    isGenerating: boolean;
+    isSending: boolean;
+    streamContent: string;
+    streamError: string | null;
+    isLoadingThread: boolean;
+    isLoadingMessages: boolean;
+    isNewChatMode: boolean;
+    selectedProject: Project | null;
+    onSendMessage: (content: string, files?: UploadedFile[]) => Promise<void>;
+    onCancelStream: () => void;
+    onTabChange?: (tab: 'workspace' | 'quick') => void;
+    onQuickChatResponse?: (response: string) => void;
 }
 
-export const ChatContainer: React.FC<ChatContainerProps> = ({ className }) => {
-    const selectedProject = useSelectedProject();
-    const isNewChatMode = useIsNewChatMode();
+export const ChatContainer: React.FC<ChatContainerProps> = ({
+    messages,
+    isGenerating,
+    isSending,
+    streamContent,
+    streamError,
+    isLoadingMessages,
+    isLoadingThread,
+    isNewChatMode,
+    selectedProject,
+    onSendMessage,
+    onCancelStream,
+    onTabChange,
+    onQuickChatResponse,
+}) => {
     const [isAtBottomOfChat, setIsAtBottomOfChat] = useState(true);
     const [keyboardHeight, setKeyboardHeight] = useState(0);
 
-    // Use appropriate chat session based on mode
-    const projectChatSession = useChatSession(
-        (!isNewChatMode && selectedProject?.id && selectedProject.id !== 'new-chat-temp')
-            ? selectedProject.id
-            : ''
-    );
-    const newChatSession = useNewChatSession();
-
-    // Select the right session based on mode
-    const chatSession = isNewChatMode ? newChatSession : projectChatSession;
-
-    const {
-        messages,
-        sendMessage,
-        stopAgent,
-        isGenerating,
-        streamContent,
-        streamError,
-    } = chatSession;
-
-    // For project mode, we still need these specific loading states
-    const { isLoadingThread, isLoadingMessages, isSending: projectIsSending } = isNewChatMode ?
-        { isLoadingThread: false, isLoadingMessages: false, isSending: false } :
-        projectChatSession;
-
-    // Get the correct isSending state based on mode
-    const isSending = isNewChatMode ? (newChatSession.isSending || false) : projectIsSending;
-
-    // Track keyboard height for MessageThread padding
     useEffect(() => {
         const handleKeyboardShow = (event: KeyboardEvent) => {
             setKeyboardHeight(event.endCoordinates.height);
@@ -107,7 +102,6 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ className }) => {
         setIsAtBottomOfChat(isAtBottom);
     };
 
-    // Show loading state while thread is being fetched (NOT created) - only for project mode
     if (!isNewChatMode && selectedProject && isLoadingThread) {
         return (
             <View style={styles.loadingContainer}>
@@ -116,7 +110,6 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ className }) => {
         );
     }
 
-    // Show empty state when no project is selected - ONLY in project mode
     if (!isNewChatMode && !selectedProject) {
         return (
             <View style={styles.emptyContainer}>
@@ -144,18 +137,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ className }) => {
                 />
             </View>
             <ChatInput
-                onSendMessage={(content: string, files?: UploadedFile[]) => {
-                    console.log('[ChatContainer] Sending message with files:', files?.length || 0);
-
-                    if (isNewChatMode) {
-                        // For new chat mode, pass files to the sendMessage function
-                        (newChatSession.sendMessage as any)(content, files);
-                    } else {
-                        // For existing chat mode, files are already uploaded to sandbox
-                        sendMessage(content);
-                    }
-                }}
-                onCancelStream={stopAgent}
+                onSendMessage={onSendMessage}
+                onCancelStream={onCancelStream}
                 placeholder={
                     isGenerating
                         ? "AI is responding..."
@@ -168,7 +151,11 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ className }) => {
                 isAtBottomOfChat={isAtBottomOfChat}
                 isGenerating={isGenerating}
                 isSending={isSending}
+                onTabChange={onTabChange}
+                onQuickChatResponse={onQuickChatResponse}
             />
         </View>
     );
-}; 
+};
+
+export default ChatContainer;

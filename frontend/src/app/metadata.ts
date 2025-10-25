@@ -23,7 +23,7 @@ export const metadata: Metadata = {
       {
         url: '/banner.png',
         width: 1200,
-        height: 630,
+        height: 568,
         alt: siteConfig.name,
       },
     ],

@@ -114,7 +114,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
 
                     <Body style={styles.description}>
                         Are you sure you want to delete the chat{' '}
-                        <Body style={styles.projectName}>"{projectName}"</Body>?
+                        <Body style={styles.projectName}>&quot;{projectName}&quot;</Body>?
                         {'\n\n'}This action cannot be undone.
                     </Body>
 

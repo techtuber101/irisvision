@@ -42,15 +42,9 @@ export const ToolHeader: React.FC<ToolHeaderProps> = ({
 }) => {
     const theme = useTheme();
 
-    // Try to get context, but don't throw if not available (for tools without extensions)
-    let context;
-    try {
-        context = useToolViewContext();
-    } catch {
-        context = null;
-    }
+    // Always call the hook, but handle the error gracefully
+    const context = useToolViewContext();
 
-    const Icon = IconComponent || getToolIcon(toolName);
     const displayName = getToolDisplayName(toolName);
 
     const styles = StyleSheet.create({

@@ -42,6 +42,7 @@ export interface Project {
     pass?: string;
   };
   is_public?: boolean;
+  icon_name?: string | null; // Lucide icon name for project categorization
   [key: string]: any;
 }
 

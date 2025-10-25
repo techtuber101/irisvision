@@ -10,7 +10,7 @@ import { Markdown } from '@/utils/markdown-renderer';
 import { parseMessage, processStreamContent } from '@/utils/message-parser';
 import { ChevronDown } from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Keyboard, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { FlatList, Image, Keyboard, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import Animated, {
     useAnimatedStyle,
     useSharedValue,
@@ -444,13 +444,46 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         return (
             <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
                 <View style={[styles.container, { backgroundColor: theme.background }]}>
+                    {/* Checkered pattern background */}
+                    <View style={styles.checkeredPattern}>
+                        {Array.from({ length: 25 }, (_, i) => 
+                            Array.from({ length: 15 }, (_, j) => {
+                                // Skip dots that would overlap with the logo area
+                                // Adjusted center to match actual logo position (slightly left and up)
+                                const centerX = 5.0; // Slightly left to align with logo
+                                const centerY = 9.3; // Very slightly up to align with logo
+                                const logoRadius = 3;
+                                
+                                const distanceFromCenter = Math.sqrt(
+                                    Math.pow(j - centerX, 2) + Math.pow(i - centerY, 2)
+                                );
+                                
+                                if (distanceFromCenter <= logoRadius) {
+                                    return null; // Skip this dot
+                                }
+                                
+                                return (
+                                    <View
+                                        key={`${i}-${j}`}
+                                        style={[
+                                            styles.checkeredDot,
+                                            {
+                                                left: j * 40,
+                                                top: i * 40,
+                                            }
+                                        ]}
+                                    />
+                                );
+                            })
+                        )}
+                    </View>
+                    
                     <View style={styles.emptyContainer}>
-                        <Body style={[styles.emptyText, { color: theme.mutedForeground }]}>
-                            This is the beginning of your conversation.
-                        </Body>
-                        <Body style={[styles.emptyText, { color: theme.mutedForeground, fontSize: 14, marginTop: 8, opacity: 0.7 }]}>
-                            Send a message to get started!
-                        </Body>
+                        <Image 
+                            source={require('@/assets/images/irissymbolwhite.png')} 
+                            style={styles.emptyLogo}
+                            resizeMode="contain"
+                        />
                     </View>
                 </View>
             </TouchableWithoutFeedback>
@@ -501,6 +534,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         paddingBottom: 20,
+        overflow: 'hidden', // Prevent dots from escaping MessageThread
     },
     content: {
         padding: 16,
@@ -556,6 +590,27 @@ const styles = StyleSheet.create({
     emptyContainer: {
         ...commonStyles.flexCenter,
         paddingHorizontal: 32,
+        marginTop: 76, // Move logo down
+    },
+    checkeredPattern: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        opacity: 0.15,
+        overflow: 'hidden', // Prevent dots from escaping the container
+    },
+    checkeredDot: {
+        position: 'absolute',
+        width: 2,
+        height: 2,
+        backgroundColor: 'rgba(255, 255, 255, 0.8)', // Increased opacity and size
+    },
+    emptyLogo: {
+        width: 80,
+        height: 80,
+        opacity: 0.15, // Very subtle transparency - feels like part of UI
     },
     emptyText: {
         fontSize: 16,

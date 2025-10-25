@@ -5,6 +5,7 @@ import { useColorScheme } from './useColorScheme';
 export interface ThemeColors {
   // Base colors
   primary: string;
+  primaryForeground: string;
   background: string;
   foreground: string;
   card: string;
@@ -71,6 +72,7 @@ export const useTheme = (): ThemeColors => {
     const theme: ThemeColors = {
       // Base colors from existing system
       primary: colors.primary,
+      primaryForeground: colors.primaryForeground,
       background: colors.background,
       foreground: colors.foreground,
       card: colors.card,

@@ -1,4 +1,4 @@
-# Kortix Frontend
+# Iris Frontend
 
 ## Quick Setup
 

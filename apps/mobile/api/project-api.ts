@@ -17,6 +17,7 @@ export type Project = {
     pass?: string;
   };
   is_public?: boolean;
+  icon_name?: string | null; // Lucide icon name for project categorization
   [key: string]: any;
 };
 
@@ -80,6 +81,8 @@ const getProjects = async (): Promise<Project[]> => {
         vnc_preview: '',
         sandbox_url: '',
       },
+      is_public: project.is_public,
+      icon_name: project.icon_name,
     }));
 
 
