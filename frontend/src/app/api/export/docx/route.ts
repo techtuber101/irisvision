@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import HTMLtoDOCX from 'html-to-docx';
 
+export const dynamic = 'force-static';
+
 export async function POST(request: NextRequest) {
   try {
     const { content, fileName } = await request.json();

@@ -1,23 +1,16 @@
-import { headers } from 'next/headers';
 import { ImageResponse } from 'next/og';
 
 // Configuration exports
-export const runtime = 'edge';
 export const alt = 'Iris';
 export const size = {
   width: 1200,
-  height: 630,
+  height: 568,
 };
 export const contentType = 'image/png';
+export const dynamic = 'force-static';
 
 export default async function Image() {
   try {
-    // Get the host from headers
-    const headersList = await headers();
-    const host = headersList.get('host') || '';
-    const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
-    const baseUrl = `${protocol}://${host}`;
-
     return new ImageResponse(
       (
         <div
@@ -28,17 +21,12 @@ export default async function Image() {
             alignItems: 'center',
             justifyContent: 'center',
             background: 'black',
+            fontSize: 48,
+            fontWeight: 'bold',
+            color: 'white',
           }}
         >
-          <img
-            src={`${baseUrl}/banner.png`}
-            alt={alt}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-            }}
-          />
+          Iris - Open Source AI Assistant
         </div>
       ),
       { ...size },

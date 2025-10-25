@@ -1,34 +1,22 @@
 {
   "expo": {
     "name": "Iris",
-    "slug": "iris-mobile",
+    "slug": "iris",
     "version": "1.0.0",
+    "sdkVersion": "54.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "owner": "iris",
+    "owner": "irisintelligence",
     "scheme": "irismobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "description": "Iris is a fully autonomous AI assistant that helps you accomplish real-world tasks with ease. Through natural conversation, Iris becomes your digital companion for research, data analysis, and everyday challenges.",
     "primaryColor": "#121215",
-    "privacy": "public",
     "platforms": [
       "ios",
       "android",
       "web"
     ],
-    "keywords": [
-      "AI",
-      "artificial intelligence",
-      "browser automation",
-      "web scraping",
-      "file management",
-      "AI assistant",
-      "open source",
-      "research",
-      "data analysis"
-    ],
-    "githubUrl": "",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.irisvision.iris",
@@ -87,6 +75,9 @@
     "experiments": {
       "typedRoutes": true
     },
+    "developmentClient": {
+      "silentLaunch": true
+    },
     "extra": {
       "metadata": {
         "applicationName": "Iris",
@@ -96,6 +87,10 @@
         "category": "Technology",
         "siteUrl": "https://irisvision.ai",
         "twitterHandle": "@irisintelligence"
+      },
+      "router": {},
+      "eas": {
+        "projectId": "8f0c8dc7-e91c-4e93-8bb7-1f0c0be41d7b"
       }
     }
   }

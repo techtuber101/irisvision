@@ -283,19 +283,6 @@ export const WebScrapeToolView: React.FC<WebScrapeToolViewProps> = ({
 
     console.log('🔧 WEB SCRAPE TOOL RECEIVED:', !!toolContent, toolContent?.length || 0);
 
-    if (!toolContent && !isStreaming) {
-        console.log('❌ WEB SCRAPE TOOL: NO CONTENT');
-        return (
-            <View style={styles.container}>
-                <View style={styles.emptyState}>
-                    <Body style={{ color: theme.mutedForeground, textAlign: 'center' }}>
-                        No web scrape data available
-                    </Body>
-                </View>
-            </View>
-        );
-    }
-
     const {
         url,
         files,
@@ -323,6 +310,20 @@ export const WebScrapeToolView: React.FC<WebScrapeToolViewProps> = ({
             setProgress(100);
         }
     }, [isStreaming]);
+
+    // Early return after hooks
+    if (!toolContent && !isStreaming) {
+        console.log('❌ WEB SCRAPE TOOL: NO CONTENT');
+        return (
+            <View style={styles.container}>
+                <View style={styles.emptyState}>
+                    <Body style={{ color: theme.mutedForeground, textAlign: 'center' }}>
+                        No web scrape data available
+                    </Body>
+                </View>
+            </View>
+        );
+    }
 
     const copyFilePath = async (filePath: string) => {
         try {

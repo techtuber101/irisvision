@@ -15,6 +15,10 @@ interface PanelContainerProps {
     onCloseLeft: () => void;
     onCloseRight: () => void;
     onOpenLeft: () => void;
+    onLeftPanelSlideStart?: () => void;
+    onLeftPanelSlideEnd?: () => void;
+    onRightPanelSlideStart?: () => void;
+    onRightPanelSlideEnd?: () => void;
     children: React.ReactNode;
     messages?: Message[];
 }
@@ -25,6 +29,10 @@ export const PanelContainer: React.FC<PanelContainerProps> = ({
     onCloseLeft,
     onCloseRight,
     onOpenLeft,
+    onLeftPanelSlideStart,
+    onLeftPanelSlideEnd,
+    onRightPanelSlideStart,
+    onRightPanelSlideEnd,
     children,
     messages = [],
 }) => {
@@ -85,22 +93,30 @@ export const PanelContainer: React.FC<PanelContainerProps> = ({
         <View style={styles.container}>
             <DrawerLayout
                 ref={leftDrawerRef}
-                drawerWidth={300}
+                drawerWidth={SCREEN_WIDTH}
                 drawerPosition="left"
                 drawerType="slide"
                 drawerBackgroundColor="transparent"
-                edgeWidth={75}
+                edgeWidth={SCREEN_WIDTH * 0.3}
                 renderNavigationView={() => leftDrawerContent}
                 onDrawerSlide={(position) => {
                     // Tiny overlay effect on main content
                     if (position > 0 && !leftPanelVisible) {
                         onOpenLeft();
                     }
+                    // Trigger animation start when sliding begins
+                    if (position > 0 && position < 1) {
+                        onLeftPanelSlideStart?.();
+                    }
+                }}
+                onDrawerOpen={() => {
+                    onLeftPanelSlideEnd?.();
                 }}
                 onDrawerClose={() => {
                     if (leftPanelVisible) {
                         onCloseLeft();
                     }
+                    onLeftPanelSlideEnd?.();
                 }}
             >
                 <DrawerLayout
@@ -109,11 +125,22 @@ export const PanelContainer: React.FC<PanelContainerProps> = ({
                     drawerPosition="right"
                     drawerType="slide"
                     drawerBackgroundColor="transparent"
+                    edgeWidth={SCREEN_WIDTH * 0.3}
                     renderNavigationView={() => rightDrawerContent}
+                    onDrawerSlide={(position) => {
+                        // Trigger animation start when sliding begins
+                        if (position > 0 && position < 1) {
+                            onRightPanelSlideStart?.();
+                        }
+                    }}
+                    onDrawerOpen={() => {
+                        onRightPanelSlideEnd?.();
+                    }}
                     onDrawerClose={() => {
                         if (rightPanelVisible) {
                             onCloseRight();
                         }
+                        onRightPanelSlideEnd?.();
                     }}
                 >
                     {mainContent}

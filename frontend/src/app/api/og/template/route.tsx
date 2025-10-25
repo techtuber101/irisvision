@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
 
-export const runtime = 'edge';
+export const dynamic = 'force-static';
 
 export async function GET(request: NextRequest) {
   try {
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
               textAlign: 'center',
             }}
           >
-            {template.is_kortix_team && (
+            {template.is_iris_team && (
               <div
                 style={{
                   display: 'flex',

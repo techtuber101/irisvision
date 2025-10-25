@@ -9,19 +9,25 @@ interface ChatHeaderProps {
     onMenuPress?: () => void;
     onSettingsPress?: () => void;
     selectedProject?: { id: string; name: string } | null;
+    title?: string;
+    centerContent?: React.ReactNode;
+    rightContent?: React.ReactNode;
 }
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
     onMenuPress,
     onSettingsPress,
     selectedProject,
+    title,
+    centerContent,
+    rightContent,
 }) => {
     const theme = useTheme();
     const insets = useSafeAreaInsets();
 
     return (
         <View style={[styles.container, {
-            backgroundColor: theme.background,
+            backgroundColor: 'transparent', // Make header transparent
             borderBottomColor: theme.border,
             paddingTop: insets.top + 12,
         }]}>
@@ -29,13 +35,23 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
                 <PanelLeft size={20} color={theme.foreground} />
             </TouchableOpacity>
 
-            <H6 style={{ color: theme.foreground }}>
-                {selectedProject?.name || 'Iris'}
-            </H6>
+            <View style={styles.centerContainer}>
+                {centerContent ? (
+                    centerContent
+                ) : (
+                    <H6 style={{ color: theme.foreground }}>
+                        {title || selectedProject?.name || 'Iris'}
+                    </H6>
+                )}
+            </View>
 
-            <TouchableOpacity style={styles.button} onPress={onSettingsPress}>
-                <PanelRightOpen size={20} color={theme.foreground} />
-            </TouchableOpacity>
+            {rightContent ? (
+                rightContent
+            ) : (
+                <TouchableOpacity style={styles.button} onPress={onSettingsPress}>
+                    <PanelRightOpen size={20} color={theme.foreground} />
+                </TouchableOpacity>
+            )}
         </View>
     );
 };
@@ -49,8 +65,12 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderBottomWidth: 1,
     },
+    centerContainer: {
+        flex: 1,
+        alignItems: 'center',
+    },
     button: {
         padding: 8,
         borderRadius: 8,
     },
-}); 
+});

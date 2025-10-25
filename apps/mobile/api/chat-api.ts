@@ -7,11 +7,20 @@ import { handleApiError } from './error-handlers';
 // Import EventSource polyfill for React Native  
 import { Platform } from 'react-native';
 
-// Use global EventSource if available, otherwise try polyfill
-let EventSourceClass: typeof EventSource;
-if (Platform.OS === 'web' || typeof global.EventSource !== 'undefined') {
-  EventSourceClass = global.EventSource || EventSource;
-} else {
+// Resolve EventSource at runtime (guarding for SSR/Node environments)
+const resolveEventSource = (): typeof EventSource | undefined => {
+  if (typeof globalThis !== 'undefined' && typeof (globalThis as any).EventSource !== 'undefined') {
+    return (globalThis as any).EventSource as typeof EventSource;
+  }
+  if (typeof window !== 'undefined' && typeof window.EventSource !== 'undefined') {
+    return window.EventSource;
+  }
+  return undefined;
+};
+
+const EventSourceClass = resolveEventSource();
+
+if (Platform.OS !== 'web' && !EventSourceClass) {
   // For React Native, we'll implement a simple fetch-based alternative
   console.warn('[STREAM] Using fetch-based streaming instead of EventSource for React Native');
 }
@@ -811,17 +820,17 @@ export const streamAgent = (
       console.log(`[STREAM] Stream URL:`, url.toString());
       console.log(`[STREAM] SERVER_URL:`, SERVER_URL);
       console.log(`[STREAM] Platform:`, Platform.OS);
-      console.log(`[STREAM] EventSource available:`, typeof global.EventSource !== 'undefined');
+      console.log(`[STREAM] EventSource available:`, Boolean(EventSourceClass));
       
-      // Use XHR-based streaming for React Native
-      if (Platform.OS !== 'web' && typeof global.EventSource === 'undefined') {
+      // Use XHR-based streaming for React Native or environments without EventSource
+      if (!EventSourceClass) {
         console.log(`[STREAM] Using XHR-based streaming for React Native`);
         const xhrCleanup = await setupFetchStream(url.toString(), agentRunId, callbacks);
         return xhrCleanup;
       }
       
       // Use EventSource for web or if available
-      const eventSource = new EventSource(url.toString());
+      const eventSource = new EventSourceClass(url.toString());
       console.log(`[STREAM] EventSource created, readyState:`, eventSource.readyState);
 
       activeStreams.set(agentRunId, eventSource);
@@ -1040,14 +1049,23 @@ export const initiateAgent = async (
 
   try {
     console.log('[API] Sending request to /agent/initiate...');
+    console.log('[API] SERVER_URL:', SERVER_URL);
+    console.log('[API] Auth token present:', !!session.access_token);
+    
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
     const response = await fetch(`${SERVER_URL}/agent/initiate`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
       },
       body: formData,
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId); // Clear timeout if request succeeds
     console.log('[API] Response status:', response.status);
     console.log('[API] Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
 
@@ -1062,6 +1080,16 @@ export const initiateAgent = async (
     return result;
   } catch (error) {
     console.error('[API] initiateAgent error:', error);
+    
+    // Add more specific error handling
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      throw new Error(`Cannot connect to backend server at ${SERVER_URL}. Please check your network connection and ensure the backend is running.`);
+    }
+    
+    if (error.name === 'AbortError') {
+      throw new Error(`Request timed out after 30 seconds. Please check your network connection.`);
+    }
+    
     throw error;
   }
 }; 

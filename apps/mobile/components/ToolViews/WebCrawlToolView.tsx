@@ -119,27 +119,6 @@ export const WebCrawlToolView: React.FC<WebCrawlToolViewProps> = ({
 
     console.log('🕸️ WEB CRAWL TOOL RECEIVED:', !!toolContent, toolContent?.length || 0);
 
-    if (!toolContent && !isStreaming) {
-        console.log('❌ WEB CRAWL TOOL: NO CONTENT');
-        return (
-            <View style={{
-                flex: 1,
-                justifyContent: 'center',
-                alignItems: 'center',
-                padding: 20,
-                backgroundColor: theme.background,
-            }}>
-                <Text style={{
-                    color: theme.mutedForeground,
-                    fontSize: 16,
-                    textAlign: 'center',
-                }}>
-                    No web crawl data available
-                </Text>
-            </View>
-        );
-    }
-
     const {
         url,
         content,
@@ -167,6 +146,28 @@ export const WebCrawlToolView: React.FC<WebCrawlToolViewProps> = ({
             setProgress(100);
         }
     }, [isStreaming]);
+
+    // Early return after hooks
+    if (!toolContent && !isStreaming) {
+        console.log('❌ WEB CRAWL TOOL: NO CONTENT');
+        return (
+            <View style={{
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+                padding: 20,
+                backgroundColor: theme.background,
+            }}>
+                <Text style={{
+                    color: theme.mutedForeground,
+                    fontSize: 16,
+                    textAlign: 'center',
+                }}>
+                    No web crawl data available
+                </Text>
+            </View>
+        );
+    }
 
     const copyContent = async () => {
         if (!content) return;

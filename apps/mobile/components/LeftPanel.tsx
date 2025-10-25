@@ -4,15 +4,16 @@ import { usePanelTopOffset } from '@/constants/SafeArea';
 import { useAuth } from '@/hooks/useAuth';
 import { useThemedStyles } from '@/hooks/useThemeColor';
 import { useIsNewChatMode, useResetNewChatSession, useSelectedProject, useSetNewChatMode, useSetSelectedProject } from '@/stores/ui-store';
-import { ChevronsUpDown, SquarePen } from 'lucide-react-native';
+import { ChevronsUpDown, SquarePen, X } from 'lucide-react-native';
 import React, { useRef, useState } from 'react';
-import { ScrollView, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChatActionModal } from './ChatActionModal';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 import { SettingsDrawer } from './SettingsDrawer';
 import { ShareModal } from './ShareModal';
 import { SkeletonProjects } from './Skeleton';
+import { ThreadIcon } from './ThreadIcon';
 import { Body, Caption, H3 } from './Typography';
 
 interface LeftPanelProps {
@@ -53,7 +54,7 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({ isVisible, onClose }) => {
     const styles = useThemedStyles((theme) => ({
         panel: {
             backgroundColor: theme.sidebar,
-            width: 300,
+            width: '100%' as const,
             height: '100%' as const,
             paddingTop: panelTopOffset,
             paddingBottom: insets.bottom,
@@ -65,8 +66,20 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({ isVisible, onClose }) => {
             paddingHorizontal: 20,
             paddingBottom: 0,
         },
+        headerRight: {
+            flexDirection: 'row' as const,
+            alignItems: 'center' as const,
+            gap: 12,
+        },
+        headerButton: {
+            padding: 8,
+        },
         title: {
             color: theme.foreground,
+        },
+        logo: {
+            width: 80,
+            height: 18,
         },
         closeButton: {
             width: 32,
@@ -146,11 +159,12 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({ isVisible, onClose }) => {
         taskItem: {
             flexDirection: 'row' as const,
             alignItems: 'center' as const,
-            paddingVertical: 10,
+            paddingVertical: 14,
             borderRadius: 6,
-            marginBottom: 4,
+            marginBottom: 2,
             marginLeft: -12,
             marginRight: -12,
+            minHeight: 68,
         },
         taskIcon: {
             marginRight: 12,
@@ -158,9 +172,30 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({ isVisible, onClose }) => {
         },
         taskText: {
             color: theme.foreground,
-            marginHorizontal: 12,
             fontSize: 15,
             fontFamily: fontWeights[500],
+            flex: 1,
+            lineHeight: 18,
+            textAlignVertical: 'center' as const,
+        },
+        taskItemContent: {
+            flexDirection: 'row' as const,
+            alignItems: 'center' as const,
+            flex: 1,
+            minHeight: 40,
+        },
+        projectLogoContainer: {
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            backgroundColor: theme.foreground + '0D', // 5% opacity (0D in hex)
+            borderWidth: 1,
+            borderColor: theme.foreground + '1A', // 10% opacity (1A in hex)
+            justifyContent: 'center' as const,
+            alignItems: 'center' as const,
+            marginRight: 14,
+            marginLeft: 6,
+            flexShrink: 0,
         },
         userSection: {
             marginTop: 'auto' as const,
@@ -253,6 +288,7 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({ isVisible, onClose }) => {
                 id: selectedProject.id,
                 name: selectedProject.name,
                 isNewChat: true,
+                icon_name: selectedProject.icon_name || null,
             });
         }
 
@@ -283,12 +319,21 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({ isVisible, onClose }) => {
                 onLongPress={() => handleProjectLongPress(project)}
                 delayLongPress={500}
             >
-                <Body style={[
-                    styles.taskText,
-                    selectedProject?.id === project.id && styles.selectedTaskText
-                ]}>
-                    {project.name}
-                </Body>
+                <View style={styles.taskItemContent}>
+                    <View style={styles.projectLogoContainer}>
+                        <ThreadIcon 
+                            iconName={project.icon_name}
+                            size={18}
+                            color={styles.title.color}
+                        />
+                    </View>
+                    <Body style={[
+                        styles.taskText,
+                        selectedProject?.id === project.id && styles.selectedTaskText
+                    ]}>
+                        {project.name}
+                    </Body>
+                </View>
             </TouchableOpacity>
         ));
     };
@@ -406,18 +451,31 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({ isVisible, onClose }) => {
     return (
         <View style={styles.panel}>
             <View style={styles.header}>
-                <H3 style={styles.title}>Iris</H3>
-                <TouchableOpacity
-                    onPress={() => {
-                        console.log('[LeftPanel] Starting new chat from pen button');
-                        resetNewChatSession(); // Reset the new chat session first
-                        setSelectedProject(null); // Clear selected project
-                        setNewChatMode(true);
-                        onClose();
-                    }}
-                >
-                    <SquarePen size={22} strokeWidth={2} color={styles.title.color} />
-                </TouchableOpacity>
+                <Image 
+                    source={require('@/assets/images/irislogowhitebig.png')} 
+                    style={styles.logo}
+                    resizeMode="contain"
+                />
+                <View style={styles.headerRight}>
+                    <TouchableOpacity
+                        onPress={() => {
+                            console.log('[LeftPanel] Starting new chat from pen button');
+                            resetNewChatSession(); // Reset the new chat session first
+                            setSelectedProject(null); // Clear selected project
+                            setNewChatMode(true);
+                            onClose();
+                        }}
+                        style={styles.headerButton}
+                    >
+                        <SquarePen size={22} strokeWidth={2} color={styles.title.color} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={onClose}
+                        style={styles.closeButton}
+                    >
+                        <X size={20} strokeWidth={2} color={styles.title.color} />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
