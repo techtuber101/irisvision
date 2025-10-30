@@ -12,7 +12,7 @@ from .template_service import (
     AgentTemplate,
     TemplateNotFoundError,
     TemplateAccessDeniedError,
-    SunaDefaultAgentTemplateError
+    IrisDefaultAgentTemplateError
 )
 from .installation_service import (
     get_installation_service,
@@ -65,7 +65,7 @@ class TemplateResponse(BaseModel):
     agentpress_tools: Dict[str, Any]
     tags: List[str]
     is_public: bool
-    is_kortix_team: Optional[bool] = False
+    is_iris_team: Optional[bool] = False
     marketplace_published_at: Optional[str] = None
     download_count: int
     created_at: str
@@ -173,8 +173,8 @@ async def create_template_from_agent(
     except TemplateAccessDeniedError as e:
         logger.warning(f"Template creation failed - access denied: {e}")
         raise HTTPException(status_code=403, detail=str(e))
-    except SunaDefaultAgentTemplateError as e:
-        logger.warning(f"Template creation failed - Suna default agent: {e}")
+    except IrisDefaultAgentTemplateError as e:
+        logger.warning(f"Template creation failed - Iris default agent: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         try:
@@ -374,8 +374,8 @@ class MarketplaceTemplatesResponse(BaseModel):
     templates: List[TemplateResponse]
     pagination: MarketplacePaginationInfo
 
-@router.get("/kortix-all", response_model=MarketplaceTemplatesResponse)
-async def get_all_kortix_templates(
+@router.get("/iris-all", response_model=MarketplaceTemplatesResponse)
+async def get_all_iris_templates(
     request: Request = None
 ):
     try:
@@ -387,7 +387,7 @@ async def get_all_kortix_templates(
         )
         
         filters = MarketplaceFilters(
-            is_kortix_team=True,
+            is_iris_team=True,
             sort_by="download_count",
             sort_order="desc"
         )
@@ -421,7 +421,7 @@ async def get_all_kortix_templates(
             error_str = str(e)
         except Exception:
             error_str = f"Error of type {type(e).__name__}"
-        logger.error(f"Error getting all Kortix templates: {error_str}")
+        logger.error(f"Error getting all Iris templates: {error_str}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/marketplace", response_model=MarketplaceTemplatesResponse)
@@ -430,7 +430,7 @@ async def get_marketplace_templates(
     limit: Optional[int] = Query(20, ge=1, le=100, description="Number of items per page"),
     search: Optional[str] = Query(None, description="Search term for name"),
     tags: Optional[str] = Query(None, description="Comma-separated list of tags to filter by"),
-    is_kortix_team: Optional[bool] = Query(None, description="Filter for Kortix team templates"),
+    is_iris_team: Optional[bool] = Query(None, description="Filter for Iris team templates"),
     mine: Optional[bool] = Query(None, description="Filter to show only user's own templates"),
     sort_by: Optional[str] = Query("download_count", description="Sort field: download_count, newest, name"),
     sort_order: Optional[str] = Query("desc", description="Sort order: asc, desc"),
@@ -460,7 +460,7 @@ async def get_marketplace_templates(
         filters = MarketplaceFilters(
             search=search,
             tags=tags_list,
-            is_kortix_team=is_kortix_team,
+            is_iris_team=is_iris_team,
             creator_id=creator_id_filter,
             sort_by=sort_by,
             sort_order=sort_order

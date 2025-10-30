@@ -26,7 +26,7 @@ export const sampleNavigation: DocsNavigationSection[] = [
     items: [
       {
         id: 'introduction',
-        title: 'What is Kortix?',
+        title: 'What is Iris?',
         href: '#introduction',
         icon: BookOpen,
         isActive: true
@@ -152,10 +152,10 @@ export const sampleNavigation: DocsNavigationSection[] = [
 
 export const sampleBreadcrumbs = [
   { title: 'Documentation', onClick: () => console.log('Navigate to docs') },
-  { title: 'Kortix Platform Guide' }
+  { title: 'Iris Platform Guide' }
 ];
 
-export const kortixFeatures = [
+export const irisFeatures = [
   {
     title: 'Browser Automation',
     description: 'Navigate websites, extract data, fill forms, automate web workflows',

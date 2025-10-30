@@ -1344,7 +1344,7 @@ BEGIN
       FROM agents a
       WHERE av.agent_version_id = a.current_version_id
         AND a.is_default = true
-        AND lower(a.name) = ANY (ARRAY['iris', 'suna']);
+        AND lower(a.name) = ANY (ARRAY['iris', 'iris']);
     ELSIF EXISTS (
       SELECT 1 FROM information_schema.columns
       WHERE table_name = 'agent_versions' AND column_name = 'id'
@@ -1359,7 +1359,7 @@ BEGIN
       FROM agents a
       WHERE av.id = a.current_version_id
         AND a.is_default = true
-        AND lower(a.name) = ANY (ARRAY['iris', 'suna']);
+        AND lower(a.name) = ANY (ARRAY['iris', 'iris']);
     END IF;
   END IF;
 
@@ -1376,7 +1376,7 @@ BEGIN
       true
     )
     WHERE is_default = true
-    AND lower(name) = ANY (ARRAY['iris', 'suna']);
+    AND lower(name) = ANY (ARRAY['iris', 'iris']);
   END IF;
 
   -- Update legacy agents.system_prompt if column exists
@@ -1387,7 +1387,7 @@ BEGIN
     UPDATE agents
     SET system_prompt = v_prompt
     WHERE is_default = true
-    AND lower(name) = ANY (ARRAY['iris', 'suna']);
+    AND lower(name) = ANY (ARRAY['iris', 'iris']);
   END IF;
 END
 $$;
@@ -1400,4 +1400,4 @@ COMMIT;
 --        system_prompt AS legacy_prompt
 -- FROM agents
 -- WHERE is_default = true
---   AND lower(name) = ANY (ARRAY['iris', 'suna']);
+--   AND lower(name) = ANY (ARRAY['iris', 'iris']);

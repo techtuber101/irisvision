@@ -5,7 +5,7 @@ import Image from 'next/image';
 interface IrisLogoProps {
   size?: number;
 }
-export function IrisLogo({ size = 24 }: IrisLogoProps) {
+export function IrisLogo({ size = 30 }: IrisLogoProps) {
   return (
     <>
       <Image

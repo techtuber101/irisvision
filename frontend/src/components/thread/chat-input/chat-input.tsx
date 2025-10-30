@@ -113,6 +113,7 @@ export interface ChatInputProps {
   showToLowCreditUsers?: boolean;
   showScrollToBottomIndicator?: boolean;
   onScrollToBottom?: () => void;
+  onScrollToTop?: () => void;
   newMessageCount?: number;
   selectedMode?: string | null;
   onModeDeselect?: () => void;
@@ -165,6 +166,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
       showToLowCreditUsers = true,
       showScrollToBottomIndicator = false,
       onScrollToBottom,
+      onScrollToTop,
       newMessageCount = 0,
       selectedMode,
       onModeDeselect,
@@ -635,13 +637,32 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
             isVisible={showToolPreview || !!showSnackbar}
           />
 
-          {/* Scroll to bottom button */}
-          {showScrollToBottomIndicator && onScrollToBottom && (
+          {/* Scroll controls: top and bottom */}
+          {showScrollToBottomIndicator && (onScrollToBottom || onScrollToTop) && (
             <div className="relative">
+              {onScrollToTop && (
+                <button
+                  onClick={onScrollToTop}
+                  className={`absolute cursor-pointer right-3 z-50 w-9 h-9 rounded-full transition-all duration-200 hover:scale-105 flex items-center justify-center backdrop-blur-md shadow-md ${
+                    // Glassy look
+                    'bg-white/30 dark:bg-white/10 border border-white/20 dark:border-white/10'
+                  } ${
+                    // Position further up above the down arrow
+                    showToolPreview || !!showSnackbar ? 'bottom-28' : 'bottom-20'
+                  }`}
+                  title="Scroll to top"
+                >
+                  <ArrowUp className="w-4 h-4 text-black/70 dark:text-white/70" />
+                </button>
+              )}
               <button
                 onClick={onScrollToBottom}
-                className={`absolute cursor-pointer right-3 z-50 w-8 h-8 rounded-full bg-card border border-border transition-all duration-200 hover:scale-105 flex items-center justify-center ${
-                  showToolPreview || !!showSnackbar ? '-top-12' : '-top-5'
+                className={`absolute cursor-pointer right-3 z-50 w-9 h-9 rounded-full transition-all duration-200 hover:scale-105 flex items-center justify-center backdrop-blur-md shadow-md ${
+                  // Glassy look
+                  'bg-white/30 dark:bg-white/10 border border-white/20 dark:border-white/10'
+                } ${
+                  // Position further up
+                  showToolPreview || !!showSnackbar ? 'bottom-16' : 'bottom-10'
                 } ${
                   newMessageCount > 0 
                     ? 'animate-pulse shadow-lg shadow-blue-500/50 ring-2 ring-blue-500/30' 
@@ -649,7 +670,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                 }`}
                 title={`Scroll to bottom${newMessageCount > 0 ? ` (${newMessageCount} new message${newMessageCount > 1 ? 's' : ''})` : ''}`}
               >
-                <ArrowDown className="w-4 h-4 text-muted-foreground" />
+                <ArrowDown className="w-4 h-4 text-black/70 dark:text-white/70" />
               </button>
               
               {/* Notification badge */}

@@ -26,7 +26,7 @@ interface GranularToolConfigurationProps {
   tools: Record<string, any>;
   onToolsChange: (tools: Record<string, any>) => void;
   disabled?: boolean;
-  isSunaAgent?: boolean;
+  isIrisAgent?: boolean;
   isLoading?: boolean;
 }
 
@@ -34,7 +34,7 @@ export const GranularToolConfiguration = ({
   tools, 
   onToolsChange, 
   disabled = false, 
-  isSunaAgent = false, 
+  isIrisAgent = false, 
   isLoading = false 
 }: GranularToolConfigurationProps) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -86,9 +86,9 @@ export const GranularToolConfiguration = ({
   const handleToolGroupToggle = (toolName: string, enabled: boolean) => {
     const toolGroup = getToolGroup(toolName, toolsData);
     
-    if (disabled && isSunaAgent) {
+    if (disabled && isIrisAgent) {
       toast.error("Tools cannot be modified", {
-        description: "Suna's default tools are managed centrally and cannot be changed.",
+        description: "Iris's default tools are managed centrally and cannot be changed.",
       });
       return;
     }
@@ -128,9 +128,9 @@ export const GranularToolConfiguration = ({
     const toolGroup = getToolGroup(toolName, toolsData);
     const method = toolGroup?.methods.find(m => m.name === methodName);
     
-    if (disabled && isSunaAgent) {
+    if (disabled && isIrisAgent) {
       toast.error("Methods cannot be modified", {
-        description: "Suna's default tool methods are managed centrally and cannot be changed.",
+        description: "Iris's default tool methods are managed centrally and cannot be changed.",
       });
       return;
     }

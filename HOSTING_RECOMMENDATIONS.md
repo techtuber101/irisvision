@@ -1,4 +1,4 @@
-# Hosting Recommendations for Iris/Suna
+# Hosting Recommendations for Iris/Iris
 
 ## Quick Summary
 

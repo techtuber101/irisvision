@@ -33,7 +33,7 @@ interface Agent {
     version_number: number;
   };
   metadata?: {
-    is_suna_default?: boolean;
+    is_iris_default?: boolean;
     centrally_managed?: boolean;
     restrictions?: {
       system_prompt_editable?: boolean;
@@ -84,7 +84,7 @@ const AgentModal: React.FC<AgentModalProps> = ({
 }) => {
   if (!agent) return null;
 
-  const isSunaAgent = agent.metadata?.is_suna_default || false;
+  const isIrisAgent = agent.metadata?.is_iris_default || false;
   
   const truncateDescription = (text?: string, maxLength = 120) => {
     if (!text || text.length <= maxLength) return text || 'Try out this agent';
@@ -102,7 +102,7 @@ const AgentModal: React.FC<AgentModalProps> = ({
               iconColor={agent.icon_color}
               backgroundColor={agent.icon_background}
               agentName={agent.name}
-              isSunaDefault={isSunaAgent}
+              isIrisDefault={isIrisAgent}
               size={64}
             />
           </div>
@@ -113,7 +113,7 @@ const AgentModal: React.FC<AgentModalProps> = ({
                 <h2 className="text-xl font-semibold text-foreground">
                   {agent.name}
                 </h2>
-                {!isSunaAgent && agent.current_version && (
+                {!isIrisAgent && agent.current_version && (
                   <Badge variant="outline" className="text-xs">
                     <GitBranch className="h-3 w-3" />
                     {agent.current_version.version_name}
@@ -145,7 +145,7 @@ const AgentModal: React.FC<AgentModalProps> = ({
                 Chat
               </Button>
             </div>
-            {!isSunaAgent && isStagingMode && (
+            {!isIrisAgent && isStagingMode && (
               <div className="pt-2">
                 {agent.is_public ? (
                   <div className="space-y-2">

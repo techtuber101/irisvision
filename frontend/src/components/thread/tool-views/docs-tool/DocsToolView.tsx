@@ -310,8 +310,8 @@ export function DocsToolView({
   
   return (
     <>
-    <Card className="gap-0 flex border shadow-none border-t border-b-0 border-x-0 p-0 rounded-none flex-col h-full overflow-hidden bg-[rgba(7,10,17,0.95)] backdrop-blur-xl">
-      <CardHeader className="h-14 bg-[rgba(7,10,17,0.95)] backdrop-blur-xl border-b border-white/10 p-2 px-4 space-y-2">
+    <Card className="gap-0 flex border shadow-none border-t border-b-0 border-x-0 p-0 rounded-none flex-col h-full overflow-hidden bg-[rgba(7,10,17,0.95)] backdrop-blur-xl light:bg-white light:text-zinc-800 light:border-black/10">
+      <CardHeader className="h-14 bg-[rgba(7,10,17,0.95)] backdrop-blur-xl border-b border-white/10 p-2 px-4 space-y-2 light:bg-white light:border-black/10">
         <div className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="relative p-2 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-600/10 border border-blue-500/20">
@@ -335,7 +335,7 @@ export function DocsToolView({
                   size="sm"
                   variant="outline"
                   disabled={isEditLoading}
-                  className="bg-white/5 border-white/10 text-white/90 hover:bg-white/10 hover:border-white/20 backdrop-blur-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-white/5 border-white/10 text-white/90 hover:bg-white/10 hover:border-white/20 backdrop-blur-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed light:bg-white light:text-zinc-800 light:border-black/10 light:hover:bg-black/5 light:hover:border-black/20"
                   onClick={() => {
                     if (!data.document) return;
                     let content = data.document.content || '';
@@ -364,33 +364,31 @@ export function DocsToolView({
                       size="sm" 
                       variant="outline" 
                       disabled={isExporting}
-                      className="bg-white/5 border-white/10 text-white/90 hover:bg-white/10 hover:border-white/20 backdrop-blur-sm transition-all duration-200 disabled:opacity-50"
+                      className="bg-white/5 border-white/10 text-white/90 hover:bg-white/10 hover:border-white/20 backdrop-blur-sm transition-all duration-200 disabled:opacity-50 light:bg-white light:text-zinc-800 light:text-base light:border-black/10 light:hover:bg-black/5 light:hover:border-black/20"
                     >
                       {isExporting ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <Loader2 className="h-3 w-3 animate-spin light:h-4 light:w-4" />
                       ) : (
-                        <Download className="h-3 w-3" />
+                        <Download className="h-3 w-3 light:h-4 light:w-4" />
                       )}
                       Export
-                      <ChevronDown className="h-3 w-3" />
+                      <ChevronDown className="h-3 w-3 light:h-4 light:w-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent 
                     align="end"
-                    className="bg-[rgba(7,10,17,0.95)] border-white/10 backdrop-blur-xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)]"
+                    className="bg-[rgba(7,10,17,0.95)] border-white/10 backdrop-blur-xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] light:bg-white light:border-black/10 light:shadow-none"
                   >
                     {/* First: Export As Text */}
                     <DropdownMenuItem 
                       onClick={() => handleExport('txt')}
-                      className="text-white/90 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                      className="text-white/90 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white light:text-zinc-800 light:hover:bg-white/60 light:hover:text-zinc-900 light:focus:bg-white/60 light:focus:text-zinc-900"
                     >
                       <div className="flex items-center gap-3">
                         <img
                           src={FILE_TYPE_ICONS.txt}
                           alt="Text file icon"
-                          width={20}
-                          height={20}
-                          className="flex-shrink-0 bg-white rounded-sm p-1"
+                          className="flex-shrink-0 bg-white rounded-sm p-1 w-5 h-5 light:w-6 light:h-6"
                           onError={(e) => {
                             console.error('Failed to load text icon:', FILE_TYPE_ICONS.txt, e);
                             // Fallback to a different icon
@@ -405,7 +403,7 @@ export function DocsToolView({
                     {/* Second: Export As PDF */}
                     <DropdownMenuItem 
                       onClick={() => handleExport('pdf')}
-                      className="text-white/90 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                      className="text-white/90 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white light:text-zinc-800 light:hover:bg-white/60 light:hover:text-zinc-900 light:focus:bg-white/60 light:focus:text-zinc-900"
                     >
                       <div className="flex items-center gap-3">
                         <img
@@ -422,7 +420,7 @@ export function DocsToolView({
                     {/* Third: Export as DOCX */}
                     <DropdownMenuItem 
                       onClick={() => handleExport('docx')}
-                      className="text-white/90 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                      className="text-white/90 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white light:text-zinc-800 light:hover:bg-white/60 light:hover:text-zinc-900 light:focus:bg-white/60 light:focus:text-zinc-900"
                     >
                       <div className="flex items-center gap-3">
                         <img
@@ -440,7 +438,7 @@ export function DocsToolView({
                     <DropdownMenuItem 
                       onClick={() => handleExport('images')}
                       disabled={true}
-                      className="text-white/50 hover:bg-white/5 hover:text-white/50 focus:bg-white/5 focus:text-white/50 cursor-not-allowed"
+                      className="text-white/50 hover:bg-white/5 hover:text-white/50 focus:bg-white/5 focus:text-white/50 cursor-not-allowed light:text-zinc-400 light:hover:bg-black/5 light:hover:text-zinc-500 light:focus:bg-black/5 light:focus:text-zinc-500"
                     >
                       <div className="flex items-center gap-3">
                         <img
@@ -459,7 +457,7 @@ export function DocsToolView({
                       <DropdownMenuItem 
                         onClick={() => handleExport('google-docs')}
                         disabled={true}
-                        className="text-white/50 hover:bg-white/5 hover:text-white/50 focus:bg-white/5 focus:text-white/50 cursor-not-allowed"
+                        className="text-white/50 hover:bg-white/5 hover:text-white/50 focus:bg-white/5 focus:text-white/50 cursor-not-allowed light:text-zinc-400 light:hover:bg-black/5 light:hover:text-zinc-500 light:focus:bg-black/5 light:focus:text-zinc-500"
                       >
                         <div className="flex items-center gap-3">
                           <img

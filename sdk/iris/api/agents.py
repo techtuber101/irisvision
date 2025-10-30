@@ -261,7 +261,7 @@ def from_dict(cls, data: Dict[str, Any]):
 
 
 class AgentsClient:
-    """SDK client for Kortix Agents API with httpx client supporting custom headers"""
+    """SDK client for Iris Agents API with httpx client supporting custom headers"""
 
     def __init__(
         self,
@@ -274,7 +274,7 @@ class AgentsClient:
         Initialize the Agents API client
 
         Args:
-            base_url: Base URL of the API (e.g., "https://api.suna.so/api")
+            base_url: Base URL of the API (e.g., "https://api.iris.so/api")
             auth_token: JWT token for authentication
             custom_headers: Additional headers to include in all requests
             timeout: Request timeout in seconds

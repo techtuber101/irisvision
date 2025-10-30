@@ -61,7 +61,7 @@ jobs:
           file: ./backend/Dockerfile
           push: true
           platforms: linux/amd64
-          tags: ghcr.io/${{ github.repository }}/suna-backend:${{ steps.get_tag_name.outputs.branch }}
+          tags: ghcr.io/${{ github.repository }}/iris-backend:${{ steps.get_tag_name.outputs.branch }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -73,7 +73,7 @@ jobs:
           username: ${{ secrets.STAGING_USERNAME }}
           key: ${{ secrets.STAGING_KEY }}
           script: |
-            cd /home/suna/backend
+            cd /home/iris/backend
             git fetch origin main
             git reset --hard origin/main
             docker compose build
@@ -87,6 +87,6 @@ jobs:
           username: ${{ secrets.PROD_USERNAME }}
           key: ${{ secrets.PROD_KEY }}
           script: |
-            cd /mnt/gluster-shared/data/infra/suna
+            cd /mnt/gluster-shared/data/infra/iris
             set -a; source .env; set +a
-            docker stack deploy -c docker-compose.yml suna
+            docker stack deploy -c docker-compose.yml iris

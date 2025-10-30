@@ -6,7 +6,7 @@ async function installIrisForNewUser(userId: string) {
     const adminApiKey = process.env.IRIS_ADMIN_API_KEY;
     
     if (!adminApiKey) {
-      console.error('IRIS_ADMIN_API_KEY not configured - cannot install Iris agent');
+      console.error('IRIS_ADMIN_API_KEY not configured - cannot install iris agent');
       return;
     }
   

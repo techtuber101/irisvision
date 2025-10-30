@@ -552,8 +552,8 @@ class TriggerTool(AgentBuilderBaseTool):
             if not composio_trigger_id:
                 return self.fail_response("Failed to get Composio trigger id from response")
             
-            # Build Suna trigger config (same as API)
-            suna_config: Dict[str, Any] = {
+            # Build Iris trigger config (same as API)
+            iris_config: Dict[str, Any] = {
                 "provider_id": "composio",
                 "composio_trigger_id": composio_trigger_id,
                 "trigger_slug": slug,
@@ -564,22 +564,22 @@ class TriggerTool(AgentBuilderBaseTool):
             
             # Add variables to config if any were found
             if variables:
-                suna_config["trigger_variables"] = variables
+                iris_config["trigger_variables"] = variables
                 logger.debug(f"Found variables in event trigger prompt: {variables}")
             
-            # Create Suna trigger
+            # Create Iris trigger
             trigger_svc = get_trigger_service(self.db)
             try:
                 trigger = await trigger_svc.create_trigger(
                     agent_id=self.agent_id,
                     provider_id="composio",
                     name=name or slug,
-                    config=suna_config,
+                    config=iris_config,
                     description=f"{slug}"
                 )
             except Exception as e:
-                logger.error(f"Failed to create Suna trigger: {e}")
-                return self.fail_response(f"Failed to create Suna trigger: {str(e)}")
+                logger.error(f"Failed to create Iris trigger: {e}")
+                return self.fail_response(f"Failed to create Iris trigger: {str(e)}")
 
             # Sync triggers to version config
             try:

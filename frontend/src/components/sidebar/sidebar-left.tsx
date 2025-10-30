@@ -178,24 +178,24 @@ export function SidebarLeft({
         backgroundSize: '40px 40px'
       }}></div>
       <SidebarHeader className="px-2 py-1 relative z-10">
-        <div className="flex h-[48px] items-center px-1 relative">
-          <Link href="/dashboard" className="flex-shrink-0" onClick={() => isMobile && setOpenMobile(false)}>
+        <div className={cn("flex h-[48px] items-center px-1 relative", state === 'collapsed' ? 'justify-center' : '')}>
+          <Link href="/dashboard" className={cn("flex-shrink-0", state === 'collapsed' ? 'ml-[3px]' : '')} onClick={() => isMobile && setOpenMobile(false)}>
             {state === 'collapsed' ? (
               <>
                 <Image
                   src="/irissymbolblack.png"
                   alt="Iris Symbol"
-                  width={48}
-                  height={48}
-                  className="w-12 h-12 dark:hidden"
+                  width={32}
+                  height={32}
+                  className="w-8 h-8 dark:hidden"
                   priority
                 />
                 <Image
                   src="/irissymbolwhite.png"
                   alt="Iris Symbol"
-                  width={48}
-                  height={48}
-                  className="w-12 h-12 hidden dark:block"
+                  width={32}
+                  height={32}
+                  className="w-8 h-8 hidden dark:block"
                   priority
                 />
               </>
@@ -206,7 +206,7 @@ export function SidebarLeft({
                   alt="Iris Logo"
                   width={260}
                   height={46}
-                  className="h-12 w-auto dark:hidden"
+                  className="h-8 w-auto dark:hidden"
                   priority
                 />
                 <Image
@@ -214,7 +214,7 @@ export function SidebarLeft({
                   alt="Iris Logo"
                   width={180}
                   height={32}
-                  className="h-8 w-auto hidden dark:block"
+                  className="h-6 w-auto hidden dark:block"
                   priority
                 />
               </>

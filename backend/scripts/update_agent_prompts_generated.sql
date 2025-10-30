@@ -2620,14 +2620,14 @@ WHERE
         config->>'system_prompt' IS NULL 
         OR config->>'system_prompt' = ''
         OR config->'metadata'->>'centrally_managed' = 'true'
-        OR metadata->>'is_suna_default' = 'true'
+        OR metadata->>'is_iris_default' = 'true'
     )
     -- Don't update agents that have custom prompts
     AND NOT (
         config->>'system_prompt' IS NOT NULL 
         AND config->>'system_prompt' != ''
         AND config->'metadata'->>'centrally_managed' = 'false'
-        AND metadata->>'is_suna_default' != 'true'
+        AND metadata->>'is_iris_default' != 'true'
     );
 
 -- Also update agent versions that are centrally managed
@@ -5274,7 +5274,7 @@ SELECT
     name,
     account_id,
     CASE 
-        WHEN metadata->>'is_suna_default' = 'true' THEN 'Default Agent'
+        WHEN metadata->>'is_iris_default' = 'true' THEN 'Default Agent'
         WHEN config->'metadata'->>'centrally_managed' = 'true' THEN 'Centrally Managed'
         ELSE 'Custom Agent'
     END as agent_type,

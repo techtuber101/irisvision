@@ -159,7 +159,7 @@ export const TaskListToolView: React.FC<ToolViewProps> = ({
                 backgroundSize: '100px 100px',
                 mixBlendMode: 'overlay'
               }} />
-              <span className="relative z-10 text-xs font-medium text-emerald-300">{completedTasks}/{totalTasks} tasks accomplished</span>
+              <span className="relative z-10 text-xs font-medium text-emerald-300 light:text-green-600">{completedTasks}/{totalTasks} tasks accomplished</span>
             </div>
           </div>
         </div>

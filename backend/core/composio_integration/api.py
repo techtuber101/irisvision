@@ -819,8 +819,8 @@ async def create_composio_trigger(req: CreateComposioTriggerRequest, current_use
         if not composio_trigger_id:
             raise HTTPException(status_code=500, detail="Failed to get Composio trigger id from response")
 
-        # Build Suna trigger config
-        suna_config: Dict[str, Any] = {
+        # Build Iris trigger config
+        iris_config: Dict[str, Any] = {
             "provider_id": "composio",
             "composio_trigger_id": composio_trigger_id,
             "trigger_slug": req.slug,
@@ -830,15 +830,15 @@ async def create_composio_trigger(req: CreateComposioTriggerRequest, current_use
             **coerced_config,
         }
         if req.agent_prompt:
-            suna_config["agent_prompt"] = req.agent_prompt
+            iris_config["agent_prompt"] = req.agent_prompt
 
-        # Create Suna trigger
+        # Create Iris trigger
         trigger_service = get_trigger_service(db)
         trigger = await trigger_service.create_trigger(
             agent_id=req.agent_id,
             provider_id="composio",
             name=req.name or f"{req.slug}",
-            config=suna_config,
+            config=iris_config,
             description=f"Composio event: {req.slug}"
         )
 

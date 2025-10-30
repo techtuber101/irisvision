@@ -1,5 +1,5 @@
 [project]
-name = "suna"
+name = "iris"
 version = "1.0"
 description = "open source generalist AI Worker"
 authors = [{ name = "marko-kraemer", email = "mail@markokraemer.com" }]
@@ -92,8 +92,8 @@ dependencies = [
 ]
 
 [project.urls]
-homepage = "https://www.suna.so/"
-repository = "https://github.com/kortix-ai/suna"
+homepage = "https://www.iris.so/"
+repository = "https://github.com/iris-ai/iris"
 
 [tool.uv]
 package = false

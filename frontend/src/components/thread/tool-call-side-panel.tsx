@@ -300,6 +300,13 @@ export function ToolCallSidePanel({
     setVncRefreshKey(prev => prev + 1);
   }, []);
 
+  // Broadcast open/close state so layout can react (e.g., adjust sidebar width)
+  React.useEffect(() => {
+    try {
+      window.dispatchEvent(new CustomEvent('tool-panel-open', { detail: { open: isOpen } }));
+    } catch {}
+  }, [isOpen]);
+
   const persistentVncIframe = useMemo(() => {
     if (!sandbox || !sandbox.vnc_preview || !sandbox.pass || !sandbox.id) return null;
     

@@ -98,7 +98,12 @@ export function useToolCalls(
         userClosedPanelRef.current = true;
       }
       if (newState) {
-        setLeftSidebarOpen(false);
+        // Defer sidebar state change to avoid React setState during render warning
+        if (typeof window !== 'undefined') {
+          setTimeout(() => setLeftSidebarOpen(false), 0);
+        } else {
+          setLeftSidebarOpen(false);
+        }
       }
       return newState;
     });

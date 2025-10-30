@@ -149,7 +149,7 @@ class ModelRegistry:
                 timeout=60.0,
                 num_retries=3,
                 extra_headers={
-                    "User-Agent": "Suna-AI-Agent/1.0"
+                    "User-Agent": "Iris-AI-Agent/1.0"
                 }
             ),
             metadata={
@@ -197,7 +197,7 @@ class ModelRegistry:
                 timeout=45.0,
                 num_retries=3,
                 extra_headers={
-                    "User-Agent": "Suna-AI-Agent/1.0"
+                    "User-Agent": "Iris-AI-Agent/1.0"
                 }
             )
         ))
@@ -230,7 +230,7 @@ class ModelRegistry:
                 timeout=90.0,
                 num_retries=2,
                 extra_headers={
-                    "User-Agent": "Suna-AI-Agent/1.0"
+                    "User-Agent": "Iris-AI-Agent/1.0"
                 }
             )
         ))

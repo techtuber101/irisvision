@@ -63,7 +63,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/kortix-splash.png",
+          "image": "./assets/images/iris-splash.png",
           "imageWidth": 400,
           "resizeMode": "contain",
           "backgroundColor": "#121215"

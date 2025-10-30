@@ -6,14 +6,14 @@ This directory contains utility scripts for backend operations.
 
 ### `update_default_agents.py`
 
-Automatically updates all default Iris agents with the latest configuration from `SUNA_CONFIG`.
+Automatically updates all default Iris agents with the latest configuration from `IRIS_CONFIG`.
 
 **What it does:**
-- Updates agent names from "Suna" → "Iris" if needed
-- Updates agent descriptions to match current config
-- Migrates metadata from `is_suna_default` → `is_iris_default`
-- Updates agent versions with latest system prompt and tools
-- Preserves user's custom MCP configurations
+- Ensures agent names remain set to "Iris"
+- Updates agent descriptions to match the current configuration
+- Migrates metadata from the legacy default flag to `is_iris_default`
+- Updates agent versions with the latest system prompt and tools
+- Preserves user-managed MCP configurations
 
 **When it runs:**
 - Automatically on every docker compose startup via `startup.sh`
@@ -32,7 +32,7 @@ This script is automatically executed when the Docker container starts. No manua
 
 - **Always Fresh**: Default agents automatically get the latest names, prompts, and configuration
 - **Zero Downtime**: Updates happen during startup before the app accepts requests
-- **Backward Compatible**: Safely handles both old (Suna) and new (Iris) metadata
+- **Backward Compatible**: Safely handles both old (Iris) and new (Iris) metadata
 - **User Data Preserved**: Custom MCPs, triggers, and user configurations are retained
 
 ## SQL Migration Scripts
@@ -58,7 +58,7 @@ Updates all agents with the latest system prompt from the backend.
 - Updates both `config` JSONB field and legacy `system_prompt` field
 - Contains the full Iris system prompt (5,000+ lines)
 
-### `update_default_iris_suna_prompts.sql`
+### `update_default_iris_prompts.sql`
 Synchronizes default agent prompts with backend's SYSTEM_PROMPT.
 
 **Purpose:** Update stored prompts for default agents across supported schemas
@@ -77,10 +77,10 @@ Legacy script for updating default agent prompts.
 
 The default agent configuration is defined in:
 ```
-backend/core/suna_config.py
+backend/core/iris_config.py
 ```
 
-To update the default agent setup, modify `SUNA_CONFIG` in that file. Changes will be applied on next container restart.
+To update the default agent setup, modify `IRIS_CONFIG` in that file. Changes will be applied on next container restart.
 
 ## Usage
 
@@ -93,7 +93,7 @@ To update the default agent setup, modify `SUNA_CONFIG` in that file. Changes wi
 # Connect to your Supabase database and run:
 psql -f backend/scripts/update_agent_prompts.sql
 psql -f backend/scripts/update_agent_prompts_generated.sql
-psql -f backend/scripts/update_default_iris_suna_prompts.sql
+psql -f backend/scripts/update_default_iris_prompts.sql
 ```
 
 **Manual Python Script:**
@@ -101,5 +101,4 @@ psql -f backend/scripts/update_default_iris_suna_prompts.sql
 cd backend
 uv run python scripts/update_default_agents.py
 ```
-
 

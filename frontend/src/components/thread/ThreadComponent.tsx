@@ -102,6 +102,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const [userInitiatedRun, setUserInitiatedRun] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isUserAtBottom, setIsUserAtBottom] = useState(true);
+  const [followNewMessages, setFollowNewMessages] = useState(true);
   const [newMessageCount, setNewMessageCount] = useState(0);
   const [showAgentLimitDialog, setShowAgentLimitDialog] = useState(false);
   const [agentLimitData, setAgentLimitData] = useState<{
@@ -335,6 +336,16 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const scrollToBottom = useCallback(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      setFollowNewMessages(true);
+      setNewMessageCount(0);
+    }
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    if (scrollContainerRef.current) {
+      const el = scrollContainerRef.current;
+      // With flex-col-reverse, older messages are at negative scrollTop
+      el.scrollTo({ top: -el.scrollHeight, behavior: 'smooth' });
     }
   }, []);
 
@@ -387,7 +398,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
 
       // Only auto-scroll to bottom if user is at the bottom, otherwise increment counter
       setTimeout(() => {
-        if (isUserAtBottom && scrollContainerRef.current) {
+        if (followNewMessages && scrollContainerRef.current) {
           scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
         } else if (!isUserAtBottom) {
           // User is scrolled up, increment new message count
@@ -395,7 +406,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         }
       }, 100);
     },
-    [setMessages, setAutoOpenedPanel, isUserAtBottom],
+    [setMessages, setAutoOpenedPanel, isUserAtBottom, followNewMessages],
   );
 
   const handleStreamStatusChange = useCallback(
@@ -512,6 +523,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
       setTimeout(() => {
         if (scrollContainerRef.current) {
           scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+          setFollowNewMessages(true);
         }
       }, 100);
 
@@ -1207,6 +1219,13 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
       // Track if user is at bottom (within threshold)
       const atBottom = scrollTop >= -threshold;
       setIsUserAtBottom(atBottom);
+      if (!atBottom) {
+        // User scrolled up; stop following new messages
+        if (followNewMessages) setFollowNewMessages(false);
+      } else {
+        // User returned to bottom; resume following
+        if (!followNewMessages) setFollowNewMessages(true);
+      }
       
       // Reset new message count when user scrolls to bottom
       if (atBottom && newMessageCount > 0) {
@@ -1226,7 +1245,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         scrollContainer.removeEventListener('scroll', handleScroll);
       };
     }
-  }, [messages, initialLoadCompleted, newMessageCount]);
+  }, [messages, initialLoadCompleted, newMessageCount, followNewMessages]);
 
   if (!initialLoadCompleted || isLoading) {
     return <ThreadSkeleton isSidePanelOpen={isSidePanelOpen} compact={compact} />;
@@ -1394,6 +1413,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
               defaultShowSnackbar="tokens"
               showScrollToBottomIndicator={showScrollToBottom}
               onScrollToBottom={scrollToBottom}
+              onScrollToTop={scrollToTop}
               initialChatMode={initialChatMode}
               onChatModeChange={handleChatModeChange}
             />
@@ -1536,6 +1556,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
               defaultShowSnackbar="tokens"
               showScrollToBottomIndicator={showScrollToBottom}
               onScrollToBottom={scrollToBottom}
+              onScrollToTop={scrollToTop}
               newMessageCount={newMessageCount}
               initialChatMode={initialChatMode}
               onChatModeChange={handleChatModeChange}

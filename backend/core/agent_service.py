@@ -274,8 +274,8 @@ class AgentService:
         
         if version_data:
             self.loader._apply_version_config(agent, version_data)
-        elif agent.is_suna_default:
-            self.loader._load_suna_config(agent)
+        elif agent.is_iris_default:
+            self.loader._load_iris_config(agent)
         else:
             # No config available, use empty defaults for filtering
             agent.configured_mcps = []
@@ -324,8 +324,8 @@ class AgentService:
             
             if version_data:
                 self.loader._apply_version_config(agent, version_data)
-            elif agent.is_suna_default:
-                self.loader._load_suna_config(agent)
+            elif agent.is_iris_default:
+                self.loader._load_iris_config(agent)
             
             configured_mcps = agent.configured_mcps or []
             agentpress_tools = agent.agentpress_tools or {}
@@ -364,8 +364,8 @@ class AgentService:
             if version_data:
                 self.loader._apply_version_config(agent, version_data)
                 agent.config_loaded = True
-            elif agent.is_suna_default:
-                self.loader._load_suna_config(agent)
+            elif agent.is_iris_default:
+                self.loader._load_iris_config(agent)
                 agent.config_loaded = True
             
             agent_datas.append(agent.to_dict())
@@ -411,7 +411,7 @@ class AgentService:
             "download_count": template_data.get('download_count', 0),
             "creator_name": agent_data.metadata.get('creator_name'),
             "creator_id": template_data.get('creator_id'),
-            "is_kortix_team": template_data.get('is_kortix_team', False)
+            "is_iris_team": template_data.get('is_iris_team', False)
         })
         
         return result 

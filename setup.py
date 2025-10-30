@@ -30,7 +30,7 @@ class Colors:
 
 # --- UI Helpers ---
 def print_banner():
-    """Prints the Suna setup banner."""
+    """Prints the Iris setup banner."""
     print(
         f"""
 {Colors.BLUE}{Colors.BOLD}
@@ -159,8 +159,8 @@ def load_existing_env_vars():
             "COMPOSIO_API_KEY": backend_env.get("COMPOSIO_API_KEY", ""),
             "COMPOSIO_WEBHOOK_SECRET": backend_env.get("COMPOSIO_WEBHOOK_SECRET", ""),
         },
-        "kortix": {
-            "KORTIX_ADMIN_API_KEY": backend_env.get("KORTIX_ADMIN_API_KEY", ""),
+        "iris": {
+            "IRIS_ADMIN_API_KEY": backend_env.get("IRIS_ADMIN_API_KEY", ""),
         },
         "frontend": {
             "NEXT_PUBLIC_SUPABASE_URL": frontend_env.get(
@@ -236,7 +236,7 @@ def generate_encryption_key():
 
 
 def generate_admin_api_key():
-    """Generates a secure admin API key for Kortix."""
+    """Generates a secure admin API key for iris."""
     # Generate 32 random bytes and encode as hex for a readable API key
     key_bytes = secrets.token_bytes(32)
     return key_bytes.hex()
@@ -269,7 +269,7 @@ class SetupWizard:
             "webhook": existing_env_vars["webhook"],
             "mcp": existing_env_vars["mcp"],
             "composio": existing_env_vars["composio"],
-            "kortix": existing_env_vars["kortix"],
+            "iris": existing_env_vars["iris"],
         }
 
         # Override with any progress data (in case user is resuming)
@@ -380,11 +380,11 @@ class SetupWizard:
             config_items.append(
                 f"{Colors.YELLOW}○{Colors.ENDC} Morph (recommended)")
 
-        # Check Kortix configuration
-        if self.env_vars["kortix"]["KORTIX_ADMIN_API_KEY"]:
-            config_items.append(f"{Colors.GREEN}✓{Colors.ENDC} Kortix Admin")
+        # Check iris configuration
+        if self.env_vars["iris"].get("IRIS_ADMIN_API_KEY"):
+            config_items.append(f"{Colors.GREEN}✓{Colors.ENDC} iris Admin")
         else:
-            config_items.append(f"{Colors.YELLOW}○{Colors.ENDC} Kortix Admin")
+            config_items.append(f"{Colors.YELLOW}○{Colors.ENDC} iris Admin")
 
         if any("✓" in item for item in config_items):
             print_info("Current configuration status:")
@@ -396,7 +396,7 @@ class SetupWizard:
         """Runs the setup wizard."""
         print_banner()
         print(
-            "This wizard will guide you through setting up Suna, an open-source generalist AI Worker.\n"
+            "This wizard will guide you through setting up Iris, an open-source generalist AI Worker.\n"
         )
 
         # Show current configuration status
@@ -411,7 +411,7 @@ class SetupWizard:
             self.run_step(6, self.collect_morph_api_key)
             self.run_step(7, self.collect_search_api_keys)
             self.run_step(8, self.collect_rapidapi_keys)
-            self.run_step(9, self.collect_kortix_keys)
+            self.run_step(9, self.collect_iris_keys)
             # Supabase Cron does not require keys; ensure DB migrations enable cron functions
             self.run_step(10, self.collect_webhook_keys)
             self.run_step(11, self.collect_mcp_keys)
@@ -420,7 +420,7 @@ class SetupWizard:
             self.run_step(13, self.configure_env_files)
             self.run_step(14, self.setup_supabase_database)
             self.run_step(15, self.install_dependencies)
-            self.run_step(16, self.start_suna)
+            self.run_step(16, self.start_iris)
 
             self.final_instructions()
 
@@ -453,9 +453,9 @@ class SetupWizard:
             return
 
         print_info(
-            "You can start Suna using either Docker Compose or by manually starting the services."
+            "You can start Iris using either Docker Compose or by manually starting the services."
         )
-        print(f"\n{Colors.CYAN}How would you like to set up Suna?{Colors.ENDC}")
+        print(f"\n{Colors.CYAN}How would you like to set up Iris?{Colors.ENDC}")
         print(
             f"{Colors.CYAN}[1] {Colors.GREEN}Docker Compose{Colors.ENDC} {Colors.CYAN}(recommended, starts all services automatically){Colors.ENDC}"
         )
@@ -524,7 +524,7 @@ class SetupWizard:
             sys.exit(1)
 
         self.check_docker_running()
-        self.check_suna_directory()
+        self.check_iris_directory()
 
     def check_docker_running(self):
         """Checks if the Docker daemon is running."""
@@ -545,7 +545,7 @@ class SetupWizard:
             )
             sys.exit(1)
 
-    def check_suna_directory(self):
+    def check_iris_directory(self):
         """Checks if the script is run from the correct project root directory."""
         print_info("Verifying project structure...")
         required_dirs = ["backend", "frontend"]
@@ -554,18 +554,18 @@ class SetupWizard:
         for directory in required_dirs:
             if not os.path.isdir(directory):
                 print_error(
-                    f"'{directory}' directory not found. Make sure you're in the Suna repository root."
+                    f"'{directory}' directory not found. Make sure you're in the Iris repository root."
                 )
                 sys.exit(1)
 
         for file in required_files:
             if not os.path.isfile(file):
                 print_error(
-                    f"'{file}' not found. Make sure you're in the Suna repository root."
+                    f"'{file}' not found. Make sure you're in the Iris repository root."
                 )
                 sys.exit(1)
 
-        print_success("Suna repository detected.")
+        print_success("Iris repository detected.")
         return True
 
     def _get_input(
@@ -657,7 +657,7 @@ class SetupWizard:
             )
         else:
             print_info(
-                "Suna uses Daytona for sandboxing. Visit https://app.daytona.io/ to create an account."
+                "Iris uses Daytona for sandboxing. Visit https://app.daytona.io/ to create an account."
             )
             print_info("Then, generate an API key from the 'Keys' menu.")
             input("Press Enter to continue once you have your API key...")
@@ -680,7 +680,7 @@ class SetupWizard:
         print_success("Daytona information saved.")
 
         print_warning(
-            "IMPORTANT: You must create a Suna snapshot in Daytona for it to work properly."
+            "IMPORTANT: You must create a Iris snapshot in Daytona for it to work properly."
         )
         print_info(
             f"Visit {Colors.GREEN}https://app.daytona.io/dashboard/snapshots{Colors.ENDC}{Colors.CYAN} to create a snapshot."
@@ -716,7 +716,7 @@ class SetupWizard:
             )
         else:
             print_info(
-                "Suna requires at least one LLM provider. Supported: OpenAI, Anthropic, Google Gemini, OpenRouter."
+                "Iris requires at least one LLM provider. Supported: OpenAI, Anthropic, Google Gemini, OpenRouter."
             )
 
         # Don't clear existing keys if we're updating
@@ -791,7 +791,7 @@ class SetupWizard:
             print_info("AI-powered code editing is enabled using Morph.")
             return
 
-        print_info("Suna uses Morph for fast, intelligent code editing.")
+        print_info("Iris uses Morph for fast, intelligent code editing.")
         print_info(
             "This is optional but highly recommended for the best experience.")
 
@@ -849,7 +849,7 @@ class SetupWizard:
             )
         else:
             print_info(
-                "Suna uses Tavily for search, Firecrawl for web scraping, and Exa for people search.")
+                "Iris uses Tavily for search, Firecrawl for web scraping, and Exa for people search.")
             print_info(
                 "Get a Tavily key at https://tavily.com, a Firecrawl key at https://firecrawl.dev, "
                 "and an Exa key at https://exa.ai"
@@ -947,24 +947,24 @@ class SetupWizard:
         else:
             print_info("Skipping RapidAPI key.")
 
-    def collect_kortix_keys(self):
-        """Generates or configures the Kortix admin API key."""
-        print_step(9, self.total_steps, "Configuring Kortix Admin API Key")
+    def collect_iris_keys(self):
+        """Generates or configures the iris admin API key."""
+        print_step(9, self.total_steps, "Configuring iris Admin API Key")
 
         # Check if we already have a value configured
-        existing_key = self.env_vars["kortix"]["KORTIX_ADMIN_API_KEY"]
+        existing_key = self.env_vars["iris"].get("IRIS_ADMIN_API_KEY")
         if existing_key:
             print_info(
-                f"Found existing Kortix admin API key: {mask_sensitive_value(existing_key)}"
+                f"Found existing iris admin API key: {mask_sensitive_value(existing_key)}"
             )
             print_info("Using existing admin API key.")
         else:
             print_info(
-                "Generating a secure admin API key for Kortix administrative functions...")
-            self.env_vars["kortix"]["KORTIX_ADMIN_API_KEY"] = generate_admin_api_key()
-            print_success("Kortix admin API key generated.")
+                "Generating a secure admin API key for iris administrative functions...")
+            self.env_vars["iris"]["IRIS_ADMIN_API_KEY"] = generate_admin_api_key()
+            print_success("iris admin API key generated.")
 
-        print_success("Kortix admin configuration saved.")
+        print_success("iris admin configuration saved.")
 
     def collect_mcp_keys(self):
         """Collects the MCP configuration."""
@@ -1049,7 +1049,7 @@ class SetupWizard:
             print_info(
                 "Webhook base URL is required for workflows to receive callbacks.")
             print_info(
-                "This must be a publicly accessible URL where Suna API can receive webhooks from Supabase Cron.")
+                "This must be a publicly accessible URL where Iris API can receive webhooks from Supabase Cron.")
             print_info(
                 "For local development, you can use services like ngrok or localtunnel to expose http://localhost:8000 to the internet.")
 
@@ -1100,12 +1100,12 @@ class SetupWizard:
             **self.env_vars["mcp"],
             **self.env_vars["composio"],
             **self.env_vars["daytona"],
-            **self.env_vars["kortix"],
+            **self.env_vars["iris"],
             "ENCRYPTION_KEY": encryption_key,
             "NEXT_PUBLIC_URL": "http://localhost:3000",
         }
 
-        backend_env_content = f"# Generated by Suna install script for '{self.env_vars['setup_method']}' setup\n\n"
+        backend_env_content = f"# Generated by Iris install script for '{self.env_vars['setup_method']}' setup\n\n"
         for key, value in backend_env.items():
             backend_env_content += f"{key}={value or ''}\n"
 
@@ -1122,10 +1122,10 @@ class SetupWizard:
             "NEXT_PUBLIC_BACKEND_URL": "http://localhost:8000/api",
             "NEXT_PUBLIC_URL": "http://localhost:3000",
             "NEXT_PUBLIC_ENV_MODE": "LOCAL",
-            "KORTIX_ADMIN_API_KEY": self.env_vars["kortix"]["KORTIX_ADMIN_API_KEY"],
+            "IRIS_ADMIN_API_KEY": self.env_vars["iris"]["IRIS_ADMIN_API_KEY"],
         }
 
-        frontend_env_content = "# Generated by Suna install script\n\n"
+        frontend_env_content = "# Generated by Iris install script\n\n"
         for key, value in frontend_env.items():
             frontend_env_content += f"{key}={value or ''}\n"
 
@@ -1271,11 +1271,11 @@ class SetupWizard:
                 "Please install dependencies manually and run the script again.")
             sys.exit(1)
 
-    def start_suna(self):
-        """Starts Suna using Docker Compose or shows instructions for manual startup."""
-        print_step(17, self.total_steps, "Starting Suna")
+    def start_iris(self):
+        """Starts Iris using Docker Compose or shows instructions for manual startup."""
+        print_step(17, self.total_steps, "Starting Iris")
         if self.env_vars["setup_method"] == "docker":
-            print_info("Starting Suna with Docker Compose...")
+            print_info("Starting Iris with Docker Compose...")
             try:
                 subprocess.run(
                     ["docker", "compose", "up", "-d", "--build"],
@@ -1292,13 +1292,13 @@ class SetupWizard:
                     shell=IS_WINDOWS,
                 )
                 if "backend" in result.stdout and "frontend" in result.stdout:
-                    print_success("Suna services are starting up!")
+                    print_success("Iris services are starting up!")
                 else:
                     print_warning(
                         "Some services might not be running. Check 'docker compose ps' for details."
                     )
             except subprocess.SubprocessError as e:
-                print_error(f"Failed to start Suna with Docker Compose: {e}")
+                print_error(f"Failed to start Iris with Docker Compose: {e}")
                 print_info(
                     "Try running 'docker compose up --build' manually to diagnose the issue."
                 )
@@ -1310,17 +1310,17 @@ class SetupWizard:
     def final_instructions(self):
         """Shows final instructions to the user."""
         print(
-            f"\n{Colors.GREEN}{Colors.BOLD}✨ Suna Setup Complete! ✨{Colors.ENDC}\n")
+            f"\n{Colors.GREEN}{Colors.BOLD}✨ Iris Setup Complete! ✨{Colors.ENDC}\n")
 
         print_info(
-            f"Suna is configured with your LLM API keys and ready to use."
+            f"Iris is configured with your LLM API keys and ready to use."
         )
         print_info(
             f"Delete the {Colors.RED}.setup_progress{Colors.ENDC} file to reset the setup."
         )
 
         if self.env_vars["setup_method"] == "docker":
-            print_info("Your Suna instance is ready to use!")
+            print_info("Your Iris instance is ready to use!")
             print("\nUseful Docker commands:")
             print(
                 f"  {Colors.CYAN}docker compose ps{Colors.ENDC}         - Check service status"
@@ -1329,14 +1329,14 @@ class SetupWizard:
                 f"  {Colors.CYAN}docker compose logs -f{Colors.ENDC}    - Follow logs"
             )
             print(
-                f"  {Colors.CYAN}docker compose down{Colors.ENDC}       - Stop Suna services"
+                f"  {Colors.CYAN}docker compose down{Colors.ENDC}       - Stop Iris services"
             )
             print(
-                f"  {Colors.CYAN}python start.py{Colors.ENDC}           - To start or stop Suna services"
+                f"  {Colors.CYAN}python start.py{Colors.ENDC}           - To start or stop Iris services"
             )
         else:
             print_info(
-                "To start Suna, you need to run these commands in separate terminals:"
+                "To start Iris, you need to run these commands in separate terminals:"
             )
             print(
                 f"\n{Colors.BOLD}1. Start Infrastructure (in project root):{Colors.ENDC}"
@@ -1358,7 +1358,7 @@ class SetupWizard:
                 f"{Colors.CYAN}   cd backend && uv run dramatiq run_agent_background{Colors.ENDC}"
             )
 
-        print("\nOnce all services are running, access Suna at: http://localhost:3000")
+        print("\nOnce all services are running, access Iris at: http://localhost:3000")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-# Suna Backend
+# Iris Backend
 
 ## Quick Setup
 

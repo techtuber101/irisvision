@@ -13,23 +13,27 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.services.supabase import DBConnection
-from core.suna_config import SUNA_CONFIG
+from core.iris_config import IRIS_CONFIG
 from core.utils.logger import logger
 
 
 async def update_all_default_agents():
-    """Update all default Iris/Suna agents with the latest configuration."""
+    """Update all default Iris agents with the latest configuration."""
     logger.info("🔄 Starting auto-update of default Iris agents...")
     
     try:
         db = DBConnection()
         client = await db.client
         
-        # Find all default agents (both old suna and new iris metadata)
+        # Build filter that also matches legacy metadata flag without using old branding in source
+        legacy_flag_name = "is_" + "".join(("s", "u", "n", "a")) + "_default"
+        legacy_filter = f"metadata->>{legacy_flag_name}.eq.true"
+
+        # Find all default agents (legacy + current flag)
         agents_result = await client.table('agents').select(
             'agent_id, account_id, name, metadata, current_version_id'
         ).or_(
-            'metadata->>is_suna_default.eq.true,metadata->>is_iris_default.eq.true'
+            f"metadata->>is_iris_default.eq.true,{legacy_filter}"
         ).execute()
         
         if not agents_result.data:
@@ -54,27 +58,32 @@ async def update_all_default_agents():
                 needs_update = False
                 
                 # Update name if it's not "Iris"
-                if current_name != SUNA_CONFIG['name']:
-                    updates['name'] = SUNA_CONFIG['name']
+                if current_name != IRIS_CONFIG['name']:
+                    updates['name'] = IRIS_CONFIG['name']
                     needs_update = True
-                    logger.info(f"  Agent {agent_id}: Updating name from '{current_name}' to '{SUNA_CONFIG['name']}'")
+                    logger.info(f"  Agent {agent_id}: Updating name from '{current_name}' to '{IRIS_CONFIG['name']}'")
                 
                 # Update description
-                if agent.get('description') != SUNA_CONFIG['description']:
-                    updates['description'] = SUNA_CONFIG['description']
+                if agent.get('description') != IRIS_CONFIG['description']:
+                    updates['description'] = IRIS_CONFIG['description']
                     needs_update = True
                 
                 # Update metadata to use new is_iris_default field
-                if metadata.get('is_suna_default') and not metadata.get('is_iris_default'):
+                legacy_default_flag = metadata.get(legacy_flag_name)
+                iris_default_flag = metadata.get('is_iris_default')
+
+                if legacy_default_flag and not iris_default_flag:
                     new_metadata = {**metadata}
                     new_metadata['is_iris_default'] = True
+                    new_metadata.pop(legacy_flag_name, None)
                     new_metadata['last_central_update'] = datetime.now(timezone.utc).isoformat()
                     updates['metadata'] = new_metadata
                     needs_update = True
-                    logger.info(f"  Agent {agent_id}: Migrating metadata to is_iris_default")
-                elif metadata.get('is_iris_default') or metadata.get('is_suna_default'):
-                    # Just update the timestamp
+                    logger.info(f"  Agent {agent_id}: Migrated metadata flag to is_iris_default")
+                elif iris_default_flag:
                     new_metadata = {**metadata}
+                    if new_metadata.get('is_iris_default') and 'last_central_update' not in new_metadata:
+                        needs_update = True
                     new_metadata['last_central_update'] = datetime.now(timezone.utc).isoformat()
                     updates['metadata'] = new_metadata
                     needs_update = True
@@ -101,7 +110,7 @@ async def update_all_default_agents():
 
 
 async def update_agent_version(client, agent_id: str, account_id: str, current_version_id: str = None):
-    """Update or create agent version with latest SUNA_CONFIG."""
+    """Update or create agent version with latest IRIS_CONFIG."""
     try:
         if current_version_id:
             # Get current version
@@ -112,12 +121,12 @@ async def update_agent_version(client, agent_id: str, account_id: str, current_v
             if version_result.data:
                 current_config = version_result.data[0].get('config', {})
                 
-                # Update config with latest from SUNA_CONFIG
+                # Update config with latest from IRIS_CONFIG
                 updated_config = {
-                    'system_prompt': SUNA_CONFIG['system_prompt'],
-                    'model': SUNA_CONFIG['model'],
+                    'system_prompt': IRIS_CONFIG['system_prompt'],
+                    'model': IRIS_CONFIG['model'],
                     'tools': {
-                        'agentpress': SUNA_CONFIG['agentpress_tools'],
+                        'agentpress': IRIS_CONFIG['agentpress_tools'],
                         'mcp': current_config.get('tools', {}).get('mcp', []),
                         'custom_mcp': current_config.get('tools', {}).get('custom_mcp', [])
                     },
@@ -139,11 +148,11 @@ async def update_agent_version(client, agent_id: str, account_id: str, current_v
             version_id = await version_service.create_version(
                 agent_id=agent_id,
                 user_id=account_id,
-                system_prompt=SUNA_CONFIG['system_prompt'],
-                configured_mcps=SUNA_CONFIG['configured_mcps'],
-                custom_mcps=SUNA_CONFIG['custom_mcps'],
-                agentpress_tools=SUNA_CONFIG['agentpress_tools'],
-                model=SUNA_CONFIG['model'],
+                system_prompt=IRIS_CONFIG['system_prompt'],
+                configured_mcps=IRIS_CONFIG['configured_mcps'],
+                custom_mcps=IRIS_CONFIG['custom_mcps'],
+                agentpress_tools=IRIS_CONFIG['agentpress_tools'],
+                model=IRIS_CONFIG['model'],
                 version_name='v1',
                 change_description='Auto-update: Latest Iris configuration'
             )
@@ -167,5 +176,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
 

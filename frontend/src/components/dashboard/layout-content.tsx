@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { SidebarLeft, FloatingMobileMenuButton } from '@/components/sidebar/sidebar-left';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { useAccounts } from '@/hooks/use-accounts';
@@ -27,6 +27,21 @@ interface DashboardLayoutContentProps {
 export default function DashboardLayoutContent({
   children,
 }: DashboardLayoutContentProps) {
+  const [isToolPanelOpen, setIsToolPanelOpen] = useState(false);
+
+  // Listen for tool panel open/close events to adjust sidebar width
+  useEffect(() => {
+    const handler = (e: Event) => {
+      try {
+        const detail = (e as CustomEvent).detail;
+        if (typeof detail?.open === 'boolean') {
+          setIsToolPanelOpen(detail.open);
+        }
+      } catch {}
+    };
+    window.addEventListener('tool-panel-open', handler as EventListener);
+    return () => window.removeEventListener('tool-panel-open', handler as EventListener);
+  }, []);
   const { user, isLoading } = useAuth();
   const { data: accounts } = useAccounts({ enabled: !!user });
   const personalAccount = accounts?.find((account) => account.personal_account);
@@ -108,7 +123,7 @@ export default function DashboardLayoutContent({
     <DeleteOperationProvider>
       <SubscriptionProvider>
         <OnboardingProvider>
-          <SidebarProvider>
+          <SidebarProvider style={{ ['--sidebar-width' as any]: isToolPanelOpen ? '16rem' : '20rem' }}>
             <SidebarLeft />
             <SidebarInset>
               {mantenanceBanner}

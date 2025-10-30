@@ -10,6 +10,15 @@ WORKDIR /app
 # Install dependencies based on the preferred package manager
 COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* .npmrc* ./
 
+# Make installs more resilient to transient network failures
+ENV npm_config_loglevel=warn \
+    npm_config_progress=false \
+    npm_config_fetch_retries=5 \
+    npm_config_fetch_retry_factor=2 \
+    npm_config_fetch_retry_maxtimeout=600000 \
+    npm_config_fetch_retry_mintimeout=10000 \
+    npm_config_network_timeout=600000
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
@@ -23,11 +32,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     librsvg2-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN \
-  if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
-  elif [ -f package-lock.json ]; then npm ci; \
-  elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
-  else echo "Lockfile not found." && exit 1; \
+RUN set -e; \
+  if [ -f yarn.lock ]; then \
+    for i in 1 2 3; do yarn --frozen-lockfile && break || (echo "yarn install failed (attempt $i), retrying in 10s" && sleep 10); done; \
+  elif [ -f package-lock.json ]; then \
+    npm config set fund false; \
+    npm config set audit false; \
+    for i in 1 2 3; do npm ci && break || (echo "npm ci failed (attempt $i), retrying in 10s" && sleep 10); done; \
+  elif [ -f pnpm-lock.yaml ]; then \
+    corepack enable pnpm; \
+    for i in 1 2 3; do pnpm i --frozen-lockfile && break || (echo "pnpm install failed (attempt $i), retrying in 10s" && sleep 10); done; \
+  else \
+    echo "Lockfile not found." && exit 1; \
   fi
 
 
