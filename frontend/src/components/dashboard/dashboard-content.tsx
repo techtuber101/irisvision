@@ -391,7 +391,7 @@ export function DashboardContent() {
                                 {(() => {
                                   const ThemeIcon = resolvedTheme === 'dark' ? Sun : Moon;
                                   const items = [
-                                    { key: 'home', Icon: Home, label: 'Homepage', onClick: () => router.push('/') },
+                                    { key: 'home', Icon: Home, label: 'Homepage', onClick: () => router.push('/homepage') },
                                     { key: 'notifications', Icon: Bell, label: 'Notifications', onClick: () => router.push('/notifications') },
                                     { key: 'personalisation', Icon: Lightbulb, label: 'Personalisation', onClick: () => router.push('/personalisation') },
                                     { key: 'theme', Icon: ThemeIcon, label: 'Theme', onClick: () => setTheme(resolvedTheme === 'light' ? 'dark' : 'light') },

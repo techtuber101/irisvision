@@ -5,6 +5,7 @@ import type { NextRequest } from 'next/server';
 // Routes that don't require authentication
 const PUBLIC_ROUTES = [
   '/', // Homepage should be public!
+  '/homepage', // Homepage route accessible to everyone (logged-in and non-logged-in)
   '/auth',
   '/auth/callback',
   '/auth/signup',
@@ -41,6 +42,50 @@ export async function middleware(request: NextRequest) {
     pathname.includes('.') ||
     pathname.startsWith('/api/')
   ) {
+    return NextResponse.next();
+  }
+
+  // Special handling for homepage: redirect logged-in users to dashboard
+  if (pathname === '/') {
+    let supabaseResponse = NextResponse.next({
+      request,
+    });
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+            supabaseResponse = NextResponse.next({
+              request,
+            });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              supabaseResponse.cookies.set(name, value, options)
+            );
+          },
+        },
+      }
+    );
+
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      // If user is logged in, redirect to dashboard
+      if (!authError && user) {
+        const url = request.nextUrl.clone();
+        url.pathname = '/dashboard';
+        return NextResponse.redirect(url);
+      }
+    } catch (error) {
+      console.error('Middleware error checking auth for homepage:', error);
+    }
+
+    // Allow non-logged-in users to access homepage
     return NextResponse.next();
   }
 

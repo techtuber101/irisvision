@@ -1,0 +1,37 @@
+#!/bin/bash
+# Script to verify SSH key setup on server
+
+echo "🔍 SSH Key Verification Helper"
+echo "=============================="
+echo ""
+echo "Your local key fingerprint:"
+ssh-keygen -l -f ~/.ssh/id_ed25519_vm.pub
+echo ""
+echo "Full public key:"
+cat ~/.ssh/id_ed25519_vm.pub
+echo ""
+echo ""
+echo "📋 Commands to run on SERVER (via E2E Console):"
+echo "----------------------------------------------"
+echo ""
+echo "1. Check if authorized_keys exists:"
+echo "   ls -la ~/.ssh/authorized_keys"
+echo ""
+echo "2. View current authorized_keys:"
+echo "   cat ~/.ssh/authorized_keys"
+echo ""
+echo "3. Check fingerprints on server:"
+echo "   ssh-keygen -l -f ~/.ssh/authorized_keys"
+echo ""
+echo "4. Check permissions:"
+echo "   ls -la ~/.ssh/"
+echo ""
+echo "5. If wrong key, replace it:"
+echo "   echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJHRBWvz5InTtrtIKFbC6VaI6qyNvGr2gAPQoZw05uDS debian-vm-access' > ~/.ssh/authorized_keys"
+echo "   chmod 600 ~/.ssh/authorized_keys"
+echo "   chmod 700 ~/.ssh"
+echo ""
+echo "📌 Expected fingerprint on server should match:"
+echo "   256 SHA256:oQGgAR095bszGuLeR8tkvvvlvTxnAuGg6LBQLm8X0fc debian-vm-access (ED25519)"
+echo ""
+
