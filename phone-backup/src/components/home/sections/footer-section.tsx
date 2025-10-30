@@ -104,7 +104,7 @@ export function FooterSection() {
 
               {/* Copyright */}
               <div className="text-sm text-muted-foreground">
-                © 2024 Iris AI. All rights reserved.
+                © 2025 Iris AI. All rights reserved.
               </div>
             </div>
           </div>

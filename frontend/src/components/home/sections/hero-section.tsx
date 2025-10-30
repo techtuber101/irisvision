@@ -125,37 +125,37 @@ function ChatBubble({ messages, onSend, samplePrompts }: { messages: ChatMessage
   };
 
   return (
-    <div className="relative">
+    <div className="relative h-full flex flex-col">
       {/* Main chat container with integrated input */}
       <div
         ref={listRef}
-        className={`relative min-h-[22vh] max-h-[38vh] overflow-y-auto rounded-2xl border border-white/10 bg-[rgba(7,10,17,0.95)] p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-all duration-300 ${
-          isTyping ? 'ring-1 ring-white/20' : ''
-        }`}
+        className="relative flex-1 min-h-[28vh] max-h-[48vh] overflow-y-auto px-5 pb-6 pt-3 transition-all duration-300"
       >
         {/* Messages */}
-        {messages.map((m) => (
-          <div key={m.id} className="mb-2 flex">
-            <div
-              className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed ring-1 shadow-[0_10px_20px_-10px_rgba(0,0,0,0.6)] ${
-                m.role === "user" ? "ml-auto bg-white/10 ring-white/15" : "bg-white/5 ring-white/10"
-              }`}
-            >
-              {m.content}
+        <div className="space-y-4">
+          {messages.map((m) => (
+            <div key={m.id} className="flex">
+              <div
+                className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ring-1 shadow-[0_10px_20px_-10px_rgba(0,0,0,0.6)] ${
+                  m.role === "user" ? "ml-auto bg-white/10 ring-white/15" : "bg-white/5 ring-white/10"
+                }`}
+              >
+                {m.content}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
 
         {/* Sample prompts */}
         {showPrompts && messages.length === 1 && (
-          <div className="mt-4 space-y-2">
-            <p className="text-xs text-white/50 mb-3">Try these examples:</p>
-            <div className="flex flex-wrap gap-2">
+          <div className="mt-8 space-y-3">
+            <p className="text-xs text-white/50 font-medium">Try these examples:</p>
+            <div className="flex flex-wrap gap-2.5">
               {samplePrompts.map((prompt, index) => (
                 <button
                   key={index}
                   onClick={() => handlePromptClick(prompt)}
-                  className="px-3 py-1.5 text-xs rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:border-white/20 transition-all duration-200"
+                  className="px-4 py-2 text-xs rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:border-white/20 transition-all duration-200"
                 >
                   {prompt}
                 </button>
@@ -163,32 +163,32 @@ function ChatBubble({ messages, onSend, samplePrompts }: { messages: ChatMessage
             </div>
           </div>
         )}
+      </div>
 
-        {/* Integrated input area */}
-        <div className="sticky bottom-0 mt-4 pt-3 border-t border-white/5">
-          <form onSubmit={submit} className="flex items-center gap-2">
-            <div className="flex-1 relative">
-              <input
-                ref={inputRef}
-                type="text"
-                aria-label="Ask Iris"
-                placeholder="Ask Iris anything…"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onFocus={handleInputFocus}
-                onBlur={handleInputBlur}
-                className="w-full h-11 rounded-2xl border border-white/15 bg-white/5 px-4 text-sm placeholder:text-white/40 outline-none ring-0 backdrop-blur-sm focus:border-white/25 focus:bg-white/8 transition-all duration-200"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={!text.trim()}
-              className="h-11 rounded-2xl border border-white/20 bg-white/10 px-4 text-sm text-white/90 transition-all duration-200 hover:border-white/30 hover:bg-white/15 active:translate-y-[1px] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Send
-            </button>
-          </form>
-        </div>
+      {/* Integrated input area */}
+      <div className="sticky bottom-0 px-5 pb-5 pt-8 border-t border-white/10 bg-gradient-to-t from-[rgba(10,14,22,0.95)] via-[rgba(10,14,22,0.8)] to-transparent">
+        <form onSubmit={submit} className="flex items-center gap-3">
+          <div className="flex-1 relative">
+            <input
+              ref={inputRef}
+              type="text"
+              aria-label="Ask Iris"
+              placeholder="Ask Iris anything…"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+              className="w-full h-12 rounded-2xl border border-white/15 bg-white/5 px-4 text-sm placeholder:text-white/40 outline-none ring-0 backdrop-blur-sm focus:border-white/25 focus:bg-white/8 transition-all duration-200"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={!text.trim()}
+            className="h-12 rounded-2xl border border-white/20 bg-white/10 px-6 text-sm font-medium text-white/90 transition-all duration-200 hover:border-white/30 hover:bg-white/15 active:translate-y-[1px] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Send
+          </button>
+        </form>
       </div>
     </div>
   );
@@ -295,82 +295,84 @@ const HeroSection: React.FC<HeroProps> = ({
 
         {/* Card stack */}
         <div className="relative mt-12 w-full max-w-6xl">
-          {/* Left placeholder card */}
-          <motion.div
-            initial={{ opacity: 0, x: -40, rotate: -6 }}
-            animate={{ opacity: 1, x: 0, rotate: -6 }}
-            transition={{ duration: 0.6, delay: 0.35 }}
-            whileHover={{ 
-              y: -12, 
-              scale: 1.02,
-              zIndex: 50,
-              transition: { duration: 0.4, ease: "easeOut" }
-            }}
-            className="absolute left-[-4%] top-8 hidden w-[42%] -rotate-6 p-6 md:block pointer-events-auto cursor-pointer group"
-          >
-            <GlassCard className="transition-all duration-400 group-hover:shadow-[0_20px_60px_-8px_rgba(0,0,0,0.8)] group-hover:ring-1 group-hover:ring-blue-400/20 group-hover:opacity-95">
-              <div className="p-6">
-                <div className="mb-4 flex items-center gap-2">
-                  <div className="h-6 w-6 rounded-full bg-white/10 ring-1 ring-white/15" />
-                  <div className="h-3 w-28 rounded bg-white/10" />
-        </div>
-                <PlaceholderCard direction="left" />
-        </div>
-            </GlassCard>
-          </motion.div>
-
-          {/* Right placeholder card */}
-          <motion.div
-            initial={{ opacity: 0, x: 40, rotate: 6 }}
-            animate={{ opacity: 1, x: 0, rotate: 6 }}
-            transition={{ duration: 0.6, delay: 0.38 }}
-            whileHover={{ 
-              y: -12, 
-              scale: 1.02,
-              zIndex: 50,
-              transition: { duration: 0.4, ease: "easeOut" }
-            }}
-            className="absolute right-[-4%] top-8 hidden w-[42%] rotate-6 p-6 md:block pointer-events-auto cursor-pointer group"
-          >
-            <GlassCard className="transition-all duration-400 group-hover:shadow-[0_20px_60px_-8px_rgba(0,0,0,0.8)] group-hover:ring-1 group-hover:ring-green-400/20 group-hover:opacity-95">
-              <div className="p-6">
-                <div className="mb-4 flex items-center gap-2">
-                  <div className="h-6 w-6 rounded-full bg-white/10 ring-1 ring-white/15" />
-                  <div className="h-3 w-28 rounded bg-white/10" />
-          </div>
-                <PlaceholderCard direction="right" />
-              </div>
-            </GlassCard>
-          </motion.div>
-
-          {/* Center interactive chat card */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.45 }}
-            className="relative z-10 mx-auto w-[92%] p-0 md:w-[58%]"
-          >
-            <GlassCard>
-              <div className="p-6 md:p-7">
-                <header className="mb-4 flex items-center gap-2">
-                  <div className="h-6 w-6 rounded-full bg-white/10 ring-1 ring-white/20 flex items-center justify-center">
-                    <img 
-                      src="/irislogoblack.png" 
-                      alt="Iris Logo" 
-                      className="h-4 w-4 dark:hidden"
-                    />
-                    <img 
-                      src="/irissymbolwhite.png" 
-                      alt="Iris Logo" 
-                      className="h-4 w-4 hidden dark:block"
-                    />
+          <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-6">
+            {/* Left placeholder card */}
+            <motion.div
+              initial={{ opacity: 0, x: -40 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.35 }}
+              whileHover={{ 
+                y: -12, 
+                scale: 1.02,
+                zIndex: 50,
+                transition: { duration: 0.4, ease: "easeOut" }
+              }}
+              className="hidden pointer-events-auto cursor-pointer group"
+            >
+              <GlassCard className="transition-all duration-400 group-hover:shadow-[0_20px_60px_-8px_rgba(0,0,0,0.8)] group-hover:ring-1 group-hover:ring-blue-400/20 group-hover:opacity-95">
+                <div className="p-6">
+                  <div className="mb-4 flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-full bg-white/10 ring-1 ring-white/15" />
+                    <div className="h-3 w-28 rounded bg-white/10" />
                   </div>
-                  <h3 className="text-sm font-medium text-white/80">Iris</h3>
-                </header>
-                <ChatBubble messages={messages} onSend={handleSend} samplePrompts={samplePrompts} />
+                  <PlaceholderCard direction="left" />
+                </div>
+              </GlassCard>
+            </motion.div>
+
+            {/* Center interactive chat card */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.45 }}
+              className="relative z-10 mx-auto w-[92%] md:w-[75%] p-0"
+            >
+              <GlassCard>
+                <div className="p-6 md:p-7">
+                  <header className="mb-4 flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-full bg-white/10 ring-1 ring-white/20 flex items-center justify-center">
+                      <img 
+                        src="/irislogoblack.png" 
+                        alt="Iris Logo" 
+                        className="h-4 w-4 dark:hidden"
+                      />
+                      <img 
+                        src="/irissymbolwhite.png" 
+                        alt="Iris Logo" 
+                        className="h-4 w-4 hidden dark:block"
+                      />
+                    </div>
+                    <h3 className="text-sm font-medium text-white/80">Iris</h3>
+                  </header>
+                  <ChatBubble messages={messages} onSend={handleSend} samplePrompts={samplePrompts} />
+                </div>
+              </GlassCard>
+            </motion.div>
+
+            {/* Right placeholder card */}
+            <motion.div
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.38 }}
+              whileHover={{ 
+                y: -12, 
+                scale: 1.02,
+                zIndex: 50,
+                transition: { duration: 0.4, ease: "easeOut" }
+              }}
+              className="hidden w-full md:w-[24%] pointer-events-auto cursor-pointer group"
+            >
+              <GlassCard className="transition-all duration-400 group-hover:shadow-[0_20px_60px_-8px_rgba(0,0,0,0.8)] group-hover:ring-1 group-hover:ring-green-400/20 group-hover:opacity-95">
+                <div className="p-6">
+                  <div className="mb-4 flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-full bg-white/10 ring-1 ring-white/15" />
+                    <div className="h-3 w-28 rounded bg-white/10" />
+                  </div>
+                  <PlaceholderCard direction="right" />
+                </div>
+              </GlassCard>
+            </motion.div>
           </div>
-            </GlassCard>
-          </motion.div>
         </div>
       </div>
     </section>
@@ -381,31 +383,41 @@ function PlaceholderCard({ direction }: { direction: "left" | "right" }) {
   if (direction === "left") {
     return (
       <div className="pointer-events-none select-none opacity-90">
-        {/* Vision Card - Real Content */}
+        {/* Create Card - What Iris Can Create */}
         <div className="mb-4 flex items-center gap-2">
           <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-400/20 to-purple-400/20 ring-1 ring-blue-400/30 flex items-center justify-center">
             <svg className="w-3 h-3 text-blue-300" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
             </svg>
           </div>
-          <span className="text-sm font-medium text-blue-300/80">Vision</span>
+          <span className="text-sm font-medium text-blue-300/80">What Iris Can Create</span>
         </div>
         
-        <div className="space-y-3">
-          <div className="p-3 rounded-lg bg-gradient-to-r from-blue-500/10 to-purple-500/10 ring-1 ring-blue-400/20">
-            <div className="text-xs text-blue-200/70 font-medium mb-1">Understanding You</div>
-            <div className="text-xs text-blue-300/60">I see your vision, and the end goal that you wish to achieve.</div>
+        <div className="space-y-2.5">
+          <div className="flex items-start gap-2.5">
+            <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-blue-400/60 flex-shrink-0" />
+            <span className="text-xs text-blue-300/80">Documents</span>
           </div>
-          <div className="p-3 rounded-lg bg-gradient-to-r from-blue-500/10 to-purple-500/10 ring-1 ring-blue-400/20">
-            <div className="text-xs text-blue-200/70 font-medium mb-1">Strategic Autonomous Planning</div>
-            <div className="text-xs text-blue-300/60"> Creating a comprehensive to-do list to execute this vision</div>
+          <div className="flex items-start gap-2.5">
+            <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-blue-400/60 flex-shrink-0" />
+            <span className="text-xs text-blue-300/80">Websites</span>
           </div>
-        </div>
-        
-        <div className="mt-4 flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-blue-400/60 animate-pulse" />
-          <span className="text-xs text-blue-300/70 font-medium">Vision → Plan</span>
+          <div className="flex items-start gap-2.5">
+            <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-blue-400/60 flex-shrink-0" />
+            <span className="text-xs text-blue-300/80">Presentations</span>
+          </div>
+          <div className="flex items-start gap-2.5">
+            <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-blue-400/60 flex-shrink-0" />
+            <span className="text-xs text-blue-300/80">Images</span>
+          </div>
+          <div className="flex items-start gap-2.5">
+            <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-blue-400/60 flex-shrink-0" />
+            <span className="text-xs text-blue-300/80">Apps</span>
+          </div>
+          <div className="flex items-start gap-2.5">
+            <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-blue-400/60 flex-shrink-0" />
+            <span className="text-xs text-blue-300/80">Reports</span>
+          </div>
         </div>
       </div>
     );

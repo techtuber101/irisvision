@@ -8,6 +8,7 @@ import { HeroSection } from '@/components/home/sections/hero-section';
 import { OpenSourceSection } from '@/components/home/sections/open-source-section';
 import { PricingSection } from '@/components/home/sections/pricing-section';
 import { UseCasesSection } from '@/components/home/sections/use-cases-section';
+import { MadeInIndiaSection } from '@/components/home/sections/made-in-india-section';
 import { ModalProviders } from '@/providers/modal-providers';
 import { HeroVideoSection } from '@/components/home/sections/hero-video-section';
 import { BackgroundAALChecker } from '@/components/auth/background-aal-checker';
@@ -43,6 +44,7 @@ export default function Home() {
           <div className="w-full divide-y divide-border">
             {/* Reference homepage structure with our providers/wrappers preserved */}
             <HeroSection />
+            <MadeInIndiaSection />
             <OpenSourceSection />
             <UseCasesSection />
             <div className='flex flex-col items-center px-4'>

@@ -6,6 +6,7 @@ import { siteConfig } from "@/lib/home";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 
 // ==============================
 // Glass primitives (match Hero)
@@ -135,8 +136,8 @@ function BillingToggle({
             )}
           >
             Yearly
-            <span className="ml-2 text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">
-              Save 17%
+            <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-medium">
+              Save 20%
             </span>
           </button>
         </div>
@@ -151,21 +152,168 @@ function BillingToggle({
 function getTierMeta(tierName: string) {
   const name = tierName.toLowerCase();
   if (name.includes("free")) {
-    return { showCoins: true, coins: "Free Forever", isEnterprise: false };
+    return { showCoins: true, coins: "Daily Coins Only", isEnterprise: false };
   }
   if (name.includes("air")) {
     return { showCoins: true, coins: "10,000 coins/month", isEnterprise: false };
   }
   if (name.includes("pro")) {
-    return { showCoins: true, coins: "25,000 coins/month", isEnterprise: false };
+    return { showCoins: true, coins: "30,000 coins/month", isEnterprise: false };
   }
   if (name.includes("ultra")) {
-    return { showCoins: true, coins: "50,000 coins/month", isEnterprise: false };
+    return { showCoins: true, coins: "60,000 coins/month", isEnterprise: false };
   }
   if (name.includes("enterprise")) {
     return { showCoins: false, coins: "", isEnterprise: true };
   }
   return { showCoins: true, coins: "1500 iris daily coins", isEnterprise: false };
+}
+
+// Floating tooltip rendered to body to avoid clipping
+function HoverTooltip({ label, children }: { label: string; children: React.ReactNode }) {
+  const [open, setOpen] = React.useState(false);
+  const [coords, setCoords] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  function onEnter(e: React.MouseEvent<HTMLSpanElement>) {
+    const rect = (e.currentTarget as HTMLSpanElement).getBoundingClientRect();
+    setCoords({ x: rect.left, y: rect.bottom + 6 });
+    setOpen(true);
+  }
+  function onMove(e: React.MouseEvent<HTMLSpanElement>) {
+    const rect = (e.currentTarget as HTMLSpanElement).getBoundingClientRect();
+    setCoords({ x: rect.left, y: rect.bottom + 6 });
+  }
+  function onLeave() {
+    setOpen(false);
+  }
+
+  return (
+    <>
+      <span
+        onMouseEnter={onEnter}
+        onMouseMove={onMove}
+        onMouseLeave={onLeave}
+        className="border-b border-dotted border-white/40 cursor-help"
+      >
+        {label}
+      </span>
+      {open && typeof window !== 'undefined'
+        ? createPortal(
+            <div
+              className="fixed z-[1000] w-64 p-4 rounded-2xl border border-white/10 bg-[rgba(10,14,22,0.95)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+              style={{ left: coords.x, top: coords.y }}
+            >
+              {/* Gradient rim */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 rounded-2xl"
+                style={{
+                  background:
+                    "linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))",
+                  WebkitMask: "linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)",
+                  WebkitMaskComposite: "xor" as any,
+                  maskComposite: "exclude",
+                  padding: 1,
+                  borderRadius: 16,
+                }}
+              />
+              {/* Specular streak */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 top-0 h-16"
+                style={{
+                  background:
+                    "linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)",
+                  filter: "blur(6px)",
+                  mixBlendMode: "screen",
+                }}
+              />
+              {/* Fine noise */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 opacity-30"
+                style={{
+                  backgroundImage:
+                    "url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%224%22/><feColorMatrix type=%22saturate%22 values=%220%22/><feComponentTransfer><feFuncA type=%22table%22 tableValues=%220 0.03%22/></feComponentTransfer></filter><rect width=%22100%%22 height=%22100%%22 filter=%22url(%23n)%22 /></svg>')",
+                  backgroundSize: "100px 100px",
+                  mixBlendMode: "overlay",
+                }}
+              />
+              <div className="relative z-10 text-xs text-white/70 leading-relaxed">{children}</div>
+            </div>,
+            document.body
+          )
+        : null}
+    </>
+  );
+}
+
+// Benefits mapping per tier based on the previous comparison table
+function getTierBenefits(tierName: string) {
+  const name = tierName.toLowerCase();
+  if (name.includes("free")) {
+    return {
+      dailyCoins: "1,000",
+      monthlyReserve: "0",
+      chatsTasks: "Unlimited",
+      integrations: "2",
+      personalities: "1",
+      quickChatMode: "Limited",
+      autoScheduleTasks: "1",
+      support: "Community",
+      earlyAccess: false,
+    };
+  }
+  if (name.includes("air")) {
+    return {
+      dailyCoins: "1,200",
+      monthlyReserve: "10,000",
+      chatsTasks: "Unlimited",
+      integrations: "10",
+      personalities: "10",
+      quickChatMode: "Unlimited",
+      autoScheduleTasks: "5",
+      support: "Priority",
+      earlyAccess: false,
+    };
+  }
+  if (name.includes("pro")) {
+    return {
+      dailyCoins: "1,500",
+      monthlyReserve: "30,000",
+      chatsTasks: "Unlimited",
+      integrations: "Unlimited",
+      personalities: "35",
+      quickChatMode: "Unlimited",
+      autoScheduleTasks: "25",
+      support: "24/7",
+      earlyAccess: true,
+    };
+  }
+  if (name.includes("ultra")) {
+    return {
+      dailyCoins: "2,000",
+      monthlyReserve: "60,000",
+      chatsTasks: "Unlimited",
+      integrations: "Unlimited",
+      personalities: "Unlimited",
+      quickChatMode: "Unlimited",
+      autoScheduleTasks: "Unlimited",
+      support: "24/7 Priority",
+      earlyAccess: true,
+    };
+  }
+  return {
+    dailyCoins: "-",
+    monthlyReserve: "-",
+    chatsTasks: "-",
+    integrations: "-",
+    personalities: "-",
+    quickChatMode: "-",
+    autoScheduleTasks: "-",
+    support: "-",
+    earlyAccess: false,
+  };
 }
 
 const PriceDisplay = ({ price }: { price: string }) => (
@@ -380,7 +528,7 @@ export function PricingSection({
   returnUrl,
   showTitleAndTabs = true,
   onSubscriptionUpdate,
-  showInfo = true,
+  showInfo = false,
   insideDialog = false,
   noPadding = false,
 }: PricingSectionProps = {}) {
@@ -405,11 +553,15 @@ export function PricingSection({
       {/* Billing Toggle */}
       {showTitleAndTabs && <BillingToggle isYearly={isYearly} onToggle={setIsYearly} />}
 
-              {/* Pricing grid - 4 columns */}
-              <div className="grid min-[650px]:grid-cols-2 min-[1000px]:grid-cols-4 gap-5 w-full max-w-7xl mx-auto px-6">
-        {siteConfig.cloudPricingItems.filter(tier => !tier.name.toLowerCase().includes('enterprise')).map((tier) => {
+              {/* Pricing grid - force single row of 4 with horizontal scroll */}
+              <div className="grid grid-cols-4 gap-5 w-full max-w-7xl mx-auto px-6 overflow-x-auto py-2">
+        {siteConfig.cloudPricingItems
+          .filter(tier => !tier.name.toLowerCase().includes('enterprise'))
+          .filter(tier => !tier.hidden)
+          .map((tier) => {
           const meta = getTierMeta(tier.name);
           const isEnterprise = meta.isEnterprise;
+          const benefits = getTierBenefits(tier.name);
 
           // Get the correct price based on billing period
           const displayPrice = isYearly ? tier.yearlyPrice : tier.price;
@@ -419,16 +571,14 @@ export function PricingSection({
           const rawBtn = tier.buttonText || "";
           const buttonText = rawBtn.toLowerCase() === "hire iris" ? "Get Now" : rawBtn || "Get Now";
 
-          // Build CTA link: prefer Stripe priceId if you route through /checkout, else default to /auth
-          const ctaHref = tier.stripePriceId
-            ? `/checkout?priceId=${encodeURIComponent(isYearly ? tier.yearlyStripePriceId || tier.stripePriceId : tier.stripePriceId)}${returnUrl ? `&returnUrl=${encodeURIComponent(returnUrl)}` : ''}`
-            : "/auth";
+          // Build CTA link: always route to /auth
+          const ctaHref = "/auth";
 
           return (
             <GlassCard
               key={tier.name}
               className={cn(
-                "flex flex-col relative h-fit min-[650px]:h-full transition-transform hover:-translate-y-0.5"
+                "flex flex-col relative h-fit min-[650px]:h-full transition-transform hover:-translate-y-0.5 min-w-[260px]"
               )}
             >
               {/* Header / Price */}
@@ -472,6 +622,111 @@ export function PricingSection({
                       Contact sales
                     </div>
                   )}
+                </div>
+
+                {/* Benefits inline list with ticks and tooltips */}
+                <div className="mt-3">
+                  <ul className="space-y-2 text-sm text-white/80">
+                    {/* Daily Coins */}
+                    <li className="flex items-start gap-2">
+                      <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
+                        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </span>
+                      <span className="text-white/80">
+                        <HoverTooltip label="Daily Coins">Daily Coins are coins you get every single day which get refreshed every day. No stacking on daily coins.</HoverTooltip>
+                        {`: ${benefits.dailyCoins}`}
+                      </span>
+                    </li>
+                    {/* Monthly Coin Reserve */}
+                    <li className="flex items-start gap-2">
+                      <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
+                        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </span>
+                      <span className="text-white/80">
+                        <HoverTooltip label="Monthly Coin Reserve">Monthly Coin Reserve are coins you get at the start of each month that accumulate and can be used throughout the month. These coins stack and don't expire until the month ends.</HoverTooltip>
+                        {`: ${benefits.monthlyReserve}`}
+                      </span>
+                    </li>
+
+                    {/* Iris Integrations */}
+                    <li className="flex items-start gap-2">
+                      <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
+                        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </span>
+                      <span className="text-white/80">
+                        <HoverTooltip label="Iris Integrations">Iris lets you connect and integrate with over 100 third-party apps & services that you use on a daily basis, to let Iris unlock productivity for you in unimaginable ways.</HoverTooltip>
+                        {`: ${benefits.integrations}`}
+                      </span>
+                    </li>
+
+                    {/* Personalities */}
+                    <li className="flex items-start gap-2">
+                      <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
+                        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </span>
+                      <span className="text-white/80">
+                        <HoverTooltip label="Personalities">Personalities are bold, customized modes of operation that combine different agent tools and behaviors to tailor Iris to your workflow. Build sharp, savvy profiles for research, sales, coding and more—switch contexts in one click.</HoverTooltip>
+                        {`: ${benefits.personalities}`}
+                      </span>
+                    </li>
+
+                    {/* Quick Chat Mode */}
+                    <li className="flex items-start gap-2">
+                      <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
+                        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </span>
+                      <span className="text-white/80">{`Quick Chat Mode: ${benefits.quickChatMode}`}</span>
+                    </li>
+
+                    {/* Auto Schedule Tasks */}
+                    <li className="flex items-start gap-2">
+                      <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
+                        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </span>
+                      <span className="text-white/80">
+                        <HoverTooltip label="Auto Schedule Tasks">Automatically run tasks on a schedule—hourly, daily, weekly, or with custom CRON. Set it once; Iris executes reliably in the background so progress never stalls.</HoverTooltip>
+                        {`: ${benefits.autoScheduleTasks}`}
+                      </span>
+                    </li>
+
+                    {/* 24/7 Priority Support (Air, Pro, Ultra) */}
+                    {/(air|pro|ultra)/i.test(tier.name) && (
+                      <li className="flex items-start gap-2">
+                        <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
+                          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                        <span className="text-white/80">{tier.name.toLowerCase().includes('ultra') ? '24/7 Exclusive Support' : '24/7 Priority Support'}</span>
+                      </li>
+                    )}
+
+                    {/* Early Access (Pro, Ultra) */}
+                    {/(pro|ultra)/i.test(tier.name) && (
+                      <li className="flex items-start gap-2">
+                        <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
+                          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                        <span className="text-white/80">Early Access: New Features</span>
+                      </li>
+                    )}
+
+                    {/* No further benefits after Auto Schedule Tasks */}
+                  </ul>
                 </div>
               </div>
 

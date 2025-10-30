@@ -129,6 +129,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const lastStreamStartedRef = useRef<string | null>(null); // Track last runId we started streaming for
   const titleGenerationTriggeredRef = useRef<boolean>(false); // Track if title generation has been triggered
+  const previousToolCallCountRef = useRef<number>(0);
 
   // Sidebar
   const { state: leftSidebarState, setOpen: setLeftSidebarOpen } = useSidebar();
@@ -1004,21 +1005,14 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     if (initialLoadCompleted && !initialPanelOpenAttempted) {
       setInitialPanelOpenAttempted(true);
 
-      // Only auto-open on desktop, not mobile, and not in compact mode
-      if (!isMobile && !compact) {
-        if (toolCalls.length > 0) {
-          setIsSidePanelOpen(true);
-          setCurrentToolIndex(toolCalls.length - 1);
-        } else {
-          if (messages.length > 0) {
-            setIsSidePanelOpen(true);
-          }
-        }
+      // Only auto-open when there are tool calls (desktop only, not compact)
+      if (!isMobile && !compact && toolCalls.length > 0) {
+        setIsSidePanelOpen(true);
+        setCurrentToolIndex(toolCalls.length - 1);
       }
     }
   }, [
     initialPanelOpenAttempted,
-    messages,
     toolCalls,
     initialLoadCompleted,
     setIsSidePanelOpen,
@@ -1026,6 +1020,17 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     isMobile,
     compact,
   ]);
+
+  // Auto-open panel when new tool calls arrive (desktop only, not compact)
+  useEffect(() => {
+    const prev = previousToolCallCountRef.current;
+    const curr = toolCalls.length;
+    if (!isMobile && !compact && !isSidePanelOpen && curr > prev) {
+      setIsSidePanelOpen(true);
+      setCurrentToolIndex(curr - 1);
+    }
+    previousToolCallCountRef.current = curr;
+  }, [toolCalls.length, isSidePanelOpen, isMobile, compact, setIsSidePanelOpen, setCurrentToolIndex]);
 
   useEffect(() => {
     // Prevent duplicate streaming calls for the same runId

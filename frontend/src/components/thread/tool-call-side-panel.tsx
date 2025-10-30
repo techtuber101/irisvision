@@ -288,6 +288,8 @@ export function ToolCallSidePanel({
     currentViewRef.current = currentView;
   }, [currentView]);
 
+  // Keep default view as 'tools' unless user switches
+
   const isMobile = useIsMobile();
   const { isOpen: isDocumentModalOpen } = useDocumentModalStore();
 

@@ -156,10 +156,10 @@ export function CTASection() {
                 {/* button body */}
                 <motion.span
                   whileHover={{ y: -1 }}
-                  className="relative z-10 bg-white text-black font-semibold text-sm h-10 px-5 rounded-full inline-flex items-center gap-2 shadow-[0_10px_20px_-12px_rgba(255,255,255,0.6)]"
+                  className="relative z-10 bg-white text-black font-semibold text-base h-12 px-7 rounded-full inline-flex items-center gap-2 shadow-[0_10px_20px_-12px_rgba(255,255,255,0.6)]"
                 >
                   {ctaSection.button.text}
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
                 </motion.span>
                 {/* glow ring */}
                 <span className="absolute inset-0 rounded-full bg-white/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />

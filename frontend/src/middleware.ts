@@ -15,12 +15,10 @@ const PUBLIC_ROUTES = [
   '/api/auth',
   '/share', // Shared content should be public
   '/templates', // Template pages should be public
-  '/enterprise', // Enterprise page should be public
 ];
 
 // Routes that require authentication but are related to billing/trials
 const BILLING_ROUTES = [
-  '/activate-trial',
   '/subscription',
 ];
 
@@ -154,7 +152,7 @@ export async function middleware(request: NextRequest) {
 
       if (!accounts) {
         const url = request.nextUrl.clone();
-        url.pathname = '/activate-trial';
+        url.pathname = '/subscription';
         return NextResponse.redirect(url);
       }
 
@@ -180,7 +178,7 @@ export async function middleware(request: NextRequest) {
           return NextResponse.redirect(url);
         } else {
           const url = request.nextUrl.clone();
-          url.pathname = '/activate-trial';
+          url.pathname = '/subscription';
           return NextResponse.redirect(url);
         }
       }
@@ -201,7 +199,7 @@ export async function middleware(request: NextRequest) {
           return NextResponse.redirect(url);
         } else {
           const url = request.nextUrl.clone();
-          url.pathname = '/activate-trial';
+          url.pathname = '/subscription';
           return NextResponse.redirect(url);
         }
       } else if ((trialExpired || trialConverted) && !hasTier) {

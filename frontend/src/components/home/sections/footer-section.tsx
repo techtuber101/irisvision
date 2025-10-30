@@ -37,11 +37,7 @@ export function FooterSection() {
                 className="mx-auto hidden dark:block"
               />
             </Link>
-            <p className="text-2xl md:text-3xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              <span className="font-thin text-3xl md:text-4xl text-primary" style={{ fontFamily: 'Dancing Script, Brush Script MT, cursive, serif', fontWeight: 300 }}>
-                Feel The Future
-              </span>
-              <br />
+            <p className="text-2xl md:text-3xl text-muted-foreground max-w-2xl mx-auto leading-relaxed transform translate-x-1 md:translate-x-2">
               <span className="text-sm text-primary font-medium">Vision → Plan → Analyze → Execute</span>
             </p>
           </div>
@@ -104,7 +100,7 @@ export function FooterSection() {
 
               {/* Copyright */}
               <div className="text-sm text-muted-foreground">
-                © 2024 Iris AI. All rights reserved.
+                © 2025 Iris AI. All rights reserved.
               </div>
             </div>
           </div>
