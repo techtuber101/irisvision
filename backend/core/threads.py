@@ -456,12 +456,12 @@ async def generate_project_title(
         raise HTTPException(status_code=500, detail=f"Failed to generate title: {str(e)}")
 
 
-@router.post("/threads/{thread_id}/summarize/stream", summary="Stream Chat Summary (GPT-5 nano)", operation_id="stream_thread_summary")
+@router.post("/threads/{thread_id}/summarize/stream", summary="Stream Chat Summary (Gemini 2.5 Flash)", operation_id="stream_thread_summary")
 async def stream_thread_summary(
     thread_id: str,
     user_id: str = Depends(verify_and_get_user_id_from_jwt)
 ):
-    """Stream a first-person retrospective summary of the specified thread using GPT-5 nano.
+    """Stream a first-person retrospective summary of the specified thread using Gemini 2.5 Flash.
 
     Uses Iris Summarizer to generate a cohesive 4-6 line summary covering the entire
     conversation flow, including objectives, actions, deliverables, and generated documents.
@@ -570,11 +570,11 @@ async def stream_thread_summary(
                 {"role": "user", "content": user_prompt},
             ]
 
-            # Make streaming call to GPT-5 nano
+            # Make streaming call to Gemini 2.5 Flash
             try:
                 llm_response = await make_llm_api_call(
                     messages=llm_messages,
-                    model_name="openai/gpt-5-nano",
+                    model_name="gemini/gemini-2.5-flash",
                     temperature=0.2,
                     max_tokens=400,
                     stream=True,
