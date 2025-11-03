@@ -17,7 +17,7 @@ import base64
     visible=True
 )
 class SandboxImageEditTool(SandboxToolsBase):
-    """Tool for generating or editing images using Google's Gemini 2.5 Flash Image model."""
+    """Tool for generating or editing images using Google's Imagen 4.0 Generate model."""
 
     def __init__(self, project_id: str, thread_id: str, thread_manager: ThreadManager):
         super().__init__(project_id, thread_manager)
@@ -29,7 +29,7 @@ class SandboxImageEditTool(SandboxToolsBase):
             "type": "function",
             "function": {
                 "name": "image_edit_or_generate",
-                "description": "Generate a new image from a prompt, or edit an existing image using Google's Gemini 2.5 Flash Image model. Stores the result in the thread context.",
+                "description": "Generate a new image from a prompt, or edit an existing image using Google's Imagen 4.0 Generate model. Stores the result in the thread context.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -58,10 +58,10 @@ class SandboxImageEditTool(SandboxToolsBase):
         prompt: str,
         image_path: Optional[str] = None,
     ) -> ToolResult:
-        """Generate or edit images using Google's Gemini 2.5 Flash Image model."""
+        """Generate or edit images using Google's Imagen 4.0 Generate model."""
         try:
             await self._ensure_sandbox()
-            model="google/gemini-2.5-flash-image"
+            model="gemini/imagen-4.0-generate-001"
 
             if mode == "generate":
                 response = await aimage_generation(
