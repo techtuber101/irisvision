@@ -1,0 +1,1 @@
+cd /Users/ishaantheman/irissecond && docker-compose -f docker-compose.local.yaml up --build -d

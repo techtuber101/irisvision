@@ -628,6 +628,8 @@ class AgentRunner:
         logger.debug(f"model_name received: {self.config.model_name}")
         iteration_count = 0
         continue_execution = True
+        final_error_detected = False  # Track if any error occurred during the run
+        final_termination_reason = None  # Track why execution stopped: None, 'explicit', 'max_iterations', 'unknown'
 
         latest_user_message = await self.client.table('messages').select('*').eq('thread_id', self.config.thread_id).eq('type', 'user').order('created_at', desc=True).limit(1).execute()
         if latest_user_message.data and len(latest_user_message.data) > 0:
@@ -643,19 +645,13 @@ class AgentRunner:
             can_run, message, reservation_id = await billing_integration.check_and_reserve_credits(self.account_id)
             if not can_run:
                 error_msg = f"Insufficient credits: {message}"
+                final_error_detected = True
                 yield {
                     "type": "status",
                     "status": "stopped",
                     "message": error_msg
                 }
                 break
-
-            latest_message = await self.client.table('messages').select('*').eq('thread_id', self.config.thread_id).in_('type', ['assistant', 'tool', 'user']).order('created_at', desc=True).limit(1).execute()
-            if latest_message.data and len(latest_message.data) > 0:
-                message_type = latest_message.data[0].get('type')
-                if message_type == 'assistant':
-                    continue_execution = False
-                    break
 
             temporary_message = None
             # Don't set max_tokens by default - let LiteLLM and providers handle their own defaults
@@ -697,8 +693,10 @@ class AgentRunner:
                             if isinstance(chunk, dict) and chunk.get('type') == 'status' and chunk.get('status') == 'error':
                                 logger.error(f"Error in thread execution: {chunk.get('message', 'Unknown error')}")
                                 error_detected = True
+                                final_error_detected = True
                                 yield chunk
-                                continue
+                                # Break immediately on error - don't process more chunks
+                                break
 
                             # Check for error status in the stream (message format)
                             if isinstance(chunk, dict) and chunk.get('type') == 'status':
@@ -710,8 +708,17 @@ class AgentRunner:
                                     # Check for error status
                                     if content.get('status_type') == 'error':
                                         error_detected = True
+                                        final_error_detected = True
                                         yield chunk
-                                        continue
+                                        # Break immediately on error - don't process more chunks
+                                        break
+                                    
+                                    # Check for thread_run_end - this indicates the thread execution completed
+                                    # We should continue the loop to allow the agent to potentially continue,
+                                    # but we'll check termination conditions after the loop
+                                    if content.get('status_type') == 'thread_run_end':
+                                        # Thread run has ended - will check termination conditions after loop
+                                        pass
                                     
                                     # Check for agent termination
                                     metadata = chunk.get('metadata', {})
@@ -765,12 +772,14 @@ class AgentRunner:
                     if error_detected:
                         if generation:
                             generation.end(status_message="error_detected", level="ERROR")
+                        final_error_detected = True
                         break
                         
                     if agent_should_terminate or last_tool_call in ['ask', 'complete', 'present_presentation']:
                         if generation:
                             generation.end(status_message="agent_stopped")
                         continue_execution = False
+                        final_termination_reason = 'explicit'
 
                 except Exception as e:
                     # Use ErrorProcessor for safe error handling
@@ -778,6 +787,7 @@ class AgentRunner:
                     ErrorProcessor.log_error(processed_error)
                     if generation:
                         generation.end(status_message=processed_error.message, level="ERROR")
+                    final_error_detected = True
                     yield processed_error.to_stream_dict()
                     break
                     
@@ -785,11 +795,47 @@ class AgentRunner:
                 # Use ErrorProcessor for safe error conversion
                 processed_error = ErrorProcessor.process_system_error(e, context={"thread_id": self.config.thread_id})
                 ErrorProcessor.log_error(processed_error)
+                final_error_detected = True
                 yield processed_error.to_stream_dict()
                 break
             
             if generation:
                 generation.end()
+
+        # Yield completion status when loop exits naturally (not via break)
+        # This ensures run_agent_background knows why the agent stopped
+        if not final_error_detected:
+            # Check if we hit max iterations
+            if iteration_count >= self.config.max_iterations:
+                final_termination_reason = 'max_iterations'
+                yield {
+                    "type": "status",
+                    "status": "stopped",
+                    "message": f"Agent reached maximum iterations ({self.config.max_iterations})"
+                }
+            elif final_termination_reason == 'explicit':
+                # Agent was explicitly stopped (termination signal)
+                yield {
+                    "type": "status",
+                    "status": "completed",
+                    "message": "Agent completed successfully"
+                }
+            elif not continue_execution:
+                # continue_execution was set to False but we don't know why
+                logger.warning(f"Agent generator exited with continue_execution=False but no explicit termination reason for thread {self.config.thread_id}")
+                yield {
+                    "type": "status",
+                    "status": "completed",
+                    "message": "Agent run completed"
+                }
+            else:
+                # Loop exited for unknown reason - this shouldn't happen but log it
+                logger.warning(f"Agent generator exited unexpectedly for thread {self.config.thread_id} (iteration_count={iteration_count}, continue_execution={continue_execution})")
+                yield {
+                    "type": "status",
+                    "status": "completed",
+                    "message": "Agent run completed"
+                }
 
         try:
             asyncio.create_task(asyncio.to_thread(lambda: langfuse.flush()))
