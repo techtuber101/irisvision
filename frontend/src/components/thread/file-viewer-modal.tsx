@@ -28,6 +28,7 @@ import {
   FileImage,
   Database,
   FileArchive,
+  Code,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -170,6 +171,22 @@ export function FileViewerModal({
   // Add state for file filtering
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [allWorkspaceFiles, setAllWorkspaceFiles] = useState<FileInfo[]>([]);
+  const [activeCodeSubFilter, setActiveCodeSubFilter] = useState<string | null>(null);
+
+  // Code file type definitions
+  const codeFileTypes = [
+    { key: 'html', label: 'HTML', extensions: ['.html', '.htm'] },
+    { key: 'css', label: 'CSS', extensions: ['.css'] },
+    { key: 'javascript', label: 'JavaScript', extensions: ['.js', '.jsx', '.mjs', '.cjs'] },
+    { key: 'typescript', label: 'TypeScript', extensions: ['.ts', '.tsx'] },
+    { key: 'python', label: 'Python', extensions: ['.py', '.pyw', '.pyi'] },
+    { key: 'java', label: 'Java', extensions: ['.java'] },
+  ];
+
+  // Get all code file extensions
+  const allCodeExtensions = useMemo(() => {
+    return codeFileTypes.flatMap(type => type.extensions);
+  }, []);
 
   // File filter definitions
   const fileFilters = [
@@ -177,6 +194,7 @@ export function FileViewerModal({
     { key: 'markdown', label: 'Markdown', icon: MarkdownIcon, extensions: ['.md', '.txt'] },
     { key: 'docs', label: 'Docs', icon: FileText, extensions: ['.doc', '.docx'] },
     { key: 'pdf', label: 'PDF', icon: FileText, extensions: ['.pdf'] },
+    { key: 'code', label: 'Code', icon: Code, extensions: allCodeExtensions },
     { key: 'images', label: 'Images', icon: FileImage, extensions: ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.bmp', '.ico', '.tiff'] },
     { key: 'data', label: 'Data', icon: Database, extensions: ['.json', '.xml', '.csv', '.yaml', '.yml', '.toml', '.ini', '.conf', '.config'] },
     { key: 'archives', label: 'Archives', icon: FileArchive, extensions: ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz'] },
@@ -199,11 +217,37 @@ export function FileViewerModal({
     loadAllWorkspaceFiles();
   }, [open, sandboxId]);
 
+  // Reset code sub-filter when changing main filter
+  useEffect(() => {
+    if (activeFilter !== 'code') {
+      setActiveCodeSubFilter(null);
+    }
+  }, [activeFilter]);
+
   // Filter files based on active filter - use all workspace files when filtering
   const filteredFiles = useMemo(() => {
     const filesToFilter = activeFilter === 'all' ? files : allWorkspaceFiles;
     
     if (activeFilter === 'all') return files;
+    
+    // Handle code filter with sub-filters
+    if (activeFilter === 'code') {
+      if (activeCodeSubFilter) {
+        // Filter by specific code type
+        const codeType = codeFileTypes.find(t => t.key === activeCodeSubFilter);
+        if (codeType) {
+          return filesToFilter.filter(file => {
+            const extension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+            return codeType.extensions.includes(extension);
+          });
+        }
+      }
+      // Show all code files when code filter is active but no sub-filter
+      return filesToFilter.filter(file => {
+        const extension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+        return allCodeExtensions.includes(extension);
+      });
+    }
     
     const filter = fileFilters.find(f => f.key === activeFilter);
     if (!filter || !filter.extensions) return filesToFilter;
@@ -212,7 +256,7 @@ export function FileViewerModal({
       const extension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
       return filter.extensions!.includes(extension);
     });
-  }, [files, allWorkspaceFiles, activeFilter]);
+  }, [files, allWorkspaceFiles, activeFilter, activeCodeSubFilter, allCodeExtensions, codeFileTypes]);
 
   // Setup project with sandbox URL if not provided directly
   useEffect(() => {
@@ -1219,8 +1263,8 @@ export function FileViewerModal({
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent 
-        className="sm:max-w-[90vw] md:max-w-[1200px] w-[95vw] h-[90vh] max-h-[900px] flex flex-col p-0 gap-0 overflow-hidden rounded-3xl border border-blue-500/10 bg-[rgba(15,23,42,0.12)] backdrop-blur-md shadow-[0_20px_60px_-10px_rgba(0,0,0,0.1),inset_0_1px_0_0_rgba(59,130,246,0.05)] !top-[50%] !left-[50%] !translate-x-[-50%] !translate-y-[-50%] light:bg-[rgba(255,255,255,0.4)] light:backdrop-blur-2xl"
+      <DialogContent
+        className="sm:max-w-[90vw] md:max-w-[1200px] w-[95vw] h-[90vh] max-h-[900px] flex flex-col p-0 gap-0 overflow-hidden rounded-3xl border border-blue-500/10 bg-[rgba(15,23,42,0.12)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.1),inset_0_1px_0_0_rgba(59,130,246,0.05)] !top-[50%] !left-[50%] !translate-x-[-50%] !translate-y-[-50%] light:border-white/20 light:bg-[rgba(255,255,255,0.22)] light:backdrop-blur-2xl light:shadow-[0_24px_70px_-18px_rgba(15,23,42,0.2),inset_0_1px_0_rgba(255,255,255,0.35),0_0_0_1px_rgba(255,255,255,0.08)]"
       >
         {/* Gradient rim */}
         <div
@@ -1237,10 +1281,27 @@ export function FileViewerModal({
           }}
         />
         
+        {/* Light mode glassy rim overlay */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-3xl hidden light:block"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.02) 40%, rgba(0,0,0,0.05) 100%)",
+            WebkitMask: "linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)",
+            WebkitMaskComposite: "xor" as any,
+            maskComposite: "exclude",
+            padding: 1.5,
+            borderRadius: 24,
+            border: "1px solid rgba(255,255,255,0.28)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4)",
+          }}
+        />
+        
         {/* Specular streak */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-24"
+          className="pointer-events-none absolute inset-x-0 top-0 h-24 light:opacity-50"
           style={{
             background:
               "linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)",
@@ -1249,10 +1310,22 @@ export function FileViewerModal({
           }}
         />
         
+        {/* Light mode enhanced specular highlight */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-32 hidden light:block"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0) 90%)",
+            filter: "blur(14px)",
+            mixBlendMode: "screen",
+          }}
+        />
+        
         {/* Fine noise */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 opacity-30"
+          className="pointer-events-none absolute inset-0 opacity-30 light:opacity-[0.12]"
           style={{
             backgroundImage:
               "url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'60\' height=\'60\'><filter id=\'n\'><feTurbulence type=\'fractalNoise\' baseFrequency=\'0.8\' numOctaves=\'4\'/><feColorMatrix type=\'saturate\' values=\'0\'/><feComponentTransfer><feFuncA type=\'table\' tableValues=\'0 0.03\'/></feComponentTransfer></filter><rect width=\'100%\' height=\'100%\' filter=\'url(%23n)\' /></svg>')",
@@ -1517,6 +1590,92 @@ export function FileViewerModal({
             <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
               {fileFilters.map((filter) => {
                 const IconComponent = filter.icon;
+                
+                // Special handling for Code filter with dropdown
+                if (filter.key === 'code') {
+                  const totalCodeFiles = allWorkspaceFiles.filter(file => {
+                    const extension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+                    return filter.extensions?.includes(extension);
+                  }).length;
+                  
+                  return (
+                    <DropdownMenu key={filter.key}>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={`h-9 px-4 text-xs font-medium whitespace-nowrap transition-all duration-300 rounded-2xl border backdrop-blur-md ${
+                            activeFilter === filter.key
+                              ? 'bg-[rgba(15,23,42,0.25)] border-blue-400/30 text-blue-300 hover:bg-[rgba(15,23,42,0.35)] shadow-[0_4px_12px_-2px_rgba(59,130,246,0.2)]'
+                              : 'border-blue-500/15 bg-[rgba(15,23,42,0.12)] text-white/70 hover:bg-[rgba(15,23,42,0.2)] hover:border-blue-400/25 hover:text-white/90 shadow-[0_2px_8px_-2px_rgba(59,130,246,0.1)]'
+                          }`}
+                          onClick={() => {
+                            if (activeFilter !== filter.key) {
+                              setActiveFilter(filter.key);
+                              setActiveCodeSubFilter(null);
+                            }
+                          }}
+                        >
+                          <IconComponent className="h-3.5 w-3.5 mr-2 stroke-[1.5]" />
+                          {filter.label}
+                          <span className="ml-2 text-xs opacity-60">
+                            ({totalCodeFiles})
+                          </span>
+                          <ChevronDown className="h-3 w-3 ml-1" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent 
+                        align="start"
+                        className="min-w-[200px] rounded-2xl border border-blue-500/10 bg-[rgba(15,23,42,0.12)] backdrop-blur-md shadow-[0_8px_32px_0_rgba(0,0,0,0.1),inset_0_1px_0_0_rgba(59,130,246,0.05)] text-white/90 light:bg-transparent light:backdrop-blur-[40px] light:border-blue-500/10 light:shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] p-1"
+                      >
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setActiveFilter('code');
+                            setActiveCodeSubFilter(null);
+                          }}
+                          className={`cursor-pointer rounded-xl px-3 py-2 text-sm transition-all ${
+                            !activeCodeSubFilter && activeFilter === 'code' 
+                              ? 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-300' 
+                              : 'hover:bg-[rgba(15,23,42,0.2)] hover:text-white light:hover:bg-[rgba(0,0,0,0.05)] light:text-gray-800'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span>All Code Files</span>
+                            <span className="text-xs opacity-60">({totalCodeFiles})</span>
+                          </div>
+                        </DropdownMenuItem>
+                        {codeFileTypes.map((codeType) => {
+                          const typeFileCount = allWorkspaceFiles.filter(file => {
+                            const extension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+                            return codeType.extensions.includes(extension);
+                          }).length;
+                          
+                          return (
+                            <DropdownMenuItem
+                              key={codeType.key}
+                              onClick={() => {
+                                setActiveFilter('code');
+                                setActiveCodeSubFilter(codeType.key);
+                              }}
+                              className={`cursor-pointer rounded-xl px-3 py-2 text-sm transition-all ${
+                                activeCodeSubFilter === codeType.key 
+                                  ? 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-300' 
+                                  : 'hover:bg-[rgba(15,23,42,0.2)] hover:text-white light:hover:bg-[rgba(0,0,0,0.05)] light:text-gray-800'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <span>{codeType.label}</span>
+                                <span className="text-xs opacity-60">({typeFileCount})</span>
+                              </div>
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  );
+                }
+                
+                // Regular filter buttons for other types
                 return (
                   <Button
                     key={filter.key}

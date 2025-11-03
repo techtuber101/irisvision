@@ -892,18 +892,34 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   );
 
   const handleStopAgent = useCallback(async () => {
+    const runIdToStop = agentRunId;
+
     setAgentStatus('idle');
+    setAgentRunId(null);
+    setUserInitiatedRun(false);
+    lastStreamStartedRef.current = null;
 
-    await stopStreaming();
+    try {
+      await stopStreaming();
+    } catch (error) {
+      console.error('Error while stopping stream:', error);
+    }
 
-    if (agentRunId) {
+    if (runIdToStop) {
       try {
-        await stopAgentMutation.mutateAsync(agentRunId);
+        await stopAgentMutation.mutateAsync(runIdToStop);
       } catch (error) {
         console.error('Error stopping agent:', error);
       }
     }
-  }, [stopStreaming, agentRunId, stopAgentMutation, setAgentStatus]);
+  }, [
+    agentRunId,
+    stopStreaming,
+    stopAgentMutation,
+    setAgentStatus,
+    setAgentRunId,
+    setUserInitiatedRun,
+  ]);
 
   const handleOpenFileViewer = useCallback(
     (filePath?: string, filePathList?: string[]) => {

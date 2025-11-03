@@ -43,8 +43,36 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
 
   const standardDocumentStyles = `
     <style>
+      @font-face {
+        font-family: 'LMRoman';
+        src: url('/fonts/lmroman/lmroman10-regular.otf') format('opentype');
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'LMRoman';
+        src: url('/fonts/lmroman/lmroman10-bold.otf') format('opentype');
+        font-weight: 700;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'LMRoman';
+        src: url('/fonts/lmroman/lmroman10-italic.otf') format('opentype');
+        font-weight: 400;
+        font-style: italic;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'LMRoman';
+        src: url('/fonts/lmroman/lmroman10-bolditalic.otf') format('opentype');
+        font-weight: 700;
+        font-style: italic;
+        font-display: swap;
+      }
       body { 
-        font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: 'LMRoman', 'Times New Roman', Times, serif;
         line-height: 1.6;
         color: #000;
         background: #fff;
@@ -138,6 +166,20 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
           html2canvas: { scale: 2, useCORS: true },
           jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
         };
+
+        const fontSet = (document as unknown as { fonts?: FontFaceSet }).fonts;
+        if (fontSet?.load) {
+          try {
+            await Promise.allSettled([
+              fontSet.load('400 16px LMRoman'),
+              fontSet.load('700 16px LMRoman'),
+              fontSet.load('italic 16px LMRoman'),
+              fontSet.load('700 italic 16px LMRoman'),
+            ]);
+          } catch (error) {
+            console.warn('LMRoman fonts failed to preload for PDF export:', error);
+          }
+        }
         
         await html2pdf().from(element).set(options).save();
         toast.success('PDF exported successfully');

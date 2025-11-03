@@ -364,15 +364,15 @@ export function DocsToolView({
                       size="sm" 
                       variant="outline" 
                       disabled={isExporting}
-                      className="bg-white/5 border-white/10 text-white/90 hover:bg-white/10 hover:border-white/20 backdrop-blur-sm transition-all duration-200 disabled:opacity-50 light:bg-white light:text-zinc-800 light:text-base light:border-black/10 light:hover:bg-black/5 light:hover:border-black/20"
+                      className="bg-white/5 border-white/10 text-white/90 hover:bg-white/10 hover:border-white/20 backdrop-blur-sm transition-all duration-200 disabled:opacity-50 light:bg-white light:text-zinc-800 light:border-black/10 light:hover:bg-black/5 light:hover:border-black/20"
                     >
                       {isExporting ? (
-                        <Loader2 className="h-3 w-3 animate-spin light:h-4 light:w-4" />
+                        <Loader2 className="h-3 w-3 animate-spin" />
                       ) : (
-                        <Download className="h-3 w-3 light:h-4 light:w-4" />
+                        <Download className="h-3 w-3" />
                       )}
                       Export
-                      <ChevronDown className="h-3 w-3 light:h-4 light:w-4" />
+                      <ChevronDown className="h-3 w-3" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent 
@@ -577,6 +577,7 @@ export function DocsToolView({
         documentData={editorDocumentData}
         sandboxId={data?.sandbox_id || project?.id || ''}
         onSave={handleDocumentSave}
+        onSubmit={onSubmit}
       />
     )}
     </>

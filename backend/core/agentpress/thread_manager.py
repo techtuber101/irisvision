@@ -3,6 +3,8 @@ Simplified conversation thread management system for AgentPress.
 """
 
 import json
+import time
+from collections import deque
 from typing import List, Dict, Any, Optional, Type, Union, AsyncGenerator, Literal, cast
 from core.services.llm import make_llm_api_call, LLMError
 from core.agentpress.prompt_caching import apply_prompt_caching_strategy, validate_cache_blocks
@@ -20,6 +22,47 @@ from core.billing.billing_integration import billing_integration
 from litellm.utils import token_counter
 
 ToolChoice = Literal["auto", "required", "none"]
+
+
+class RollingTokenUsageTracker:
+    """Maintains a 60-second rolling window of Gemini token metrics."""
+
+    WINDOW_SECONDS = 60
+
+    def __init__(self) -> None:
+        self._window: deque = deque()  # entries: (timestamp, prompt, completion, cache_read, cache_write)
+
+    def record(
+        self,
+        prompt_tokens: int,
+        completion_tokens: int,
+        cache_read_tokens: int,
+        cache_creation_tokens: int,
+    ) -> Dict[str, int]:
+        now = time.time()
+        self._window.append((now, prompt_tokens, completion_tokens, cache_read_tokens, cache_creation_tokens))
+
+        cutoff = now - self.WINDOW_SECONDS
+        while self._window and self._window[0][0] < cutoff:
+            self._window.popleft()
+
+        totals = {
+            "events": len(self._window),
+            "prompt": 0,
+            "completion": 0,
+            "cache_read": 0,
+            "cache_write": 0,
+        }
+        for _, p, c, cr, cw in self._window:
+            totals["prompt"] += p
+            totals["completion"] += c
+            totals["cache_read"] += cr
+            totals["cache_write"] += cw
+        return totals
+
+
+token_usage_tracker = RollingTokenUsageTracker()
+
 
 class ThreadManager:
     """Manages conversation threads with LLM models and tool execution."""
@@ -138,6 +181,16 @@ class ThreadManager:
             
             usage_type = "FALLBACK ESTIMATE" if is_fallback else ("ESTIMATED" if is_estimated else "EXACT")
             logger.info(f"💰 Usage type: {usage_type} - prompt={prompt_tokens}, completion={completion_tokens}, cache_read={cache_read_tokens}, cache_creation={cache_creation_tokens}")
+            uncached_prompt_tokens = max(prompt_tokens - cache_read_tokens, 0)
+            logger.debug(
+                "🧮 Token breakdown (per call) model=%s prompt=%s (fresh=%s, cached_read=%s) completion=%s cache_write=%s",
+                model or "unknown",
+                prompt_tokens,
+                uncached_prompt_tokens,
+                cache_read_tokens,
+                completion_tokens,
+                cache_creation_tokens,
+            )
             
             client = await self.db.client
             thread_row = await client.table('threads').select('account_id').eq('thread_id', thread_id).limit(1).execute()
@@ -162,11 +215,28 @@ class ThreadManager:
                     cache_read_tokens=cache_read_tokens,
                     cache_creation_tokens=cache_creation_tokens
                 )
-                
+
                 if deduct_result.get('success'):
                     logger.info(f"Successfully deducted ${deduct_result.get('cost', 0):.6f}")
                 else:
                     logger.error(f"Failed to deduct credits: {deduct_result}")
+
+            rolling_totals = token_usage_tracker.record(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                cache_read_tokens=cache_read_tokens,
+                cache_creation_tokens=cache_creation_tokens,
+            )
+            fresh_prompt_window = max(rolling_totals["prompt"] - rolling_totals["cache_read"], 0)
+            logger.info(
+                "📈 60s token window (events=%s): prompt≈%s (fresh≈%s, cached_read≈%s) | cache_writes≈%s | completion≈%s",
+                rolling_totals["events"],
+                rolling_totals["prompt"],
+                fresh_prompt_window,
+                rolling_totals["cache_read"],
+                rolling_totals["cache_write"],
+                rolling_totals["completion"],
+            )
         except Exception as e:
             logger.error(f"Error handling billing: {str(e)}", exc_info=True)
 
@@ -300,24 +370,50 @@ class ThreadManager:
             # ==================================
 
             # Apply context compression
+            compression_report = None
             if ENABLE_CONTEXT_MANAGER:
                 logger.debug(f"Context manager enabled, compressing {len(messages)} messages")
                 context_manager = ContextManager()
 
-                compressed_messages = context_manager.compress_messages(
+                compressed_messages, compression_report = await context_manager.compress_messages(
                     messages, llm_model, max_tokens=llm_max_tokens, 
                     actual_total_tokens=None,  # Will be calculated inside
-                    system_prompt=system_prompt # KEY FIX: No caching during compression
+                    system_prompt=system_prompt, # KEY FIX: No caching during compression
+                    return_report=True,
                 )
-                logger.debug(f"Context compression completed: {len(messages)} -> {len(compressed_messages)} messages")
+                if compression_report:
+                    logger.info(f"🧮 Context compression summary: {compression_report.summary_line()}")
+                    logger.debug(f"Context compression diagnostics: {compression_report.to_dict()}")
+                else:
+                    logger.debug(f"Context compression completed (no report): {len(messages)} -> {len(compressed_messages)} messages")
                 messages = compressed_messages
             else:
                 logger.debug("Context manager disabled, using raw messages")
 
             # Apply caching
+            cache_report = None
             if ENABLE_PROMPT_CACHING:
-                prepared_messages = apply_prompt_caching_strategy(system_prompt, messages, llm_model)
+                prepared_messages, cache_report = apply_prompt_caching_strategy(
+                    system_prompt,
+                    messages,
+                    llm_model,
+                    return_report=True,
+                )
                 prepared_messages = validate_cache_blocks(prepared_messages, llm_model)
+                if cache_report:
+                    logger.info(f"🧊 Gemini caching summary: {cache_report.summary_line()}")
+                    logger.debug(f"Gemini caching diagnostics: {cache_report.to_dict()}")
+                    min_expected_blocks = 1 if cache_report.system_cached else 0
+                    if (
+                        cache_report.historical_messages > 0
+                        and cache_report.cached_blocks <= min_expected_blocks
+                    ):
+                        logger.warning(
+                            "Gemini caching produced no historical cache blocks despite %s historical messages (~%s tokens). Notes: %s",
+                            cache_report.historical_messages,
+                            f"{cache_report.total_input_tokens:,}",
+                            cache_report.notes,
+                        )
             else:
                 prepared_messages = [system_prompt] + messages
 
@@ -344,21 +440,27 @@ class ThreadManager:
             # Log final prepared messages token count
             final_prepared_tokens = token_counter(model=llm_model, messages=prepared_messages)
             logger.info(f"📤 Final prepared messages being sent to LLM: {final_prepared_tokens} tokens")
+            if cache_report:
+                logger.info(
+                    "📉 Estimated fresh tokens after cache reuse: ~%s (raw input %s)",
+                    f"{cache_report.estimated_prompt_tokens_after_cache:,}",
+                    f"{cache_report.total_input_tokens:,}",
+                )
 
-            # Make LLM call
+            # Make single LLM call (no automatic flash-lite fallback)
             try:
                 llm_response = await make_llm_api_call(
-                    prepared_messages, llm_model,
+                    prepared_messages,
+                    llm_model,
                     temperature=llm_temperature,
                     max_tokens=llm_max_tokens,
                     tools=openapi_tool_schemas,
                     tool_choice=tool_choice if config.native_tool_calling else "none",
-                    stream=stream
+                    stream=stream,
                 )
-            except LLMError as e:
-                return {"type": "status", "status": "error", "message": str(e)}
+            except LLMError as err:
+                return {"type": "status", "status": "error", "message": str(err)}
 
-            # Check for error response
             if isinstance(llm_response, dict) and llm_response.get("status") == "error":
                 return llm_response
 

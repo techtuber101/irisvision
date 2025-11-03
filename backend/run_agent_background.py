@@ -195,13 +195,35 @@ async def run_agent_background(
             # Check for agent-signaled completion or error
             if response.get('type') == 'status':
                  status_val = response.get('status')
+                 
+                 # Also check for error in content field (status_type: "error")
+                 if not status_val:
+                     try:
+                         content = response.get('content', {})
+                         if isinstance(content, str):
+                             content = json.loads(content)
+                         if content.get('status_type') == 'error':
+                             status_val = 'error'
+                     except (json.JSONDecodeError, TypeError, AttributeError):
+                         pass
+                 
                  # logger.debug(f"Agent status: {status_val}")
                  
                  if status_val in ['completed', 'failed', 'stopped', 'error']:
                      logger.info(f"Agent run {agent_run_id} finished with status: {status_val}")
                      final_status = status_val if status_val != 'error' else 'failed'
                      if status_val in ['failed', 'stopped', 'error']:
-                         error_message = response.get('message', f"Run ended with status: {status_val}")
+                         # Try to extract error message from content if not in root
+                         if not response.get('message') and response.get('content'):
+                             try:
+                                 content = response.get('content', {})
+                                 if isinstance(content, str):
+                                     content = json.loads(content)
+                                 error_message = content.get('message', f"Run ended with status: {status_val}")
+                             except (json.JSONDecodeError, TypeError, AttributeError):
+                                 error_message = f"Run ended with status: {status_val}"
+                         else:
+                             error_message = response.get('message', f"Run ended with status: {status_val}")
                          logger.error(f"Agent run failed: {error_message}")
                      break
 
@@ -230,6 +252,23 @@ async def run_agent_background(
             logger.debug(f"Published final control signal '{control_signal}' to {global_control_channel}")
         except Exception as e:
             logger.warning(f"Failed to publish final control signal {control_signal}: {str(e)}")
+        
+        # Auto-restart with flash-lite model if ERROR and using flash (non-lite) model
+        # (disabled: inline fallback now handled directly in ThreadManager)
+        if False and control_signal == "ERROR" and final_status == "failed":
+            # Verify the model is a flash (non-lite) model before attempting restart
+            effective_model_lower = effective_model.lower()
+            is_flash_model = "flash" in effective_model_lower
+            is_lite_model = "lite" in effective_model_lower
+            
+            if is_flash_model and not is_lite_model:
+                logger.info(f"🔄 ERROR signal received for flash model ({effective_model}), attempting auto-restart with flash-lite")
+                await _attempt_auto_restart_with_lite(
+                    client, agent_run_id, thread_id, project_id, 
+                    effective_model, agent_config, instance_id, request_id
+                )
+            else:
+                logger.debug(f"Skipping auto-restart: model '{effective_model}' is not a flash (non-lite) model")
 
     except Exception as e:
         error_message = str(e)
@@ -250,12 +289,28 @@ async def run_agent_background(
         # Update DB status
         await update_agent_run_status(client, agent_run_id, "failed", error=f"{error_message}\n{traceback_str}")
 
+        # Check if auto-restart is applicable before publishing ERROR signal
+        effective_model_lower = effective_model.lower()
+        is_flash_model = "flash" in effective_model_lower
+        is_lite_model = "lite" in effective_model_lower
+        should_auto_restart = is_flash_model and not is_lite_model
+        
         # Publish ERROR signal
         try:
             await redis.publish(global_control_channel, "ERROR")
             logger.debug(f"Published ERROR signal to {global_control_channel}")
         except Exception as e:
             logger.warning(f"Failed to publish ERROR signal: {str(e)}")
+        
+        # Auto-restart with flash-lite model if ERROR and using flash (non-lite) model
+        if False and should_auto_restart:
+            logger.info(f"🔄 Exception occurred with flash model ({effective_model}), attempting auto-restart with flash-lite")
+            await _attempt_auto_restart_with_lite(
+                client, agent_run_id, thread_id, project_id,
+                effective_model, agent_config, instance_id, request_id
+            )
+        else:
+            logger.debug(f"Skipping auto-restart after exception: model '{effective_model}' is not a flash (non-lite) model")
 
     finally:
         # Cleanup stop checker task
@@ -377,3 +432,137 @@ async def update_agent_run_status(
         return False
 
     return False
+
+async def _attempt_auto_restart_with_lite(
+    client,
+    original_agent_run_id: str,
+    thread_id: str,
+    project_id: str,
+    original_model: str,
+    agent_config: Optional[dict],
+    instance_id: str,
+    request_id: Optional[str]
+):
+    """
+    Automatically restart the chat with gemini-2.5-flash-lite if the original model
+    was a flash variant (not lite) and we haven't already retried.
+    
+    This preserves all context and puts the lite model in the same position as the
+    original flash model would be, with all the same context and knowing what to do next.
+    """
+    try:
+        # Check if the original model is a flash variant (not lite)
+        original_model_lower = original_model.lower()
+        is_flash_model = "flash" in original_model_lower
+        is_lite_model = "lite" in original_model_lower
+        
+        # Only restart if it's a flash model but not lite
+        if not is_flash_model or is_lite_model:
+            logger.debug(f"Skipping auto-restart: original model '{original_model}' is not a flash (non-lite) model")
+            return
+        
+        # Check if we've already retried by looking at the original run's metadata
+        # Use atomic check-and-update to prevent race conditions
+        original_run = await client.table('agent_runs').select('metadata').eq('id', original_agent_run_id).maybe_single().execute()
+        metadata = {}
+        if original_run and original_run.data:
+            metadata = original_run.data.get('metadata', {})
+            if metadata.get('auto_restart_attempted', False):
+                logger.info(f"Skipping auto-restart: already attempted for run {original_agent_run_id}")
+                return
+        
+        # Mark that we're attempting auto-restart in the original run's metadata
+        # This is an atomic update to prevent concurrent restart attempts
+        try:
+            update_result = await client.table('agent_runs').update({
+                'metadata': {
+                    **metadata,
+                    'auto_restart_attempted': True,
+                    'original_model': original_model,
+                    'retry_model': 'gemini/gemini-2.5-flash-lite'
+                }
+            }).eq('id', original_agent_run_id).execute()
+            
+            # Verify the update succeeded
+            if not update_result.data:
+                logger.warning(f"Failed to update original run metadata for {original_agent_run_id} - run may have been deleted")
+                return
+                
+        except Exception as e:
+            logger.error(f"Failed to update original run metadata: {e}", exc_info=True)
+            return
+        
+        # Determine the lite model name - always use gemini-2.5-flash-lite
+        # Replace flash with flash-lite, preserving any prefixes like "gemini/" or "openrouter/"
+        if original_model.startswith("gemini/"):
+            lite_model = "gemini/gemini-2.5-flash-lite"
+        elif original_model.startswith("openrouter/"):
+            lite_model = "openrouter/google/gemini-2.5-flash-lite"
+        else:
+            # Default to gemini prefix if no prefix found
+            lite_model = "gemini/gemini-2.5-flash-lite"
+        
+        logger.info(f"🔄 Auto-restarting agent run {original_agent_run_id}")
+        logger.info(f"   Original model: {original_model}")
+        logger.info(f"   Retry model: {lite_model}")
+        logger.info(f"   Preserving context: thread_id={thread_id}, project_id={project_id}")
+        
+        # Create new agent run with flash-lite model
+        # The thread context is preserved automatically since we use the same thread_id
+        from core.ai_models import model_manager
+        resolved_lite_model = model_manager.resolve_model_id(lite_model)
+        
+        new_agent_run = await client.table('agent_runs').insert({
+            "thread_id": thread_id,
+            "status": "running",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "agent_id": agent_config.get('agent_id') if agent_config else None,
+            "agent_version_id": agent_config.get('current_version_id') if agent_config else None,
+            "metadata": {
+                "model_name": resolved_lite_model,
+                "auto_restart": True,
+                "original_agent_run_id": original_agent_run_id,
+                "original_model": original_model,
+                "retry_model": resolved_lite_model
+            }
+        }).execute()
+        
+        new_agent_run_id = new_agent_run.data[0]['id']
+        logger.info(f"✅ Created new agent run {new_agent_run_id} with {resolved_lite_model}")
+        
+        # Register in Redis
+        instance_key = f"active_run:{instance_id}:{new_agent_run_id}"
+        try:
+            await redis.set(instance_key, "running", ex=redis.REDIS_KEY_TTL)
+        except Exception as e:
+            logger.warning(f"Failed to register new agent run in Redis ({instance_key}): {str(e)}")
+        
+        # Start the new agent run in background with the same context
+        # The ThreadManager will automatically load all existing messages from the thread
+        try:
+            run_agent_background.send(
+                agent_run_id=new_agent_run_id,
+                thread_id=thread_id,
+                instance_id=instance_id,
+                project_id=project_id,
+                model_name=lite_model,  # Will be resolved again in the function
+                agent_config=agent_config,  # Preserve agent config
+                request_id=request_id,
+            )
+            
+            logger.info(f"🚀 Auto-restart initiated: new run {new_agent_run_id} will continue from where {original_agent_run_id} failed")
+            logger.info(f"   Using model: {resolved_lite_model}")
+        except Exception as send_error:
+            logger.error(f"Failed to send auto-restart task to background worker: {send_error}", exc_info=True)
+            # Try to mark the new run as failed since we couldn't start it
+            try:
+                await client.table('agent_runs').update({
+                    "status": "failed",
+                    "error": f"Failed to start auto-restart task: {str(send_error)}"
+                }).eq('id', new_agent_run_id).execute()
+            except Exception as update_err:
+                logger.error(f"Failed to update new agent run status after send failure: {update_err}")
+        
+    except Exception as e:
+        logger.error(f"Failed to auto-restart with lite model: {str(e)}", exc_info=True)
+        # Don't raise - we don't want to break the error handling flow

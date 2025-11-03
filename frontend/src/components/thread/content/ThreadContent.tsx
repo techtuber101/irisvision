@@ -1,7 +1,7 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { CircleDashed, CheckCircle, AlertTriangle, Sparkles } from 'lucide-react';
+import { CircleDashed, CheckCircle, AlertTriangle, Sparkles, Copy } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UnifiedMessage, ParsedContent, ParsedMetadata } from '@/components/thread/types';
+import { UnifiedMessage, ParsedContent } from '@/components/thread/types';
 import { FileAttachmentGrid } from '@/components/thread/file-attachment';
 import { useFilePreloader } from '@/hooks/react-query/files';
 import { useAuth } from '@/components/AuthProvider';
@@ -22,6 +22,81 @@ import { ComposioUrlDetector } from './composio-url-detector';
 import { StreamingText } from './StreamingText';
 import { HIDE_STREAMING_XML_TAGS } from '@/components/thread/utils';
 import { useAgentsFromCache } from '@/hooks/react-query/agents/use-agents';
+
+const DAY_IN_MS = 86_400_000;
+const ATTACHMENT_TAG_REGEX = /\[Uploaded File: .*?\]/g;
+const TOOL_CALL_BLOCK_REGEX = /<function_calls>[\s\S]*?<\/function_calls>/gi;
+const LEGACY_TOOL_CALL_REGEX = /<(?:ask|complete|present_presentation|tool_result|tool_results|tool_call)[^>]*>[\s\S]*?<\/(?:ask|complete|present_presentation|tool_result|tool_results|tool_call)>/gi;
+
+function formatMessageTimestamp(timestamp?: string | null): string | null {
+    if (!timestamp) return null;
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return null;
+
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const showFullDate = Math.abs(diff) >= DAY_IN_MS;
+
+    const timeFormatter = new Intl.DateTimeFormat(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+    });
+
+    if (showFullDate) {
+        const includeYear = now.getFullYear() !== date.getFullYear();
+        const dateFormatter = new Intl.DateTimeFormat(undefined, {
+            month: 'short',
+            day: 'numeric',
+            ...(includeYear ? { year: 'numeric' } : {}),
+        });
+        return `${dateFormatter.format(date)}, ${timeFormatter.format(date)}`;
+    }
+
+    return timeFormatter.format(date);
+}
+
+function normalizeTextValue(value: unknown): string {
+    if (!value) return '';
+
+    if (typeof value === 'string') {
+        return value;
+    }
+
+    if (Array.isArray(value)) {
+        return value
+            .map((item) => {
+                if (!item) return '';
+                if (typeof item === 'string') return item;
+                if (item && typeof item === 'object' && 'text' in item && typeof (item as { text?: unknown }).text === 'string') {
+                    return (item as { text: string }).text;
+                }
+                return '';
+            })
+            .filter(Boolean)
+            .join('\n');
+    }
+
+    if (value && typeof value === 'object') {
+        const maybeContent = value as { content?: unknown; text?: unknown };
+        if (maybeContent.content && typeof maybeContent.content === 'string') {
+            return maybeContent.content;
+        }
+        if (maybeContent.text && typeof maybeContent.text === 'string') {
+            return maybeContent.text;
+        }
+    }
+
+    return typeof value === 'object' ? JSON.stringify(value) : String(value);
+}
+
+function getCopyTextPayload(value: unknown): string {
+    const normalized = normalizeTextValue(value);
+    const withoutAttachments = normalized.replace(ATTACHMENT_TAG_REGEX, '');
+    const withoutToolCalls = withoutAttachments
+        .replace(TOOL_CALL_BLOCK_REGEX, '')
+        .replace(LEGACY_TOOL_CALL_REGEX, '');
+    return withoutToolCalls.trim();
+}
 
 
 // Helper function to render all attachments as standalone messages
@@ -110,6 +185,7 @@ export function renderMarkdownContent(
     content: string,
     handleToolClick: (assistantMessageId: string | null, toolName: string) => void,
     messageId: string | null,
+    messageTimestamp?: string | null,
     fileViewerHandler?: (filePath?: string, filePathList?: string[]) => void,
     sandboxId?: string,
     project?: Project,
@@ -412,10 +488,19 @@ export function renderMarkdownContent(
             const paramDisplay = extractPrimaryParam(toolName, rawXml);
 
             // Render tool button as a clickable element
+            const toolTimestamp =
+                formatMessageTimestamp(
+                    (typeof toolCall.parameters?.timestamp === 'string' && toolCall.parameters.timestamp) ||
+                    (typeof toolCall.parameters?.time === 'string' && toolCall.parameters.time) ||
+                    (typeof toolCall.parameters?.created_at === 'string' && toolCall.parameters.created_at) ||
+                    (typeof toolCall.parameters?.started_at === 'string' && toolCall.parameters.started_at) ||
+                    messageTimestamp
+                );
+
             contentParts.push(
                 <div
                     key={toolCallKey}
-                    className="my-1"
+                    className="my-1 flex items-center gap-2 justify-start relative group"
                 >
                     <button
                         onClick={() => handleToolClick(messageId, toolName)}
@@ -451,6 +536,11 @@ export function renderMarkdownContent(
                         <span className="font-mono text-white/90 relative z-10" style={{ fontSize: '12px' }}>{getUserFriendlyToolName(toolName)}</span>
                         {paramDisplay && <span className="ml-1 text-white/70 truncate max-w-[200px] relative z-10" title={paramDisplay}>{paramDisplay}</span>}
                     </button>
+                    {toolTimestamp && (
+                        <span className="text-[10px] text-muted-foreground/70 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 whitespace-nowrap">
+                            {toolTimestamp}
+                        </span>
+                    )}
                 </div>
             );
         }
@@ -542,6 +632,20 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
 
     // React Query file preloader
     const { preloadFiles } = useFilePreloader();
+
+    const handleCopy = useCallback(async (text: string) => {
+        const value = text?.trim();
+        if (!value) return;
+        if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
+            console.warn('Clipboard API not available for copying message content.');
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(value);
+        } catch (error) {
+            console.error('Failed to copy message content', error);
+        }
+    }, []);
 
     const containerClassName = isPreviewMode
         ? "flex-1 overflow-y-auto scrollbar-thin scrollbar-track-secondary/0 scrollbar-thumb-primary/10 scrollbar-thumb-rounded-full hover:scrollbar-thumb-primary/10 py-4 pb-0"
@@ -922,44 +1026,6 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                             }
                                         })();
 
-                                        // In debug mode, display raw message content
-                                        if (debugMode) {
-                                            return (
-                                                <div key={group.key} className="flex justify-end">
-                                                    <div className="flex max-w-[85%] rounded-2xl bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] px-4 py-3 break-words overflow-hidden relative">
-                                                        {/* Gradient rim */}
-                                                        <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl" style={{
-                                                            background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
-                                                            WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
-                                                            WebkitMaskComposite: 'xor',
-                                                            maskComposite: 'exclude',
-                                                            padding: '1px',
-                                                            borderRadius: '16px'
-                                                        }}></div>
-                                                        
-                                                        {/* Specular streak */}
-                                                        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-24" style={{
-                                                            background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
-                                                            filter: 'blur(6px)',
-                                                            mixBlendMode: 'screen'
-                                                        }}></div>
-                                                        
-                                                        {/* Fine noise */}
-                                                        <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-30" style={{
-                                                            backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
-                                                            backgroundSize: '100px 100px',
-                                                            mixBlendMode: 'overlay'
-                                                        }}></div>
-                                                        
-                                                        <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto min-w-0 flex-1 relative z-10">
-                                                            {message.content}
-                                                        </pre>
-                                                    </div>
-                                                </div>
-                                            );
-                                        }
-
-                                        // Extract attachments from the message content
                                         const attachmentsMatch = messageContent.match(/\[Uploaded File: (.*?)\]/g);
                                         const attachments = attachmentsMatch
                                             ? attachmentsMatch.map((match: string) => {
@@ -968,15 +1034,78 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                             }).filter(Boolean)
                                             : [];
 
-                                        // Remove attachment info from the message content
-                                        const cleanContent = messageContent.replace(/\[Uploaded File: .*?\]/g, '').trim();
+                                        const cleanContent = messageContent.replace(ATTACHMENT_TAG_REGEX, '').trim();
+                                        const timestampLabel = formatMessageTimestamp(message.created_at);
+                                        const messageCopyText = getCopyTextPayload(cleanContent || messageContent);
+                                        const canCopyMessage = Boolean(messageCopyText);
+
+                                        const metaControls = (timestampLabel || canCopyMessage) ? (
+                                            <div className="absolute -top-3 right-0 flex items-center gap-1 text-[10px] text-muted-foreground/70 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto focus-within:pointer-events-auto">
+                                                {timestampLabel && <span>{timestampLabel}</span>}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleCopy(messageCopyText)}
+                                                    className="rounded-sm p-1 text-muted-foreground/70 hover:text-muted-foreground hover:bg-white/10 dark:hover:bg-white/10 transition-colors disabled:opacity-40 disabled:pointer-events-none light:hover:bg-black/5"
+                                                    disabled={!canCopyMessage}
+                                                    aria-label="Copy message"
+                                                >
+                                                    <Copy className="h-3 w-3" />
+                                                </button>
+                                            </div>
+                                        ) : null;
+
+                                        // In debug mode, display raw message content
+                                        if (debugMode) {
+                                            return (
+                                                <div key={group.key} className="space-y-3">
+                                                    {renderStandaloneAttachments(attachments as string[], handleOpenFileViewer, sandboxId, project, true)}
+                                                    <div className="flex justify-end relative group pt-3 -mt-3">
+                                                        {metaControls}
+                                                        <div className="flex max-w-[85%] rounded-2xl bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] px-4 py-3 break-words overflow-hidden relative">
+                                                            {/* Gradient rim */}
+                                                            <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl" style={{
+                                                                background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+                                                                WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                                                                WebkitMaskComposite: 'xor',
+                                                                maskComposite: 'exclude',
+                                                                padding: '1px',
+                                                                borderRadius: '16px'
+                                                            }}></div>
+                                                            
+                                                            {/* Specular streak */}
+                                                            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-24" style={{
+                                                                background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+                                                                filter: 'blur(6px)',
+                                                                mixBlendMode: 'screen'
+                                                            }}></div>
+
+                                                            {/* Fine noise */}
+                                                            <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-30" style={{
+                                                                backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+                                                                backgroundSize: '100px 100px',
+                                                                mixBlendMode: 'overlay'
+                                                            }}></div>
+                                                            
+                                                            <div className="min-w-0 flex-1 relative z-10">
+                                                                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto">
+                                                                    {typeof message.content === 'string'
+                                                                        ? message.content
+                                                                        : JSON.stringify(message.content, null, 2)}
+                                                                </pre>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
 
                                         return (
                                             <div key={group.key} className="space-y-3">
                                                 {/* All file attachments rendered outside message bubble */}
                                                 {renderStandaloneAttachments(attachments as string[], handleOpenFileViewer, sandboxId, project, true)}
 
-                                                <div className="flex justify-end">
+                                                <div className="flex justify-end relative group pt-3 -mt-3">
+                                                    {metaControls}
                                                     <div className="flex max-w-[85%] rounded-3xl bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] px-4 py-3 break-words overflow-hidden relative light:border-black/5 light:bg-black/2 light:shadow-[0_2px_8px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(0,0,0,0.05)] light:backdrop-blur-sm">
                                                         {/* Gradient rim */}
                                                         <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-3xl" style={{
@@ -1022,11 +1151,121 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                         const firstAssistantMsg = group.messages.find(m => m.type === 'assistant');
                                         const groupAgentId = firstAssistantMsg?.agent_id;
                                         const groupAgent = groupAgentId ? agentsMap.get(groupAgentId) : undefined;
+                                        const assistantTimestampLabel = formatMessageTimestamp(firstAssistantMsg?.created_at);
+
+                                        const { elements: assistantElements, copyText: assistantCopyText } = (() => {
+                                            if (debugMode) {
+                                                const debugElements = group.messages.map((message, msgIndex) => {
+                                                    const msgKey = message.message_id || `raw-msg-${msgIndex}`;
+                                                    return (
+                                                        <div key={msgKey} className="mb-4">
+                                                            <div className="text-xs font-medium text-muted-foreground mb-1">
+                                                                Type: {message.type} | ID: {message.message_id || 'no-id'}
+                                                            </div>
+                                                            <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto p-2 border border-border rounded-md bg-muted/30">
+                                                                {JSON.stringify(message.content, null, 2)}
+                                                            </pre>
+                                                            {message.metadata && message.metadata !== '{}' && (
+                                                                <div className="mt-2">
+                                                                    <div className="text-xs font-medium text-muted-foreground mb-1">
+                                                                        Metadata:
+                                                                    </div>
+                                                                    <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto p-2 border border-border rounded-md bg-muted/30">
+                                                                        {JSON.stringify(message.metadata, null, 2)}
+                                                                    </pre>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                });
+
+                                                const copyText = group.messages
+                                                    .filter(msg => msg.type === 'assistant')
+                                                    .map(msg => getCopyTextPayload(msg.content))
+                                                    .filter(Boolean)
+                                                    .join('\n\n')
+                                                    .trim();
+
+                                                return { elements: debugElements, copyText };
+                                            }
+
+                                            const elements: React.ReactNode[] = [];
+                                            const copyParts: string[] = [];
+                                            let assistantMessageCount = 0;
+
+                                            group.messages.forEach((message, msgIndex) => {
+                                                if (message.type === 'assistant') {
+                                                    const parsedContent = safeJsonParse<ParsedContent>(message.content, {});
+                                                    const msgKey = message.message_id || `submsg-assistant-${msgIndex}`;
+
+                                                    if (!parsedContent.content) return;
+
+                                                    const renderedContent = renderMarkdownContent(
+                                                        parsedContent.content,
+                                                        handleToolClick,
+                                                        message.message_id,
+                                                        message.created_at,
+                                                        handleOpenFileViewer,
+                                                        sandboxId,
+                                                        project,
+                                                        debugMode
+                                                    );
+
+                                                    const copyContribution = getCopyTextPayload(parsedContent.content ?? message.content);
+                                                    if (copyContribution) {
+                                                        copyParts.push(copyContribution);
+                                                    }
+
+                                                    elements.push(
+                                                        <AnimatePresence key={msgKey} mode="wait">
+                                                            <motion.div
+                                                                className={assistantMessageCount > 0 ? "mt-4" : ""}
+                                                                initial={{ opacity: 0, y: 8 }}
+                                                                animate={{ opacity: 1, y: 0 }}
+                                                                exit={{ opacity: 0, y: -8 }}
+                                                                transition={{
+                                                                    duration: 0.2,
+                                                                    ease: "easeOut"
+                                                                }}
+                                                            >
+                                                                <div className="prose prose-base dark:prose-invert chat-markdown max-w-none [&>:first-child]:mt-0 prose-headings:mt-3 break-words overflow-hidden">
+                                                                    {renderedContent}
+                                                                </div>
+                                                            </motion.div>
+                                                        </AnimatePresence>
+                                                    );
+
+                                                    assistantMessageCount++;
+                                                }
+                                            });
+
+                                            return {
+                                                elements,
+                                                copyText: copyParts.join('\n\n').trim(),
+                                            };
+                                        })();
+
+                                        const canCopyAssistant = Boolean(assistantCopyText);
+                                        const assistantMetaControls = (assistantTimestampLabel || canCopyAssistant) ? (
+                                            <div className="absolute top-1 right-0 flex items-center gap-1 text-[10px] text-muted-foreground/70 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto focus-within:pointer-events-auto">
+                                                {assistantTimestampLabel && <span>{assistantTimestampLabel}</span>}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleCopy(assistantCopyText)}
+                                                    className="rounded-sm p-1 text-muted-foreground/70 hover:text-muted-foreground hover:bg-white/10 dark:hover:bg-white/10 transition-colors disabled:opacity-40 disabled:pointer-events-none light:hover:bg-black/5"
+                                                    disabled={!canCopyAssistant}
+                                                    aria-label="Copy assistant response"
+                                                >
+                                                    <Copy className="h-3 w-3" />
+                                                </button>
+                                            </div>
+                                        ) : null;
 
                                         return (
-                                            <div key={group.key} ref={groupIndex === groupedMessages.length - 1 ? latestMessageRef : null}>
+                                            <div key={group.key} ref={groupIndex === groupedMessages.length - 1 ? latestMessageRef : null} className="relative group">
+                                                {assistantMetaControls}
                                                 <div className="flex flex-col gap-2">
-                                                    <div className="flex items-center">
+                                                    <div className="flex items-center pr-12">
                                                         <div className="rounded-md flex items-center justify-center relative">
                                                             {groupAgent || groupAgentId ? (
                                                                 <AgentAvatar agent={groupAgent} agentId={groupAgentId} size={20} className="h-5 w-5" />
@@ -1046,92 +1285,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                     {/* Message content - ALL messages in the group */}
                                                     <div className="flex max-w-[90%] text-sm break-words overflow-hidden">
                                                         <div className="space-y-2 min-w-0 flex-1">
-                                                            {(() => {
-                                                                // In debug mode, just show raw messages content
-                                                                if (debugMode) {
-                                                                    return group.messages.map((message, msgIndex) => {
-                                                                        const msgKey = message.message_id || `raw-msg-${msgIndex}`;
-                                                                        return (
-                                                                            <div key={msgKey} className="mb-4">
-                                                                                <div className="text-xs font-medium text-muted-foreground mb-1">
-                                                                                    Type: {message.type} | ID: {message.message_id || 'no-id'}
-                                                                                </div>
-                                                                                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto p-2 border border-border rounded-md bg-muted/30">
-                                                                                    {JSON.stringify(message.content, null, 2)}
-                                                                                </pre>
-                                                                                {message.metadata && message.metadata !== '{}' && (
-                                                                                    <div className="mt-2">
-                                                                                        <div className="text-xs font-medium text-muted-foreground mb-1">
-                                                                                            Metadata:
-                                                                                        </div>
-                                                                                        <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto p-2 border border-border rounded-md bg-muted/30">
-                                                                                            {JSON.stringify(message.metadata, null, 2)}
-                                                                                        </pre>
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        );
-                                                                    });
-                                                                }
-
-                                                                const toolResultsMap = new Map<string | null, UnifiedMessage[]>();
-                                                                group.messages.forEach(msg => {
-                                                                    if (msg.type === 'tool') {
-                                                                        const meta = safeJsonParse<ParsedMetadata>(msg.metadata, {});
-                                                                        const assistantId = meta.assistant_message_id || null;
-                                                                        if (!toolResultsMap.has(assistantId)) {
-                                                                            toolResultsMap.set(assistantId, []);
-                                                                        }
-                                                                        toolResultsMap.get(assistantId)?.push(msg);
-                                                                    }
-                                                                });
-
-                                                                const elements: React.ReactNode[] = [];
-                                                                let assistantMessageCount = 0; // Move this outside the loop
-
-                                                                group.messages.forEach((message, msgIndex) => {
-                                                                    if (message.type === 'assistant') {
-                                                                        const parsedContent = safeJsonParse<ParsedContent>(message.content, {});
-                                                                        const msgKey = message.message_id || `submsg-assistant-${msgIndex}`;
-
-
-                                                                        if (!parsedContent.content) return;
-
-                                                                        const renderedContent = renderMarkdownContent(
-                                                                            parsedContent.content,
-                                                                            handleToolClick,
-                                                                            message.message_id,
-                                                                            handleOpenFileViewer,
-                                                                            sandboxId,
-                                                                            project,
-                                                                            debugMode
-                                                                        );
-
-                                                                        elements.push(
-                                                                            <AnimatePresence key={msgKey} mode="wait">
-                                                                                <motion.div 
-                                                                                    className={assistantMessageCount > 0 ? "mt-4" : ""}
-                                                                                    initial={{ opacity: 0, y: 8 }}
-                                                                                    animate={{ opacity: 1, y: 0 }}
-                                                                                    exit={{ opacity: 0, y: -8 }}
-                                                                                    transition={{ 
-                                                                                        duration: 0.2, 
-                                                                                        ease: "easeOut" 
-                                                                                    }}
-                                                                                >
-                                                                                    <div className="prose prose-base dark:prose-invert chat-markdown max-w-none [&>:first-child]:mt-0 prose-headings:mt-3 break-words overflow-hidden">
-                                                                                        {renderedContent}
-                                                                                    </div>
-                                                                                </motion.div>
-                                                                            </AnimatePresence>
-                                                                        );
-
-                                                                        assistantMessageCount++; // Increment after adding the element
-                                                                    }
-                                                                });
-
-                                                                return elements;
-                                                            })()}
+                                                            {assistantElements}
 
                                                             {groupIndex === finalGroupedMessages.length - 1 && !readOnly && (streamHookStatus === 'streaming' || streamHookStatus === 'connecting') && (
                                                                 <div className="mt-4">

@@ -56,6 +56,8 @@ class AgentConfig:
     model_name: str = "openai/gpt-5-mini"
     agent_config: Optional[dict] = None
     trace: Optional[StatefulTraceClient] = None
+    fallback_model: str = "gemini/gemini-2.5-flash-lite"  # Model to use when error occurs
+    fallback_triggered: bool = False  # Track if fallback has been triggered
 
 class ToolManager:
     def __init__(self, thread_manager: ThreadManager, project_id: str, thread_id: str, agent_config: Optional[dict] = None):
@@ -562,6 +564,62 @@ class AgentRunner:
             else:
                 logger.warning("Could not register agent_creation_tool: account_id not available")
     
+    def _should_trigger_fallback(self, error_message: str) -> bool:
+        """
+        Determine if an error should trigger fallback to flash-lite model.
+        
+        Only triggers on actual errors, not false positives like:
+        - "not found" errors (agent run not found, etc.)
+        - Cancellation errors
+        - User-initiated stops
+        
+        Args:
+            error_message: The error message to evaluate
+            
+        Returns:
+            True if fallback should be triggered, False otherwise
+        """
+        if not error_message:
+            return False
+        
+        error_lower = error_message.lower()
+        
+        # Don't trigger fallback for these benign/expected errors
+        skip_patterns = [
+            'not found',
+            'not running',
+            'cancelled',
+            'canceled',
+            'stopped by user',
+            'insufficient credits',
+            'billing',
+            'authentication',
+            'authorization',
+            'permission denied',
+        ]
+        
+        for pattern in skip_patterns:
+            if pattern in error_lower:
+                logger.debug(f"Skipping fallback for error: {error_message[:100]} (matches skip pattern: {pattern})")
+                return False
+        
+        # Only trigger fallback if we haven't already done so
+        if self.config.fallback_triggered:
+            logger.debug(f"Skipping fallback - already triggered (error: {error_message[:100]})")
+            return False
+        
+        # Check if current model is NOT already the fallback model
+        current_model_lower = self.config.model_name.lower()
+        fallback_model_lower = self.config.fallback_model.lower()
+        
+        if current_model_lower == fallback_model_lower or 'lite' in current_model_lower:
+            logger.debug(f"Skipping fallback - already using fallback model or lite variant (current: {self.config.model_name})")
+            return False
+        
+        # Trigger fallback for actual errors
+        logger.info(f"✅ Triggering fallback: {error_message[:200]}")
+        return True
+    
     def _get_disabled_tools_from_config(self) -> List[str]:
         disabled_tools = []
         
@@ -624,10 +682,15 @@ class AgentRunner:
             tool_registry=self.thread_manager.tool_registry,
             xml_tool_calling=True
         )
-        logger.info(f"📝 System message built once: {len(str(system_message.get('content', '')))} chars")
+        system_content_length = len(str(system_message.get('content', '')))
+        logger.info(f"📝 System message built once: {system_content_length} chars")
         logger.debug(f"model_name received: {self.config.model_name}")
         iteration_count = 0
         continue_execution = True
+        final_error_detected = False  # Track if any error occurred during the run
+        final_termination_reason = None  # Track why execution stopped: None, 'explicit', 'max_iterations', 'unknown'
+        fallback_triggered = self.config.fallback_triggered  # Track if fallback model has been used
+        system_message_needs_rebuild = False  # Track if system message needs to be rebuilt after fallback
 
         latest_user_message = await self.client.table('messages').select('*').eq('thread_id', self.config.thread_id).eq('type', 'user').order('created_at', desc=True).limit(1).execute()
         if latest_user_message.data and len(latest_user_message.data) > 0:
@@ -639,10 +702,12 @@ class AgentRunner:
 
         while continue_execution and iteration_count < self.config.max_iterations:
             iteration_count += 1
+            should_continue = False
 
             can_run, message, reservation_id = await billing_integration.check_and_reserve_credits(self.account_id)
             if not can_run:
                 error_msg = f"Insufficient credits: {message}"
+                final_error_detected = True
                 yield {
                     "type": "status",
                     "status": "stopped",
@@ -650,20 +715,28 @@ class AgentRunner:
                 }
                 break
 
-            latest_message = await self.client.table('messages').select('*').eq('thread_id', self.config.thread_id).in_('type', ['assistant', 'tool', 'user']).order('created_at', desc=True).limit(1).execute()
-            if latest_message.data and len(latest_message.data) > 0:
-                message_type = latest_message.data[0].get('type')
-                if message_type == 'assistant':
-                    continue_execution = False
-                    break
-
             temporary_message = None
             # Don't set max_tokens by default - let LiteLLM and providers handle their own defaults
             max_tokens = None
             logger.debug(f"max_tokens: {max_tokens} (using provider defaults)")
             generation = self.config.trace.generation(name="thread_manager.run_thread") if self.config.trace else None
+            
+            # Rebuild system message if model changed (fallback triggered)
+            if system_message_needs_rebuild:
+                logger.info(f"🔄 Rebuilding system prompt with fallback model: {self.config.model_name}")
+                system_message = await PromptManager.build_system_prompt(
+                    self.config.model_name, self.config.agent_config, 
+                    self.config.thread_id, 
+                    mcp_wrapper_instance, self.client,
+                    tool_registry=self.thread_manager.tool_registry,
+                    xml_tool_calling=True
+                )
+                system_message_needs_rebuild = False
+                system_content_length_rebuilt = len(str(system_message.get('content', '')))
+                logger.info(f"📝 System message rebuilt with fallback model: {system_content_length_rebuilt} chars")
+            
             try:
-                logger.debug(f"Starting thread execution for {self.config.thread_id}")
+                logger.debug(f"Starting thread execution for {self.config.thread_id} with model: {self.config.model_name}")
                 response = await self.thread_manager.run_thread(
                     thread_id=self.config.thread_id,
                     system_prompt=system_message,
@@ -689,16 +762,43 @@ class AgentRunner:
                 last_tool_call = None
                 agent_should_terminate = False
                 error_detected = False
+                tool_activity_detected = False
+                finish_reason = None
+                saw_thread_run_end = False
 
                 try:
                     if hasattr(response, '__aiter__') and not isinstance(response, dict):
                         async for chunk in response:
                             # Check for error status from thread_manager
                             if isinstance(chunk, dict) and chunk.get('type') == 'status' and chunk.get('status') == 'error':
-                                logger.error(f"Error in thread execution: {chunk.get('message', 'Unknown error')}")
-                                error_detected = True
-                                yield chunk
-                                continue
+                                error_message = chunk.get('message', 'Unknown error')
+                                logger.error(f"Error in thread execution: {error_message}")
+                                
+                                # Check if we should trigger fallback instead of stopping
+                                if not fallback_triggered and self._should_trigger_fallback(error_message):
+                                    logger.info(f"🔄 Error detected, triggering fallback to {self.config.fallback_model} (thread {self.config.thread_id})")
+                                    fallback_triggered = True
+                                    self.config.model_name = self.config.fallback_model
+                                    self.config.fallback_triggered = True
+                                    system_message_needs_rebuild = True  # Mark system message for rebuild
+                                    
+                                    # Yield a status message indicating fallback
+                                    yield {
+                                        "type": "status",
+                                        "status": "fallback",
+                                        "message": f"Switching to fallback model {self.config.fallback_model} due to error",
+                                        "original_error": error_message
+                                    }
+                                    
+                                    # Continue execution instead of breaking
+                                    error_detected = False
+                                    break  # Break to restart iteration with new model
+                                else:
+                                    # Error occurred but fallback already used or shouldn't trigger
+                                    error_detected = True
+                                    final_error_detected = True
+                                    yield chunk
+                                    break
 
                             # Check for error status in the stream (message format)
                             if isinstance(chunk, dict) and chunk.get('type') == 'status':
@@ -709,10 +809,42 @@ class AgentRunner:
                                     
                                     # Check for error status
                                     if content.get('status_type') == 'error':
-                                        error_detected = True
-                                        yield chunk
-                                        continue
+                                        error_message = content.get('message', 'Unknown error')
+                                        
+                                        # Check if we should trigger fallback instead of stopping
+                                        if not fallback_triggered and self._should_trigger_fallback(error_message):
+                                            logger.info(f"🔄 Error detected in stream, triggering fallback to {self.config.fallback_model} (thread {self.config.thread_id})")
+                                            fallback_triggered = True
+                                            self.config.model_name = self.config.fallback_model
+                                            self.config.fallback_triggered = True
+                                            system_message_needs_rebuild = True  # Mark system message for rebuild
+                                            
+                                            # Yield a status message indicating fallback
+                                            yield {
+                                                "type": "status",
+                                                "status": "fallback",
+                                                "message": f"Switching to fallback model {self.config.fallback_model} due to error",
+                                                "original_error": error_message
+                                            }
+                                            
+                                            # Continue execution instead of breaking
+                                            error_detected = False
+                                            break  # Break to restart iteration with new model
+                                        else:
+                                            # Error occurred but fallback already used or shouldn't trigger
+                                            error_detected = True
+                                            final_error_detected = True
+                                            yield chunk
+                                            break
                                     
+                                    # Check for thread_run_end - marks a completed run from ThreadManager
+                                    if content.get('status_type') == 'thread_run_end':
+                                        saw_thread_run_end = True
+
+                                    if content.get('status_type') == 'finish':
+                                        finish_reason = content.get('finish_reason')
+                                        logger.debug(f"Finish reason detected: {finish_reason} (thread {self.config.thread_id})")
+
                                     # Check for agent termination
                                     metadata = chunk.get('metadata', {})
                                     if isinstance(metadata, str):
@@ -725,10 +857,15 @@ class AgentRunner:
                                             last_tool_call = content['function_name']
                                         elif content.get('xml_tag_name'):
                                             last_tool_call = content['xml_tag_name']
-                                            
+
+                                    status_type = content.get('status_type')
+                                    if status_type and status_type.startswith('tool_'):
+                                        tool_activity_detected = True
+                                        logger.debug(f"Tool activity detected: {status_type} (thread {self.config.thread_id})")
+
                                 except Exception:
                                     pass
-                            
+
                             # Check for terminating XML tools in assistant content
                             if chunk.get('type') == 'assistant' and 'content' in chunk:
                                 try:
@@ -744,9 +881,13 @@ class AgentRunner:
                                             last_tool_call = 'ask'
                                         elif '</complete>' in assistant_text:
                                             last_tool_call = 'complete'
-                                
+
                                 except (json.JSONDecodeError, Exception):
                                     pass
+
+                            if chunk.get('type') == 'tool':
+                                tool_activity_detected = True
+                                logger.debug(f"Tool activity detected: tool chunk (thread {self.config.thread_id})")
 
                             yield chunk
                     else:
@@ -755,9 +896,30 @@ class AgentRunner:
                         
                         # Check if it's an error dict
                         if isinstance(response, dict) and response.get('type') == 'status' and response.get('status') == 'error':
-                            logger.error(f"Thread returned error: {response.get('message', 'Unknown error')}")
-                            error_detected = True
-                            yield response
+                            error_message = response.get('message', 'Unknown error')
+                            logger.error(f"Thread returned error: {error_message}")
+                            
+                            # Check if we should trigger fallback instead of stopping
+                            if not fallback_triggered and self._should_trigger_fallback(error_message):
+                                logger.info(f"🔄 Error detected in response, triggering fallback to {self.config.fallback_model} (thread {self.config.thread_id})")
+                                fallback_triggered = True
+                                self.config.model_name = self.config.fallback_model
+                                self.config.fallback_triggered = True
+                                system_message_needs_rebuild = True  # Mark system message for rebuild
+                                
+                                # Yield a status message indicating fallback
+                                yield {
+                                    "type": "status",
+                                    "status": "fallback",
+                                    "message": f"Switching to fallback model {self.config.fallback_model} due to error",
+                                    "original_error": error_message
+                                }
+                                
+                                # Continue execution instead of breaking
+                                error_detected = False
+                            else:
+                                error_detected = True
+                                yield response
                         else:
                             logger.warning(f"Unexpected response type: {type(response)}")
                             error_detected = True
@@ -765,31 +927,144 @@ class AgentRunner:
                     if error_detected:
                         if generation:
                             generation.end(status_message="error_detected", level="ERROR")
+                        final_error_detected = True
                         break
                         
                     if agent_should_terminate or last_tool_call in ['ask', 'complete', 'present_presentation']:
                         if generation:
                             generation.end(status_message="agent_stopped")
                         continue_execution = False
+                        final_termination_reason = 'explicit'
+                    else:
+                        auto_continue_reasons = {"length", "tool_calls"}
+                        # Priority 1: If tool activity was detected, always continue
+                        # This ensures the agent continues after executing tools to process results
+                        if tool_activity_detected:
+                            should_continue = True
+                            logger.debug(f"Continuing execution due to tool activity detected (thread {self.config.thread_id})")
+                        # Priority 2: Check finish_reason for auto-continue reasons
+                        elif finish_reason and finish_reason in auto_continue_reasons:
+                            should_continue = True
+                            logger.debug(f"Continuing execution due to finish_reason: {finish_reason} (thread {self.config.thread_id})")
+                        # Priority 3: If we haven't seen thread_run_end yet, assume more processing may follow
+                        elif not saw_thread_run_end and finish_reason is None and not tool_activity_detected:
+                            should_continue = True
+                            logger.debug(f"Continuing execution - no explicit finish signal yet (thread {self.config.thread_id})")
+                        # Priority 4: Only stop if we've seen thread_run_end AND no tool activity AND no auto-continue reason
+                        else:
+                            should_continue = False
+                            if saw_thread_run_end and final_termination_reason is None:
+                                final_termination_reason = 'implicit'
+                                logger.debug(f"Stopping execution - saw thread_run_end with no tool activity (thread {self.config.thread_id}, finish_reason={finish_reason}, tool_activity_detected={tool_activity_detected})")
+                    
+                    # Log final decision for debugging
+                    logger.debug(f"Continuation decision for iteration {iteration_count}: should_continue={should_continue}, tool_activity_detected={tool_activity_detected}, finish_reason={finish_reason}, saw_thread_run_end={saw_thread_run_end}, agent_should_terminate={agent_should_terminate} (thread {self.config.thread_id})")
 
                 except Exception as e:
                     # Use ErrorProcessor for safe error handling
                     processed_error = ErrorProcessor.process_system_error(e, context={"thread_id": self.config.thread_id})
                     ErrorProcessor.log_error(processed_error)
-                    if generation:
-                        generation.end(status_message=processed_error.message, level="ERROR")
-                    yield processed_error.to_stream_dict()
-                    break
+                    error_message = processed_error.message
+                    
+                    # Check if we should trigger fallback instead of stopping
+                    if not fallback_triggered and self._should_trigger_fallback(error_message):
+                        logger.info(f"🔄 Exception detected, triggering fallback to {self.config.fallback_model} (thread {self.config.thread_id})")
+                        fallback_triggered = True
+                        self.config.model_name = self.config.fallback_model
+                        self.config.fallback_triggered = True
+                        system_message_needs_rebuild = True  # Mark system message for rebuild
+                        
+                        # Yield a status message indicating fallback
+                        yield {
+                            "type": "status",
+                            "status": "fallback",
+                            "message": f"Switching to fallback model {self.config.fallback_model} due to error",
+                            "original_error": error_message
+                        }
+                        
+                        # Continue execution instead of breaking - restart iteration with new model
+                        error_detected = False
+                        if generation:
+                            generation.end()
+                        continue  # Continue to next iteration with fallback model
+                    else:
+                        # Error occurred but fallback already used or shouldn't trigger
+                        if generation:
+                            generation.end(status_message=processed_error.message, level="ERROR")
+                        final_error_detected = True
+                        yield processed_error.to_stream_dict()
+                        break
                     
             except Exception as e:
                 # Use ErrorProcessor for safe error conversion
                 processed_error = ErrorProcessor.process_system_error(e, context={"thread_id": self.config.thread_id})
                 ErrorProcessor.log_error(processed_error)
-                yield processed_error.to_stream_dict()
-                break
+                error_message = processed_error.message
+                
+                # Check if we should trigger fallback instead of stopping
+                if not fallback_triggered and self._should_trigger_fallback(error_message):
+                    logger.info(f"🔄 Outer exception detected, triggering fallback to {self.config.fallback_model} (thread {self.config.thread_id})")
+                    fallback_triggered = True
+                    self.config.model_name = self.config.fallback_model
+                    self.config.fallback_triggered = True
+                    system_message_needs_rebuild = True  # Mark system message for rebuild
+                    
+                    # Yield a status message indicating fallback
+                    yield {
+                        "type": "status",
+                        "status": "fallback",
+                        "message": f"Switching to fallback model {self.config.fallback_model} due to error",
+                        "original_error": error_message
+                    }
+                    
+                    # Continue execution instead of breaking - restart iteration with new model
+                    final_error_detected = False
+                    continue  # Continue to next iteration with fallback model
+                else:
+                    # Error occurred but fallback already used or shouldn't trigger
+                    final_error_detected = True
+                    yield processed_error.to_stream_dict()
+                    break
             
             if generation:
                 generation.end()
+
+            continue_execution = should_continue
+
+        # Yield completion status when loop exits naturally (not via break)
+        # This ensures run_agent_background knows why the agent stopped
+        if not final_error_detected:
+            # Check if we hit max iterations
+            if iteration_count >= self.config.max_iterations:
+                final_termination_reason = 'max_iterations'
+                yield {
+                    "type": "status",
+                    "status": "stopped",
+                    "message": f"Agent reached maximum iterations ({self.config.max_iterations})"
+                }
+            elif final_termination_reason == 'explicit':
+                # Agent was explicitly stopped (termination signal)
+                yield {
+                    "type": "status",
+                    "status": "completed",
+                    "message": "Agent completed successfully"
+                }
+            elif not continue_execution:
+                # continue_execution was set to False but we don't know why
+                logger.warning(f"Agent generator exited with continue_execution=False but no explicit termination reason for thread {self.config.thread_id}")
+                yield {
+                    "type": "status",
+                    "status": "completed",
+                    "message": "Agent run completed"
+                }
+            else:
+                # Loop exited for unknown reason - this shouldn't happen but log it
+                logger.warning(f"Agent generator exited unexpectedly for thread {self.config.thread_id} (iteration_count={iteration_count}, continue_execution={continue_execution})")
+                yield {
+                    "type": "status",
+                    "status": "completed",
+                    "message": "Agent run completed"
+                }
 
         try:
             asyncio.create_task(asyncio.to_thread(lambda: langfuse.flush()))

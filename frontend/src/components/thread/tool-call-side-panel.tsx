@@ -10,7 +10,6 @@ import { CircleDashed, X, ChevronLeft, ChevronRight, Computer, Minimize2, Globe,
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { ToolView } from './tool-views/wrapper';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -138,6 +137,92 @@ const getComputerTitle = (agentName?: string): string => {
   return agentName ? `${agentName}'s Computer` : "Iris's Computer";
 };
 
+const formatDuration = (durationMs: number): string => {
+  const safeMs = Number.isFinite(durationMs) ? Math.max(0, Math.floor(durationMs)) : 0;
+  const totalSeconds = Math.floor(safeMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds
+      .toString()
+      .padStart(2, '0')}`;
+  }
+
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
+const RunningStatusBadge: React.FC<{ durationMs: number; className?: string }> = ({
+  durationMs,
+  className,
+}) => {
+  const formatted = formatDuration(durationMs);
+
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-2 text-emerald-200 light:text-emerald-600',
+        className,
+      )}
+    >
+      <motion.span
+        className="relative flex h-3.5 w-3.5 items-center justify-center rounded-full"
+        animate={{
+          scale: [1, 1.3, 1],
+          boxShadow: [
+            '0 0 0px rgba(16,185,129,0.4)',
+            '0 0 14px rgba(16,185,129,0.55)',
+            '0 0 0px rgba(16,185,129,0.35)',
+          ],
+          opacity: [0.9, 1, 0.9],
+        }}
+        transition={{
+          duration: 1.8,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+      >
+        <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400/35 blur-[6px]" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-emerald-200/70 bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.55)]" />
+      </motion.span>
+      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-100 light:text-emerald-600 ml-0.5">
+        Running
+      </span>
+      <span className="rounded-full border border-emerald-400/35 bg-emerald-500/15 px-2 py-0.5 text-xs font-mono text-emerald-100 shadow-[0_0_12px_rgba(16,185,129,0.35)] light:bg-emerald-200/50 light:text-emerald-600">
+        {formatted}
+      </span>
+    </div>
+  );
+};
+
+const CompletedStatusBadge: React.FC<{ durationMs: number; className?: string }> = ({
+  durationMs,
+  className,
+}) => {
+  const formatted = formatDuration(durationMs);
+
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-2 text-amber-200/80 light:text-amber-600/80',
+        className,
+      )}
+    >
+      <span className="relative flex h-3.5 w-3.5 items-center justify-center rounded-full">
+        <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400/20 blur-[6px]" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-amber-200/40 bg-amber-400/70 shadow-[0_0_6px_rgba(251,191,36,0.35)]" />
+      </span>
+      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-200/80 light:text-amber-600/80">
+        Completed
+      </span>
+      <span className="rounded-full border border-amber-300/30 bg-amber-400/12 px-1.5 py-[2px] text-[10px] font-mono text-amber-100/85 shadow-[0_0_6px_rgba(251,191,36,0.22)] light:bg-amber-200/20 light:text-amber-700/75">
+        {formatted}
+      </span>
+    </div>
+  );
+};
+
 // Reusable header component for the tool panel
 interface PanelHeaderProps {
   agentName?: string;
@@ -146,6 +231,8 @@ interface PanelHeaderProps {
   variant?: 'drawer' | 'desktop' | 'motion';
   showMinimize?: boolean;
   layoutId?: string;
+  runningDurationMs?: number;
+  completedDurationMs?: number;
 }
 
 const PanelHeader: React.FC<PanelHeaderProps> = memo(function PanelHeader({
@@ -155,26 +242,54 @@ const PanelHeader: React.FC<PanelHeaderProps> = memo(function PanelHeader({
   variant = 'desktop',
   showMinimize = false,
   layoutId,
+  runningDurationMs = 0,
+  completedDurationMs,
 }) {
   const title = getComputerTitle(agentName);
+  const showRunningIndicator = isStreaming;
+  const showCompletedIndicator =
+    !isStreaming && typeof completedDurationMs === 'number' && completedDurationMs > 0;
+  const runningBadgeDesktop = showRunningIndicator ? (
+    <RunningStatusBadge durationMs={runningDurationMs} className="hidden sm:flex" />
+  ) : null;
+  const runningBadgeMobile = showRunningIndicator ? (
+    <RunningStatusBadge durationMs={runningDurationMs} className="sm:hidden" />
+  ) : null;
+  const completedBadgeDesktop = showCompletedIndicator ? (
+    <CompletedStatusBadge durationMs={completedDurationMs} className="hidden sm:flex" />
+  ) : null;
+  const completedBadgeMobile = showCompletedIndicator ? (
+    <CompletedStatusBadge durationMs={completedDurationMs} className="sm:hidden" />
+  ) : null;
   
   if (variant === 'drawer') {
     return (
       <DrawerHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <DrawerTitle className="text-lg font-medium">
-            {title}
-          </DrawerTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="h-8 w-8"
-            title="Minimize to floating preview"
-          >
-            <Minimize2 className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-3">
+            <DrawerTitle className="text-lg font-medium">
+              {title}
+            </DrawerTitle>
+            {runningBadgeDesktop}
+          </div>
+          <div className="flex items-center gap-2">
+            {completedBadgeDesktop}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="h-8 w-8"
+              title="Minimize to floating preview"
+            >
+              <Minimize2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
+        {(runningBadgeMobile || completedBadgeMobile) && (
+          <div className="mt-2">
+            {showRunningIndicator ? runningBadgeMobile : completedBadgeMobile}
+          </div>
+        )}
       </DrawerHeader>
     );
   }
@@ -192,15 +307,12 @@ const PanelHeader: React.FC<PanelHeaderProps> = memo(function PanelHeader({
                 {title}
               </h2>
             </motion.div>
+            {runningBadgeDesktop}
           </div>
 
           <div className="flex items-center gap-2">
-            {isStreaming && (
-              <div className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1.5">
-                <CircleDashed className="h-3 w-3 animate-spin" />
-                <span>Running</span>
-              </div>
-            )}
+            {completedBadgeDesktop}
+            {showRunningIndicator ? runningBadgeMobile : completedBadgeMobile}
             <Button
               variant="ghost"
               size="icon"
@@ -226,14 +338,11 @@ const PanelHeader: React.FC<PanelHeaderProps> = memo(function PanelHeader({
               {title}
             </h2>
           </div>
+          {runningBadgeDesktop}
         </div>
         <div className="flex-1 flex items-center justify-end gap-2">
-          {isStreaming && (
-            <Badge variant="outline" className="gap-1.5 p-2 rounded-3xl">
-              <CircleDashed className="h-3 w-3 animate-spin" />
-              <span>Running</span>
-            </Badge>
-          )}
+          {completedBadgeDesktop}
+          {showRunningIndicator ? runningBadgeMobile : completedBadgeMobile}
           <Button
             variant="ghost"
             size="icon"
@@ -277,6 +386,106 @@ export function ToolCallSidePanel({
   const [navigationMode, setNavigationMode] = React.useState<'live' | 'manual'>('live');
   const [toolCallSnapshots, setToolCallSnapshots] = React.useState<ToolCallSnapshot[]>([]);
   const [isInitialized, setIsInitialized] = React.useState(false);
+  const [runStartTime, setRunStartTime] = React.useState<number | null>(null);
+  const [runElapsedMs, setRunElapsedMs] = React.useState(0);
+  const [lastRunDurationMs, setLastRunDurationMs] = React.useState<number | null>(null);
+  const wasRunningRef = React.useRef(false);
+  const hasRestoredTimerRef = React.useRef(false);
+
+  // Generate localStorage key for timer persistence
+  const getTimerStorageKey = React.useCallback(() => {
+    const projectId = project?.id || 'unknown';
+    const agentId = selectedAgentId || 'default';
+    return `agent_timer_${projectId}_${agentId}`;
+  }, [project?.id, selectedAgentId]);
+
+  // Clean up old timer entries (older than 24 hours)
+  React.useEffect(() => {
+    try {
+      const now = Date.now();
+      const oneDayAgo = now - 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+      const keysToRemove: string[] = [];
+
+      // Check all localStorage keys
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith('agent_timer_')) {
+          try {
+            const stored = localStorage.getItem(key);
+            if (stored) {
+              const data = JSON.parse(stored);
+              if (data.startTime && data.startTime < oneDayAgo) {
+                keysToRemove.push(key);
+              }
+            }
+          } catch (e) {
+            // Invalid data, remove it
+            keysToRemove.push(key);
+          }
+        }
+      }
+
+      // Remove old entries
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+    } catch (e) {
+      // Silently fail if localStorage is not available
+    }
+  }, []); // Run once on mount
+
+  // Restore timer from localStorage on mount or when key changes
+  React.useEffect(() => {
+    // Only restore once per key, or when key changes
+    if (hasRestoredTimerRef.current && runStartTime !== null) {
+      return; // Already restored and timer is active
+    }
+
+    try {
+      const storageKey = getTimerStorageKey();
+      const stored = localStorage.getItem(storageKey);
+      
+      if (stored) {
+        const data = JSON.parse(stored);
+        const storedStartTime = data.startTime;
+        
+        // Check if the stored time is valid and not too old (max 24 hours)
+        const now = Date.now();
+        const oneDayAgo = now - 24 * 60 * 60 * 1000;
+        
+        if (storedStartTime && storedStartTime > oneDayAgo) {
+          // Check if agent appears to still be running (check both isAgentRunning and isStreaming)
+          const isCurrentlyStreaming = toolCallSnapshots.some(
+            snapshot => snapshot.toolCall.toolResult?.content === 'STREAMING'
+          );
+          const shouldRestore = isAgentRunning || isCurrentlyStreaming;
+          
+          if (shouldRestore && runStartTime === null) {
+            setRunStartTime(storedStartTime);
+            setRunElapsedMs(now - storedStartTime);
+            wasRunningRef.current = true;
+            hasRestoredTimerRef.current = true;
+          } else if (!shouldRestore) {
+            // Task completed, remove from storage
+            localStorage.removeItem(storageKey);
+            hasRestoredTimerRef.current = true;
+          }
+        } else {
+          // Entry is too old, remove it
+          localStorage.removeItem(storageKey);
+          hasRestoredTimerRef.current = true;
+        }
+      } else {
+        hasRestoredTimerRef.current = true;
+      }
+    } catch (e) {
+      // Silently fail if localStorage is not available or data is corrupted
+      hasRestoredTimerRef.current = true;
+    }
+  }, [getTimerStorageKey, isAgentRunning, toolCallSnapshots, runStartTime]); // Run when key, agent status, or tool calls change
+
+  // Reset restore flag when key changes
+  React.useEffect(() => {
+    hasRestoredTimerRef.current = false;
+  }, [getTimerStorageKey]);
 
   // Add copy functionality state
   // Add view toggle state  
@@ -483,6 +692,66 @@ export function ToolCallSidePanel({
   }
 
   const isStreaming = displayToolCall?.toolResult?.content === 'STREAMING';
+  const showRunningState = isAgentRunning || isStreaming;
+  const runningDurationMs = showRunningState ? runElapsedMs : 0;
+  React.useEffect(() => {
+    if (!showRunningState || runStartTime === null) return;
+
+    const updateElapsed = () => {
+      setRunElapsedMs(Date.now() - runStartTime);
+    };
+
+    updateElapsed();
+    const intervalId = window.setInterval(updateElapsed, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [showRunningState, runStartTime]);
+
+  React.useEffect(() => {
+    const wasRunning = wasRunningRef.current;
+    const storageKey = getTimerStorageKey();
+
+    if (showRunningState) {
+      if (!wasRunning) {
+        const startTime = Date.now();
+        setRunStartTime(startTime);
+        setLastRunDurationMs(null);
+        setRunElapsedMs(0);
+        
+        // Save to localStorage
+        try {
+          localStorage.setItem(storageKey, JSON.stringify({ startTime }));
+        } catch (e) {
+          // Silently fail if localStorage is not available
+        }
+      }
+    } else if (wasRunning) {
+      setLastRunDurationMs(prev => {
+        if (runStartTime !== null) {
+          return Date.now() - runStartTime;
+        }
+        return prev;
+      });
+      setRunStartTime(null);
+      setRunElapsedMs(0);
+      
+      // Remove from localStorage when task completes
+      try {
+        localStorage.removeItem(storageKey);
+      } catch (e) {
+        // Silently fail if localStorage is not available
+      }
+    }
+
+    wasRunningRef.current = showRunningState;
+  }, [showRunningState, runStartTime, getTimerStorageKey]);
+
+  const completedDurationMs =
+    !showRunningState && typeof lastRunDurationMs === 'number' && lastRunDurationMs > 0
+      ? lastRunDurationMs
+      : null;
 
   // Extract actual success value from tool content with fallbacks
   const getActualSuccess = (toolCall: any): boolean => {
@@ -733,6 +1002,9 @@ export function ToolCallSidePanel({
               agentName={agentName}
               onClose={handleClose}
               variant="drawer"
+              isStreaming={showRunningState}
+              runningDurationMs={runningDurationMs}
+              completedDurationMs={completedDurationMs}
             />
             
             <div className="flex-1 p-4 overflow-auto">
@@ -758,6 +1030,9 @@ export function ToolCallSidePanel({
                   agentName={agentName}
                   onClose={handleClose}
                   showMinimize={true}
+                  isStreaming={showRunningState}
+                  runningDurationMs={runningDurationMs}
+                  completedDurationMs={completedDurationMs}
                 />
                 <div className="flex-1 p-4 overflow-auto">
                   <div className="space-y-4">
@@ -783,6 +1058,9 @@ export function ToolCallSidePanel({
             <PanelHeader 
               agentName={agentName}
               onClose={handleClose}
+              isStreaming={showRunningState}
+              runningDurationMs={runningDurationMs}
+              completedDurationMs={completedDurationMs}
             />
           )}
           <div className="flex flex-col items-center justify-center flex-1 p-8">
@@ -818,15 +1096,16 @@ export function ToolCallSidePanel({
               <PanelHeader 
                 agentName={agentName}
                 onClose={handleClose}
-                isStreaming={true}
+                isStreaming={showRunningState || !!firstStreamingTool}
+                runningDurationMs={runningDurationMs}
+                completedDurationMs={completedDurationMs}
               />
             )}
             {isMobile && (
               <div className="px-4 pb-2">
                 <div className="flex items-center justify-center">
-                  <div className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1.5">
-                    <CircleDashed className="h-3 w-3 animate-spin" />
-                    <span>Running</span>
+                  <div className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-3 py-1 shadow-[0_0_12px_rgba(16,185,129,0.25)] dark:border-emerald-400/35 dark:bg-emerald-500/15">
+                    <RunningStatusBadge durationMs={runningDurationMs} />
                   </div>
                 </div>
               </div>
@@ -858,6 +1137,9 @@ export function ToolCallSidePanel({
             <PanelHeader 
               agentName={agentName}
               onClose={handleClose}
+              isStreaming={showRunningState}
+              runningDurationMs={runningDurationMs}
+              completedDurationMs={completedDurationMs}
             />
           )}
           <div className="flex-1 p-4 overflow-auto">
@@ -902,9 +1184,11 @@ export function ToolCallSidePanel({
           <PanelHeader 
             agentName={agentName}
             onClose={handleClose}
-            isStreaming={isStreaming}
+            isStreaming={showRunningState}
             variant="motion"
             layoutId={CONTENT_LAYOUT_ID}
+            runningDurationMs={runningDurationMs}
+            completedDurationMs={completedDurationMs}
           />
         )}
 
@@ -960,6 +1244,9 @@ export function ToolCallSidePanel({
             agentName={agentName}
             onClose={handleClose}
             variant="drawer"
+            isStreaming={showRunningState}
+            runningDurationMs={runningDurationMs}
+            completedDurationMs={completedDurationMs}
           />
           
           <div className="flex-1 flex flex-col overflow-hidden">

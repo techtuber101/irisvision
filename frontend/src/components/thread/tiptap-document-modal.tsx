@@ -34,6 +34,7 @@ interface TipTapDocumentModalProps {
   };
   sandboxId: string;
   onSave?: (updatedContent: string) => void;
+  onSubmit?: (message: string, options?: { hidden?: boolean }) => void;
 }
 
 export function TipTapDocumentModal({
@@ -43,6 +44,7 @@ export function TipTapDocumentModal({
   documentData,
   sandboxId,
   onSave,
+  onSubmit,
 }: TipTapDocumentModalProps) {
   const [saveState, setSaveState] = useState<'saving' | 'saved' | 'unsaved'>('saved');
   const [editorInstance, setEditorInstance] = useState<TiptapEditor | null>(null);
@@ -139,13 +141,27 @@ export function TipTapDocumentModal({
 
   const handleExport = useCallback(async (format: ExportFormat) => {
     if (!editorInstance) return;
-    const content = editorInstance.getHTML();
-    await exportDocument({
-      content,
-      fileName,
-      format,
-    });
-  }, [editorInstance, fileName]);
+    
+    if (format === 'pdf') {
+      // Use the same PDF export mechanism as DocsToolView
+      if (onSubmit && filePath) {
+        const message = `Iris, convert the ${fileName} to pdf and attach it here and only if that's not possible give me the secure cloud uploaded link for the pdf file.`;
+        onSubmit(message, { hidden: true });
+        // Close the editor modal after triggering PDF export
+        onOpenChange(false);
+      } else {
+        console.error('onSubmit function not available or file path missing');
+        toast.error('PDF export is not available. Please use the export button in the document tool view.');
+      }
+    } else {
+      const content = editorInstance.getHTML();
+      await exportDocument({
+        content,
+        fileName,
+        format,
+      });
+    }
+  }, [editorInstance, fileName, onSubmit, filePath, onOpenChange]);
 
   const SaveStateIndicator = () => {
     switch (saveState) {
