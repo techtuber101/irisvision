@@ -49,7 +49,7 @@ function formatMessageTimestamp(timestamp?: string | null): string | null {
             day: 'numeric',
             ...(includeYear ? { year: 'numeric' } : {}),
         });
-        return `${dateFormatter.format(date)} ${timeFormatter.format(date)}`;
+        return `${dateFormatter.format(date)}, ${timeFormatter.format(date)}`;
     }
 
     return timeFormatter.format(date);
@@ -1040,7 +1040,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                         const canCopyMessage = Boolean(messageCopyText);
 
                                         const metaControls = (timestampLabel || canCopyMessage) ? (
-                                            <div className="absolute -top-6 right-0 flex items-center gap-1 text-[10px] text-muted-foreground/70 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto focus-within:pointer-events-auto">
+                                            <div className="absolute -top-3 right-0 flex items-center gap-1 text-[10px] text-muted-foreground/70 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto focus-within:pointer-events-auto">
                                                 {timestampLabel && <span>{timestampLabel}</span>}
                                                 <button
                                                     type="button"
@@ -1059,7 +1059,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                             return (
                                                 <div key={group.key} className="space-y-3">
                                                     {renderStandaloneAttachments(attachments as string[], handleOpenFileViewer, sandboxId, project, true)}
-                                                    <div className="flex justify-end relative group">
+                                                    <div className="flex justify-end relative group pt-3 -mt-3">
                                                         {metaControls}
                                                         <div className="flex max-w-[85%] rounded-2xl bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] px-4 py-3 break-words overflow-hidden relative">
                                                             {/* Gradient rim */}
@@ -1104,7 +1104,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                 {/* All file attachments rendered outside message bubble */}
                                                 {renderStandaloneAttachments(attachments as string[], handleOpenFileViewer, sandboxId, project, true)}
 
-                                                <div className="flex justify-end relative group">
+                                                <div className="flex justify-end relative group pt-3 -mt-3">
                                                     {metaControls}
                                                     <div className="flex max-w-[85%] rounded-3xl bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] px-4 py-3 break-words overflow-hidden relative light:border-black/5 light:bg-black/2 light:shadow-[0_2px_8px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(0,0,0,0.05)] light:backdrop-blur-sm">
                                                         {/* Gradient rim */}
