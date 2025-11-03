@@ -237,11 +237,26 @@ async def read_file(
         # Get sandbox using the safer method
         sandbox = await get_sandbox_by_id_safely(client, sandbox_id)
         
+        # Normalize path to ensure it's absolute and starts with /workspace
+        # Handle paths that might be relative (e.g., "designs/file.png") or 
+        # already absolute (e.g., "/workspace/designs/file.png")
+        if not path.startswith('/'):
+            # Relative path - prepend /workspace
+            normalized_download_path = f"/workspace/{path.lstrip('/')}"
+        elif path.startswith('/workspace'):
+            # Already has /workspace prefix - use as-is
+            normalized_download_path = path
+        else:
+            # Absolute path but not starting with /workspace - prepend /workspace
+            normalized_download_path = f"/workspace{path}"
+        
+        logger.debug(f"Normalized download path: {path} -> {normalized_download_path}")
+        
         # Read file directly - don't check existence first with a separate call
         try:
-            content = await sandbox.fs.download_file(path)
+            content = await sandbox.fs.download_file(normalized_download_path)
         except Exception as download_err:
-            logger.error(f"Error downloading file {path} from sandbox {sandbox_id}: {str(download_err)}")
+            logger.error(f"Error downloading file {normalized_download_path} (original path: {path}) from sandbox {sandbox_id}: {str(download_err)}")
             raise HTTPException(
                 status_code=404, 
                 detail=f"Failed to download file: {str(download_err)}"

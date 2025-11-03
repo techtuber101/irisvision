@@ -328,7 +328,12 @@ class SandboxDesignerTool(SandboxToolsBase):
 
             await self.sandbox.fs.upload_file(image_data, full_path)
             
-            return full_path
+            # Return relative path (without /workspace prefix) to avoid path duplication
+            # when used in API calls
+            relative_path = full_path.lstrip('/')
+            if relative_path.startswith('workspace/'):
+                relative_path = relative_path[10:]  # Remove 'workspace/' prefix
+            return relative_path
 
         except Exception as e:
             return self.fail_response(f"Failed to save design: {str(e)}") 
