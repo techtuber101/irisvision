@@ -444,20 +444,20 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
       }
     }, [autoFocus]);
 
-    const handleSubmit = useCallback(async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (
-        (!value.trim() && uploadedFiles.length === 0) ||
-        loading ||
-        (disabled && !isAgentRunning) ||
-        isUploading // Prevent submission while files are uploading
-      )
-        return;
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (
+      (!value.trim() && uploadedFiles.length === 0) ||
+      loading ||
+      (disabled && !isAgentRunning) ||
+      isUploading // Prevent submission while files are uploading
+    )
+      return;
 
-      if (isAgentRunning && onStopAgent) {
-        onStopAgent();
-        return;
-      }
+    if (isAgentRunning && onStopAgent) {
+      await onStopAgent();
+      return;
+    }
 
       let message = value;
 
@@ -1057,8 +1057,15 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                       </TooltipProvider>
 
                       <Button
-                      type="submit"
-                      onClick={isAgentRunning && onStopAgent ? onStopAgent : handleSubmit}
+                      type={isAgentRunning && onStopAgent ? "button" : "submit"}
+                      onClick={
+                        isAgentRunning && onStopAgent
+                          ? (event) => {
+                              event.preventDefault();
+                              onStopAgent();
+                            }
+                          : undefined
+                      }
                       disabled={
                         (!value.trim() && uploadedFiles.length === 0 && !isAgentRunning) ||
                         loading ||

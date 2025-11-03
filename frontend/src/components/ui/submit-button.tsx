@@ -1,7 +1,7 @@
 'use client';
 
 import { useFormStatus } from 'react-dom';
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
 import { type ComponentProps } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from './alert';
@@ -11,6 +11,7 @@ type Props = Omit<ComponentProps<typeof Button>, 'formAction'> & {
   pendingText?: string;
   formAction: (prevState: any, formData: FormData) => Promise<any>;
   errorMessage?: string;
+  onSuccess?: (result: any) => void;
 };
 
 const initialState = {
@@ -22,6 +23,7 @@ export function SubmitButton({
   formAction,
   errorMessage,
   pendingText = 'Submitting...',
+  onSuccess,
   ...props
 }: Props) {
   const { pending, action } = useFormStatus();
@@ -29,9 +31,16 @@ export function SubmitButton({
 
   const isPending = pending && action === internalFormAction;
 
+  // Handle success callback
+  useEffect(() => {
+    if (state?.success && onSuccess) {
+      onSuccess(state);
+    }
+  }, [state, onSuccess]);
+
   return (
     <div className="flex flex-col gap-y-4 w-full">
-      {Boolean(errorMessage || state?.message) && (
+      {Boolean(errorMessage || (state?.message && !state?.success)) && (
         <Alert variant="destructive" className="w-full">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>{errorMessage || state?.message}</AlertDescription>

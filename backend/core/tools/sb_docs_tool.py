@@ -1,17 +1,22 @@
+import base64
 import json
+import mimetypes
 import os
 from typing import Optional, Dict, Any, List
-from core.agentpress.tool import openapi_schema, tool_metadata
-from core.sandbox.tool_base import SandboxToolsBase
+from urllib.parse import unquote
+
+from bs4 import BeautifulSoup
 from core.agentpress.thread_manager import ThreadManager
-from core.utils.logger import logger
+from core.agentpress.tool import ToolResult, openapi_schema, tool_metadata
+from core.sandbox.tool_base import SandboxToolsBase
+from core.tools.fonts import get_lmroman_data_uri
 from core.utils.config import config
-import uuid
+from core.utils.logger import logger
 from datetime import datetime
-import re
 from pathlib import Path
-from core.agentpress.tool import ToolResult
 import html
+import re
+import uuid
 
 @tool_metadata(
     display_name="Document Creator",
@@ -129,6 +134,177 @@ class SandboxDocsTool(SandboxToolsBase):
             content = f'<p>{content}</p>'
         
         return content
+
+    def _resolve_image_path(self, src: str) -> Optional[str]:
+        if not src:
+            return None
+
+        cleaned_src = unquote(src.strip())
+        if not cleaned_src:
+            return None
+
+        lowered = cleaned_src.lower()
+        # Skip URLs and data URIs - these are already accessible
+        if lowered.startswith(('data:', 'http://', 'https://', 'blob:', 'mailto:')):
+            return None
+
+        # Remove sandbox://, sandbox:/, sandbox: prefixes
+        for prefix in ('sandbox://', 'sandbox:/', 'sandbox:'):
+            if lowered.startswith(prefix):
+                cleaned_src = cleaned_src[len(prefix):]
+                lowered = cleaned_src.lower()
+                break
+
+        # Remove file://, file:/ prefixes
+        for prefix in ('file://', 'file:/'):
+            if lowered.startswith(prefix):
+                cleaned_src = cleaned_src[len(prefix):]
+                lowered = cleaned_src.lower()
+                break
+
+        cleaned_src = cleaned_src.replace('\\', '/')
+
+        # Skip absolute URLs that start with //
+        if cleaned_src.startswith('//'):
+            return None
+
+        # Normalize workspace/ prefix
+        if cleaned_src.startswith('workspace/'):
+            cleaned_src = f'/{cleaned_src}'
+        elif not cleaned_src.startswith('/workspace') and not cleaned_src.startswith('/'):
+            # If it's a relative path without /workspace, try multiple locations
+            # First try in workspace root
+            candidate = os.path.normpath(os.path.join(self.workspace_path, cleaned_src))
+            if not candidate.startswith('/'):
+                candidate = f'/{candidate.lstrip("/")}'
+            return candidate
+
+        # If it already starts with /workspace, use it directly
+        if cleaned_src.startswith('/workspace'):
+            normalized = os.path.normpath(cleaned_src)
+            if not normalized.startswith('/'):
+                normalized = f'/{normalized.lstrip("/")}'
+            return normalized
+
+        # If it starts with /, try to resolve it
+        if cleaned_src.startswith('/'):
+            normalized = os.path.normpath(cleaned_src)
+            if not normalized.startswith('/'):
+                normalized = f'/{normalized.lstrip("/")}'
+            # Ensure it's within workspace
+            if normalized.startswith(self.workspace_path):
+                return normalized
+            # Try joining with workspace
+            candidate = os.path.normpath(os.path.join(self.workspace_path, normalized.lstrip('/')))
+            if candidate.startswith(self.workspace_path):
+                return candidate
+            return None
+
+        # For relative paths, try multiple locations
+        # Try in workspace root first
+        candidate = os.path.normpath(os.path.join(self.workspace_path, cleaned_src))
+        if not candidate.startswith('/'):
+            candidate = f'/{candidate.lstrip("/")}'
+        if candidate.startswith(self.workspace_path):
+            return candidate
+
+        # Try in docs directory
+        candidate = os.path.normpath(os.path.join(self.docs_dir, cleaned_src))
+        if not candidate.startswith('/'):
+            candidate = f'/{candidate.lstrip("/")}'
+        if candidate.startswith(self.workspace_path):
+            return candidate
+
+        logger.debug(f"Could not resolve image path: {src} (cleaned: {cleaned_src})")
+        return None
+
+    async def _inline_local_images(self, content: str) -> str:
+        if not content:
+            return content
+
+        await self._ensure_sandbox()
+
+        try:
+            soup = BeautifulSoup(content, 'html.parser')
+        except Exception as exc:
+            logger.warning(f"Failed to parse document HTML for image inlining: {exc}")
+            return content
+
+        images = soup.find_all('img')
+        if not images:
+            return content
+
+        updated = False
+
+        for img in images:
+            src = img.get('src')
+            if not src:
+                continue
+
+            # Skip if already a data URI or URL
+            src_lower = src.lower().strip()
+            if src_lower.startswith(('data:', 'http://', 'https://', 'blob:')):
+                continue
+
+            resolved_path = self._resolve_image_path(src)
+            if not resolved_path:
+                logger.debug(f"Could not resolve image path for inlining: {src}")
+                continue
+
+            try:
+                # Check if file exists first
+                try:
+                    file_info = await self.sandbox.fs.get_file_info(resolved_path)
+                    if file_info.is_dir:
+                        logger.warning(f"Image path is a directory, not a file: {src}")
+                        continue
+                except Exception:
+                    logger.debug(f"Could not get file info for image: {src} (resolved: {resolved_path})")
+                    continue
+
+                image_bytes = await self.sandbox.fs.download_file(resolved_path)
+            except Exception as exc:
+                logger.warning(f"Failed to inline image '{src}' (resolved: {resolved_path}): {exc}")
+                continue
+
+            if not isinstance(image_bytes, (bytes, bytearray)):
+                if isinstance(image_bytes, str):
+                    image_bytes = image_bytes.encode()
+                else:
+                    logger.warning(f"Image data is not bytes for '{src}': {type(image_bytes)}")
+                    continue
+
+            # Limit data URI size to avoid performance issues (max 10MB)
+            max_size = 10 * 1024 * 1024  # 10MB
+            if len(image_bytes) > max_size:
+                logger.warning(f"Image '{src}' is too large ({len(image_bytes)} bytes) to inline as data URI. Consider using a URL instead.")
+                continue
+
+            mime_type, _ = mimetypes.guess_type(resolved_path)
+            if not mime_type or not mime_type.startswith('image/'):
+                # Try to detect from file extension
+                ext = os.path.splitext(resolved_path)[1].lower()
+                mime_map = {
+                    '.jpg': 'image/jpeg',
+                    '.jpeg': 'image/jpeg',
+                    '.png': 'image/png',
+                    '.gif': 'image/gif',
+                    '.webp': 'image/webp',
+                    '.svg': 'image/svg+xml',
+                    '.bmp': 'image/bmp',
+                }
+                mime_type = mime_map.get(ext, 'image/png')
+
+            try:
+                data_uri = f"data:{mime_type};base64,{base64.b64encode(image_bytes).decode('ascii')}"
+                img['src'] = data_uri
+                updated = True
+                logger.debug(f"Successfully inlined image: {src} -> data URI ({len(image_bytes)} bytes)")
+            except Exception as exc:
+                logger.warning(f"Failed to create data URI for image '{src}': {exc}")
+                continue
+
+        return str(soup) if updated else content
         
     async def _generate_viewer_html(self, title: str, content: str, doc_id: str, 
                                    metadata: Optional[Dict] = None, updated_at: str = "") -> str:
@@ -241,6 +417,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
             
             if format == "html":
                 content = self._validate_and_clean_tiptap_html(content)
+                content = await self._inline_local_images(content)
                 logger.debug(f"Cleaned HTML content for TipTap: {content[:200]}...")
                 
                 document_wrapper = {
@@ -340,6 +517,11 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                     content = content_str
             else:
                 content = content_str
+            
+            # Inline local images for proper display in iframe and editor
+            # This ensures images work even if they weren't inlined during creation
+            if content and isinstance(content, str):
+                content = await self._inline_local_images(content)
             
             preview_url = None
             if hasattr(self, '_sandbox_url') and self._sandbox_url:
@@ -519,8 +701,43 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
         })
     
     def _generate_pdf_html(self, title: str, content: str, metadata: Optional[Dict] = None) -> str:
+        regular_font = get_lmroman_data_uri("regular")
+        bold_font = get_lmroman_data_uri("bold")
+        italic_font = get_lmroman_data_uri("italic")
+        bold_italic_font = get_lmroman_data_uri("bolditalic")
+
+        font_face_css = ""
+        if all([regular_font, bold_font, italic_font, bold_italic_font]):
+            font_face_css = f"""
+            @font-face {{
+                font-family: 'LMRoman';
+                src: url('{regular_font}') format('opentype');
+                font-weight: 400;
+                font-style: normal;
+            }}
+            @font-face {{
+                font-family: 'LMRoman';
+                src: url('{bold_font}') format('opentype');
+                font-weight: 700;
+                font-style: normal;
+            }}
+            @font-face {{
+                font-family: 'LMRoman';
+                src: url('{italic_font}') format('opentype');
+                font-weight: 400;
+                font-style: italic;
+            }}
+            @font-face {{
+                font-family: 'LMRoman';
+                src: url('{bold_italic_font}') format('opentype');
+                font-weight: 700;
+                font-style: italic;
+            }}
+            """
+
         css_styles = """
         <style>
+            {font_face_css}
             @page {
                 size: A4;
                 margin: 1in;
@@ -531,7 +748,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 box-sizing: border-box;
             }
             body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+                font-family: 'LMRoman', 'Times New Roman', Times, serif;
                 line-height: 1.6;
                 color: #333;
                 background: white;
@@ -573,6 +790,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 margin-top: 2rem;
             }
             h1 { 
+                font-family: 'LMRoman', 'Times New Roman', Times, serif;
                 font-size: 2rem; 
                 font-weight: 700; 
                 margin: 1.5rem 0 0.75rem; 
@@ -580,6 +798,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 page-break-after: avoid;
             }
             h2 { 
+                font-family: 'LMRoman', 'Times New Roman', Times, serif;
                 font-size: 1.5rem; 
                 font-weight: 600; 
                 margin: 1.25rem 0 0.625rem; 
@@ -587,6 +806,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 page-break-after: avoid;
             }
             h3 { 
+                font-family: 'LMRoman', 'Times New Roman', Times, serif;
                 font-size: 1.25rem; 
                 font-weight: 600; 
                 margin: 1rem 0 0.5rem; 
@@ -682,7 +902,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 text-align: center;
             }
         </style>
-        """
+        """.replace("{font_face_css}", font_face_css)
         
         current_time = datetime.now().strftime("%B %d, %Y at %I:%M %p")
         
@@ -802,13 +1022,24 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
             
             logger.info(f"Creating PDF from document: {title}")
             
-            pdf_generation_script = f"""
-import asyncio
+            pdf_filename = f'{self._sanitize_filename(title)}_{doc_id}.pdf'
+            pdf_path_value = f'/workspace/docs/{pdf_filename}'
+            
+            # Build script with proper escaping to avoid f-string issues
+            html_file_path = temp_html_path
+            pdf_output_path = pdf_path_value
+            
+            pdf_generation_script = f"""import asyncio
 from playwright.async_api import async_playwright
 import sys
+import os
 
 async def html_to_pdf():
     try:
+        # Ensure docs directory exists
+        docs_dir = '/workspace/docs'
+        os.makedirs(docs_dir, exist_ok=True)
+        
         async with async_playwright() as p:
             browser = await p.chromium.launch(
                 headless=True,
@@ -817,10 +1048,34 @@ async def html_to_pdf():
             
             page = await browser.new_page()
             
-            await page.goto('file://{temp_html_path}', wait_until='networkidle')
+            # Navigate to the HTML file
+            html_path = '{html_file_path}'
+            await page.goto('file://' + html_path, wait_until='networkidle')
             
-            pdf_filename = '{self._sanitize_filename(title)}_{doc_id}.pdf'
-            pdf_path = f'/workspace/docs/{{pdf_filename}}'
+            # Wait for fonts to load - critical for LMRoman font rendering
+            # Data URI fonts need time to decode and load
+            try:
+                # Wait for all fonts to be ready
+                await page.evaluate('''() => {{
+                    return new Promise((resolve) => {{
+                        if (document.fonts && document.fonts.ready) {{
+                            document.fonts.ready.then(() => {{
+                                resolve(true);
+                            }}).catch(() => resolve(true));
+                        }} else {{
+                            resolve(true);
+                        }}
+                    }});
+                }}''')
+                # Additional buffer time for font rendering
+                await page.wait_for_timeout(1500)
+            except Exception as font_error:
+                # If font loading check fails, wait a safe amount of time
+                error_msg_str = str(font_error)
+                print("Font loading check completed with note: " + error_msg_str, file=sys.stderr)
+                await page.wait_for_timeout(2000)
+            
+            pdf_path = '{pdf_output_path}'
             
             await page.pdf(
                 path=pdf_path,
@@ -840,7 +1095,8 @@ async def html_to_pdf():
             return pdf_path
             
     except Exception as e:
-        print(f"ERROR: {{str(e)}}", file=sys.stderr)
+        error_str = str(e)
+        print("ERROR: " + error_str, file=sys.stderr)
         sys.exit(1)
 
 if __name__ == "__main__":
@@ -889,29 +1145,38 @@ if __name__ == "__main__":
             
             if download:
                 pdf_content = await self.sandbox.fs.download_file(pdf_path)
-                
-                import base64
-                pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
-                
-                return self.success_response({
+                pdf_size_bytes = len(pdf_content)
+                pdf_info["size_bytes"] = pdf_size_bytes
+
+                MAX_INLINE_BYTES = 5 * 1024 * 1024  # 5 MB
+                response_payload = {
                     "success": True,
                     "message": f"PDF generated successfully from document '{title}'",
                     "pdf_info": pdf_info,
-                    "pdf_base64": pdf_base64,
                     "pdf_filename": pdf_filename,
                     "preview_url": preview_url,
                     "download_url": download_url,
                     "sandbox_id": self.sandbox_id
-                })
-            else:
-                return self.success_response({
-                    "success": True,
-                    "message": f"PDF saved successfully: {pdf_filename}",
-                    "pdf_info": pdf_info,
-                    "preview_url": preview_url,
-                    "download_url": download_url,
-                    "sandbox_id": self.sandbox_id
-                })
+                }
+
+                if pdf_size_bytes <= MAX_INLINE_BYTES:
+                    import base64
+                    pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
+                    response_payload["pdf_base64"] = pdf_base64
+                else:
+                    response_payload["message"] += " (File is large—use the download link to retrieve it.)"
+                    response_payload["pdf_inline_skipped"] = True
+
+                return self.success_response(response_payload)
+
+            return self.success_response({
+                "success": True,
+                "message": f"PDF saved successfully: {pdf_filename}",
+                "pdf_info": pdf_info,
+                "preview_url": preview_url,
+                "download_url": download_url,
+                "sandbox_id": self.sandbox_id
+            })
                 
         except Exception as e:
             logger.error(f"Error converting document to PDF: {str(e)}")

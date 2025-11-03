@@ -6,7 +6,7 @@ import { SubmitButton } from '@/components/ui/submit-button';
 import { Input } from '@/components/ui/input';
 import GoogleSignIn from '@/components/GoogleSignIn';
 import { useMediaQuery } from '@/hooks/use-media-query';
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { signIn, signUp, forgotPassword } from './actions';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
@@ -40,6 +40,7 @@ function LoginContent() {
   const mode = searchParams.get('mode');
   const returnUrl = searchParams.get('returnUrl') || searchParams.get('redirect');
   const message = searchParams.get('message');
+  const errorFromUrl = searchParams.get('error');
 
   const isSignUp = mode === 'signup';
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -48,19 +49,29 @@ function LoginContent() {
 
   const { wasLastMethod: wasEmailLastMethod, markAsUsed: markEmailAsUsed } = useAuthMethodTracking('email');
 
+  // Handle redirect when user is already logged in
   useEffect(() => {
     if (!isLoading && user) {
-      if (returnUrl) {
-        router.push(returnUrl);
-      } else {
-        router.push('/');
-      }
+      const redirectPath = returnUrl || '/dashboard';
+      router.push(redirectPath);
     }
   }, [user, isLoading, router, returnUrl]);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Handle successful authentication
+  const handleAuthSuccess = useCallback((result: any) => {
+    if (result?.success && result?.redirectTo) {
+      // Refresh router to ensure auth state is updated, then redirect
+      router.refresh();
+      // Small delay to ensure session cookie is set
+      setTimeout(() => {
+        router.push(result.redirectTo);
+      }, 50);
+    }
+  }, [router]);
 
   if (!mounted) {
     return null;
@@ -244,6 +255,12 @@ function LoginContent() {
               </div>
             )}
 
+            {errorFromUrl && (
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
+                {decodeURIComponent(errorFromUrl)}
+              </div>
+            )}
+
             <form className="space-y-4">
               {/* Hidden fields for server actions */}
               <input type="hidden" name="origin" value={typeof window !== 'undefined' ? window.location.origin : ''} />
@@ -306,6 +323,7 @@ function LoginContent() {
 
               <SubmitButton 
                 formAction={isSignUp ? signUp : signIn}
+                onSuccess={handleAuthSuccess}
                 className="w-full bg-primary hover:bg-primary/90 text-black font-medium py-2.5 rounded-lg transition-colors"
               >
                 {isSignUp ? 'Sign up' : 'Sign in'}

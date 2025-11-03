@@ -235,6 +235,18 @@ export function AdvancedToolbar({
                   Export as
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
+                  <DropdownMenuItem onClick={() => onExport?.('pdf')}>
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={FILE_TYPE_ICONS.pdf}
+                        alt="PDF file icon"
+                        width={20}
+                        height={20}
+                        className="flex-shrink-0"
+                      />
+                      <span className="text-sm font-medium">PDF Document</span>
+                    </div>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onExport?.('docx')}>
                     <div className="flex items-center gap-3">
                       <img

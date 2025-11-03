@@ -622,6 +622,20 @@ export function DocumentViewer({ content, format }: { content: string; format: s
                 height: auto; 
                 border-radius: 8px;
                 margin: 1.25rem 0;
+                display: block;
+                object-fit: contain;
+              }
+              
+              /* Ensure data URI images and external images display properly */
+              img[src^="data:"] {
+                max-width: 100%;
+                height: auto;
+              }
+              
+              img[src^="http://"],
+              img[src^="https://"] {
+                max-width: 100%;
+                height: auto;
               }
               
               hr {
@@ -675,7 +689,7 @@ export function DocumentViewer({ content, format }: { content: string; format: s
           srcDoc={iframeHtml}
           title="Document Preview"
           className="w-[calc(100%+32px)] -mx-4 flex-1 border-0 rounded-lg min-h-[600px]"
-          sandbox="allow-same-origin allow-scripts"
+          sandbox="allow-same-origin allow-scripts allow-popups"
           onLoad={handleLoad}
         />
       </div>
@@ -693,7 +707,7 @@ export function DocumentViewer({ content, format }: { content: string; format: s
           autoSave={false}
           minHeight="0"
           className="w-full"
-          editorClassName="focus:outline-none bg-transparent border-0 w-full prose prose-sm dark:prose-invert max-w-none prose-img:max-w-none prose-img:w-full prose-img:h-auto"
+          editorClassName="focus:outline-none bg-transparent border-0 w-full prose prose-sm dark:prose-invert max-w-none prose-img:max-w-none prose-img:w-full prose-img:h-auto [&_img]:max-w-full [&_img]:h-auto [&_img]:object-contain [&_img]:block"
         />
       </div>
     );

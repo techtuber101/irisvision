@@ -64,19 +64,6 @@ class RollingTokenUsageTracker:
 token_usage_tracker = RollingTokenUsageTracker()
 
 
-def _resolve_flash_lite_fallback_model(model_name: str) -> Optional[str]:
-    """Return flash-lite fallback model for Gemini flash variants."""
-    if not model_name:
-        return None
-    lowered = model_name.lower()
-    if "flash" not in lowered or "lite" in lowered:
-        return None
-
-    if "/" in model_name:
-        prefix = model_name.rsplit("/", 1)[0]
-        return f"{prefix}/gemini-2.5-flash-lite"
-    return "gemini/gemini-2.5-flash-lite"
-
 class ThreadManager:
     """Manages conversation threads with LLM models and tool execution."""
 
@@ -460,54 +447,22 @@ class ThreadManager:
                     f"{cache_report.total_input_tokens:,}",
                 )
 
-            # Make LLM call with optional flash-lite fallback
-            candidate_models: List[str] = [llm_model]
-            fallback_model = _resolve_flash_lite_fallback_model(llm_model)
-            if fallback_model and fallback_model not in candidate_models:
-                candidate_models.append(fallback_model)
+            # Make single LLM call (no automatic flash-lite fallback)
+            try:
+                llm_response = await make_llm_api_call(
+                    prepared_messages,
+                    llm_model,
+                    temperature=llm_temperature,
+                    max_tokens=llm_max_tokens,
+                    tools=openapi_tool_schemas,
+                    tool_choice=tool_choice if config.native_tool_calling else "none",
+                    stream=stream,
+                )
+            except LLMError as err:
+                return {"type": "status", "status": "error", "message": str(err)}
 
-            llm_response: Any = None
-            last_error: Optional[Dict[str, Any]] = None
-            used_model = llm_model
-
-            for candidate in candidate_models:
-                if candidate != llm_model:
-                    logger.warning(
-                        "⚡ Gemini flash model '%s' failed; retrying with fallback model '%s'",
-                        llm_model,
-                        candidate,
-                    )
-                    used_model = candidate
-                    if generation:
-                        try:
-                            generation.update(model=candidate)
-                        except Exception as gen_err:
-                            logger.debug("Failed to update generation model for fallback: %s", gen_err)
-
-                try:
-                    llm_response = await make_llm_api_call(
-                        prepared_messages,
-                        candidate,
-                        temperature=llm_temperature,
-                        max_tokens=llm_max_tokens,
-                        tools=openapi_tool_schemas,
-                        tool_choice=tool_choice if config.native_tool_calling else "none",
-                        stream=stream,
-                    )
-                except LLMError as err:
-                    last_error = {"type": "status", "status": "error", "message": str(err)}
-                    continue
-
-                if isinstance(llm_response, dict) and llm_response.get("status") == "error":
-                    last_error = llm_response
-                    continue
-
-                # Successful response
-                llm_model = candidate
-                break
-
-            if llm_response is None or (isinstance(llm_response, dict) and llm_response.get("status") == "error"):
-                return last_error or {"type": "status", "status": "error", "message": "LLM call failed"}
+            if isinstance(llm_response, dict) and llm_response.get("status") == "error":
+                return llm_response
 
             # Process response - ensure config is ProcessorConfig object
             # logger.debug(f"Config type before response processing: {type(config)}")

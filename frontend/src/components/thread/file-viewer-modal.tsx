@@ -1263,8 +1263,8 @@ export function FileViewerModal({
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent 
-        className="sm:max-w-[90vw] md:max-w-[1200px] w-[95vw] h-[90vh] max-h-[900px] flex flex-col p-0 gap-0 overflow-hidden rounded-3xl border border-blue-500/10 bg-[rgba(15,23,42,0.12)] backdrop-blur-md shadow-[0_20px_60px_-10px_rgba(0,0,0,0.1),inset_0_1px_0_0_rgba(59,130,246,0.05)] !top-[50%] !left-[50%] !translate-x-[-50%] !translate-y-[-50%] light:bg-[rgba(255,255,255,0.08)] light:backdrop-blur-[40px] light:border-white/20 light:shadow-[0_8px_32px_0_rgba(31,38,135,0.15),inset_0_1px_0_0_rgba(255,255,255,0.3),0_0_0_1px_rgba(255,255,255,0.1)]"
+      <DialogContent
+        className="sm:max-w-[90vw] md:max-w-[1200px] w-[95vw] h-[90vh] max-h-[900px] flex flex-col p-0 gap-0 overflow-hidden rounded-3xl border border-blue-500/10 bg-[rgba(15,23,42,0.12)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.1),inset_0_1px_0_0_rgba(59,130,246,0.05)] !top-[50%] !left-[50%] !translate-x-[-50%] !translate-y-[-50%] light:border-white/20 light:bg-[rgba(255,255,255,0.22)] light:backdrop-blur-2xl light:shadow-[0_24px_70px_-18px_rgba(15,23,42,0.2),inset_0_1px_0_rgba(255,255,255,0.35),0_0_0_1px_rgba(255,255,255,0.08)]"
       >
         {/* Gradient rim */}
         <div
@@ -1287,13 +1287,14 @@ export function FileViewerModal({
           className="pointer-events-none absolute inset-0 rounded-3xl hidden light:block"
           style={{
             background:
-              "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 30%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.01) 85%, rgba(255,255,255,0.025) 100%)",
+              "linear-gradient(180deg, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.02) 40%, rgba(0,0,0,0.05) 100%)",
             WebkitMask: "linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)",
             WebkitMaskComposite: "xor" as any,
             maskComposite: "exclude",
             padding: 1.5,
             borderRadius: 24,
-            border: "1px solid rgba(255,255,255,0.12)",
+            border: "1px solid rgba(255,255,255,0.28)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4)",
           }}
         />
         
@@ -1315,16 +1316,16 @@ export function FileViewerModal({
           className="pointer-events-none absolute inset-x-0 top-0 h-32 hidden light:block"
           style={{
             background:
-              "linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 30%, rgba(255,255,255,0.02) 60%, rgba(255,255,255,0) 100%)",
-            filter: "blur(12px)",
-            mixBlendMode: "overlay",
+              "linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0) 90%)",
+            filter: "blur(14px)",
+            mixBlendMode: "screen",
           }}
         />
         
         {/* Fine noise */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 opacity-30 light:opacity-[0.08]"
+          className="pointer-events-none absolute inset-0 opacity-30 light:opacity-[0.12]"
           style={{
             backgroundImage:
               "url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'60\' height=\'60\'><filter id=\'n\'><feTurbulence type=\'fractalNoise\' baseFrequency=\'0.8\' numOctaves=\'4\'/><feColorMatrix type=\'saturate\' values=\'0\'/><feComponentTransfer><feFuncA type=\'table\' tableValues=\'0 0.03\'/></feComponentTransfer></filter><rect width=\'100%\' height=\'100%\' filter=\'url(%23n)\' /></svg>')",

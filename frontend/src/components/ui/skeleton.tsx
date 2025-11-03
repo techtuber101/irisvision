@@ -11,8 +11,7 @@ function Skeleton({
     <div
       className={cn(
         'relative overflow-hidden rounded-md',
-        'bg-gradient-to-r from-blue-500/15 via-blue-400/10 to-blue-500/15',
-        'dark:from-blue-500/20 dark:via-blue-400/15 dark:to-blue-500/20',
+        'bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10',
         'background-animate',
         className,
       )}
