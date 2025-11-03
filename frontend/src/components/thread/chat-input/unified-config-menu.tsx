@@ -189,71 +189,6 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
         return <AgentAvatar agentId={agent?.agent_id} size={24} className="flex-shrink-0" fallbackName={agent?.name} />;
     }, []);
 
-    // Find Claude Sonnet 4.5 model from available models
-    const findClaudeSonnet45Model = useCallback(() => {
-        // First try to find exact Claude Sonnet 4.5 matches
-        const exactMatch = modelOptions.find(model => {
-            const id = model.id.toLowerCase();
-            const label = model.label.toLowerCase();
-            return (
-                (id.includes('claude') && id.includes('sonnet') && (id.includes('4.5') || id.includes('4-5'))) ||
-                (label.includes('claude') && label.includes('sonnet') && (label.includes('4.5') || label.includes('4-5'))) ||
-                id.includes('anthropic/claude-sonnet-4.5') ||
-                id.includes('anthropic/claude-4.5-sonnet') ||
-                id.includes('anthropic/claude-sonnet-4-5')
-            );
-        });
-        
-        if (exactMatch) return exactMatch;
-        
-        // Fallback: try to find any Claude Sonnet model
-        return modelOptions.find(model => {
-            const id = model.id.toLowerCase();
-            const label = model.label.toLowerCase();
-            return (
-                (id.includes('claude') && id.includes('sonnet')) ||
-                (label.includes('claude') && label.includes('sonnet'))
-            );
-        });
-    }, [modelOptions]);
-
-    // Handle switching to Claude Sonnet 4.5
-    const handleClaudeSwitch = useCallback(() => {
-        const claudeModel = findClaudeSonnet45Model();
-        if (claudeModel && canAccessModel(claudeModel.id)) {
-            onModelChange(claudeModel.id);
-        } else {
-            // Fallback: try to find any Claude model
-            const anyClaude = modelOptions.find(m => 
-                m.id.toLowerCase().includes('claude') || m.label.toLowerCase().includes('claude')
-            );
-            if (anyClaude && canAccessModel(anyClaude.id)) {
-                onModelChange(anyClaude.id);
-            }
-        }
-    }, [findClaudeSonnet45Model, modelOptions, canAccessModel, onModelChange]);
-
-    // Handle switching to Iris Pro (default/recommended model)
-    const handleIrisProSwitch = useCallback(() => {
-        // Switch to default/Iris Pro model (use the recommended model or first available)
-        const defaultModel = modelOptions.find(m => m.recommended) || modelOptions[0];
-        if (defaultModel && canAccessModel(defaultModel.id)) {
-            onModelChange(defaultModel.id);
-        }
-    }, [modelOptions, canAccessModel, onModelChange]);
-
-    // Check if current model is Claude
-    const isClaudeModel = useMemo(() => {
-        return selectedModel.toLowerCase().includes('claude');
-    }, [selectedModel]);
-
-    // Check if current model is Iris Pro (default/recommended)
-    const isIrisProModel = useMemo(() => {
-        if (isClaudeModel) return false;
-        const defaultModel = modelOptions.find(m => m.recommended) || modelOptions[0];
-        return defaultModel && selectedModel === defaultModel.id;
-    }, [selectedModel, modelOptions, isClaudeModel]);
-
     return (
         <>
             <div className="flex items-center gap-2">
@@ -351,40 +286,6 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
                                     <Plus className="h-3.5 w-3.5" />
                                 </Button>
                             </div>
-                            
-                            {/* Iris Pro Option */}
-                            <DropdownMenuItem
-                                className="text-sm px-3 py-2 mx-0 my-0.5 flex items-center justify-between cursor-pointer rounded-xl bg-gradient-to-r from-white/20 via-white/10 to-white/20 dark:from-white/5 dark:via-white/2 dark:to-white/5 border border-black/20 dark:border-white/10 hover:bg-gradient-to-r hover:from-white/25 hover:via-white/15 hover:to-white/25 dark:hover:from-white/8 dark:hover:via-white/4 dark:hover:to-white/8 hover:border-black/30 dark:hover:border-white/20 backdrop-blur-sm transition-all duration-200 relative overflow-hidden"
-                                onClick={() => {
-                                    handleIrisProSwitch();
-                                    setIsOpen(false);
-                                }}
-                            >
-                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                    <IrisLogo size={24} />
-                                    <span className="truncate font-medium text-black/90 dark:text-white/90">Iris Pro</span>
-                                </div>
-                                {isIrisProModel && (
-                                    <Check className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                                )}
-                            </DropdownMenuItem>
-
-                            {/* Claude Option */}
-                            <DropdownMenuItem
-                                className="text-sm px-3 py-2 mx-0 my-0.5 flex items-center justify-between cursor-pointer rounded-xl bg-gradient-to-r from-white/20 via-white/10 to-white/20 dark:from-white/5 dark:via-white/2 dark:to-white/5 border border-black/20 dark:border-white/10 hover:bg-gradient-to-r hover:from-white/25 hover:via-white/15 hover:to-white/25 dark:hover:from-white/8 dark:hover:via-white/4 dark:hover:to-white/8 hover:border-black/30 dark:hover:border-white/20 backdrop-blur-sm transition-all duration-200 relative overflow-hidden"
-                                onClick={() => {
-                                    handleClaudeSwitch();
-                                    setIsOpen(false);
-                                }}
-                            >
-                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                    <IrisLogo size={24} />
-                                    <span className="truncate font-medium text-black/90 dark:text-white/90">Claude</span>
-                                </div>
-                                {isClaudeModel && (
-                                    <Check className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                                )}
-                            </DropdownMenuItem>
 
                             {isLoading && orderedAgents.length === 0 ? (
                                 <div className="px-3 py-2 text-xs text-black/60 dark:text-white/60">Loading agents...</div>
