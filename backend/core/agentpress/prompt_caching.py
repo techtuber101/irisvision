@@ -255,16 +255,16 @@ def _fingerprint_payload(base_text: str) -> str:
 class GeminiPromptCachePlanner:
     MIN_SYSTEM_CACHE_TOKENS = 512
     MAX_CONVERSATION_CACHE_BLOCKS = 3
-    MIN_CHUNK_TOKENS = 1_024
+    MIN_CHUNK_TOKENS = 768
 
     def __init__(self, model_name: str, context_window: int):
         self.model_name = model_name
         self.context_window = max(context_window, 128_000)
-        self.live_context_min_tokens = 4_096
-        self.live_context_fraction = 0.05
-        self.live_context_max_tokens = max(18_000, int(self.context_window * 0.10))
-        self.min_live_messages = 6
-        self.max_chunk_tokens = max(12_000, int(self.context_window * 0.06))
+        self.live_context_min_tokens = 2_048
+        self.live_context_fraction = 0.01
+        self.live_context_max_tokens = max(12_000, int(self.context_window * 0.03))
+        self.min_live_messages = 4
+        self.max_chunk_tokens = max(8_000, int(self.context_window * 0.04))
 
     def assemble(
         self,
@@ -325,6 +325,7 @@ class GeminiPromptCachePlanner:
         report.notes.append(
             f"Historical context: {len(historical)} messages / ~{historical_tokens:,} tokens before caching."
         )
+        small_history = bool(historical) and historical_tokens < self.MIN_CHUNK_TOKENS
 
         if not historical:
             report.notes.append("No historical context eligible for caching; live tail consumes budget.")
@@ -337,6 +338,10 @@ class GeminiPromptCachePlanner:
 
         plans = self._build_chunk_plans(historical)
         report.cached_blocks += len(plans)
+        if small_history and plans:
+            report.notes.append(
+                f"Historical payload (~{historical_tokens:,} tokens) forced into cache despite being smaller than the normal chunk threshold."
+            )
 
         if not plans:
             report.notes.append(
@@ -423,12 +428,12 @@ class GeminiPromptCachePlanner:
         if not messages:
             return []
 
-        available_blocks = min(self.MAX_CONVERSATION_CACHE_BLOCKS, len(messages))
+        available_blocks = max(1, min(self.MAX_CONVERSATION_CACHE_BLOCKS, len(messages)))
         token_list = [max(1, get_message_token_count(message, self.model_name)) for message in messages]
         total_tokens = sum(token_list)
 
         if total_tokens < self.MIN_CHUNK_TOKENS:
-            return []
+            return [self._create_chunk_plan(messages)]
 
         min_chunk = self.MIN_CHUNK_TOKENS
         max_chunk = self.max_chunk_tokens

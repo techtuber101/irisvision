@@ -254,8 +254,8 @@ async def run_agent_background(
             logger.warning(f"Failed to publish final control signal {control_signal}: {str(e)}")
         
         # Auto-restart with flash-lite model if ERROR and using flash (non-lite) model
-        # Check if auto-restart is applicable before attempting
-        if control_signal == "ERROR" and final_status == "failed":
+        # (disabled: inline fallback now handled directly in ThreadManager)
+        if False and control_signal == "ERROR" and final_status == "failed":
             # Verify the model is a flash (non-lite) model before attempting restart
             effective_model_lower = effective_model.lower()
             is_flash_model = "flash" in effective_model_lower
@@ -303,7 +303,7 @@ async def run_agent_background(
             logger.warning(f"Failed to publish ERROR signal: {str(e)}")
         
         # Auto-restart with flash-lite model if ERROR and using flash (non-lite) model
-        if should_auto_restart:
+        if False and should_auto_restart:
             logger.info(f"🔄 Exception occurred with flash model ({effective_model}), attempting auto-restart with flash-lite")
             await _attempt_auto_restart_with_lite(
                 client, agent_run_id, thread_id, project_id,

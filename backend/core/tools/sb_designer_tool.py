@@ -153,7 +153,7 @@ class SandboxDesignerTool(SandboxToolsBase):
 
             if mode == "create":
                 response = await aimage_generation(
-                    model="gpt-image-1",
+                    model="google/gemini-2.5-flash-image",
                     prompt=enhanced_prompt,
                     n=1,
                     size=size_string,
@@ -173,7 +173,7 @@ class SandboxDesignerTool(SandboxToolsBase):
                 response = await aimage_edit(
                     image=[image_io],  
                     prompt=enhanced_prompt,
-                    model="gpt-image-1",
+                    model="google/gemini-2.5-flash-image",
                     n=1,
                     size=size_string,
                 )

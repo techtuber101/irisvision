@@ -52,6 +52,8 @@ type UnifiedConfigMenuProps = {
     onInputChange?: (value: string) => void;
 };
 
+type AgentModelType = 'iris' | 'claude';
+
 const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMenu({
     isLoggedIn = true,
     selectedAgentId,
@@ -75,6 +77,7 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
     const [showNewAgentDialog, setShowNewAgentDialog] = useState(false);
     const searchInputRef = useRef<HTMLInputElement>(null);
     const [agentConfigDialog, setAgentConfigDialog] = useState<{ open: boolean; tab: 'instructions' | 'knowledge' | 'triggers' | 'tools' | 'integrations' }>({ open: false, tab: 'instructions' });
+    const [agentModelType, setAgentModelType] = useState<AgentModelType>('iris');
 
     // Debounce search query
     useEffect(() => {
@@ -188,32 +191,122 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
         return <AgentAvatar agentId={agent?.agent_id} size={24} className="flex-shrink-0" fallbackName={agent?.name} />;
     }, []);
 
+    // Find Claude Sonnet 4.5 model from available models
+    const findClaudeSonnet45Model = useCallback(() => {
+        // First try to find exact Claude Sonnet 4.5 matches
+        const exactMatch = modelOptions.find(model => {
+            const id = model.id.toLowerCase();
+            const label = model.label.toLowerCase();
+            return (
+                (id.includes('claude') && id.includes('sonnet') && (id.includes('4.5') || id.includes('4-5'))) ||
+                (label.includes('claude') && label.includes('sonnet') && (label.includes('4.5') || label.includes('4-5'))) ||
+                id.includes('anthropic/claude-sonnet-4.5') ||
+                id.includes('anthropic/claude-4.5-sonnet') ||
+                id.includes('anthropic/claude-sonnet-4-5')
+            );
+        });
+        
+        if (exactMatch) return exactMatch;
+        
+        // Fallback: try to find any Claude Sonnet model
+        return modelOptions.find(model => {
+            const id = model.id.toLowerCase();
+            const label = model.label.toLowerCase();
+            return (
+                (id.includes('claude') && id.includes('sonnet')) ||
+                (label.includes('claude') && label.includes('sonnet'))
+            );
+        });
+    }, [modelOptions]);
+
+    // Handle agent model type change (Iris Pro vs Claude)
+    const handleAgentModelTypeChange = useCallback((type: AgentModelType) => {
+        setAgentModelType(type);
+        
+        if (type === 'claude') {
+            // Switch to Claude Sonnet 4.5
+            const claudeModel = findClaudeSonnet45Model();
+            if (claudeModel && canAccessModel(claudeModel.id)) {
+                onModelChange(claudeModel.id);
+            } else {
+                // Fallback: try to find any Claude model
+                const anyClaude = modelOptions.find(m => 
+                    m.id.toLowerCase().includes('claude') || m.label.toLowerCase().includes('claude')
+                );
+                if (anyClaude && canAccessModel(anyClaude.id)) {
+                    onModelChange(anyClaude.id);
+                }
+            }
+        } else {
+            // Switch back to default/Iris Pro model (use the recommended model or first available)
+            const defaultModel = modelOptions.find(m => m.recommended) || modelOptions[0];
+            if (defaultModel && canAccessModel(defaultModel.id)) {
+                onModelChange(defaultModel.id);
+            }
+        }
+    }, [findClaudeSonnet45Model, modelOptions, canAccessModel, onModelChange]);
+
+    // Determine current agent model type based on selected model
+    useEffect(() => {
+        const isClaude = selectedModel.toLowerCase().includes('claude');
+        setAgentModelType(isClaude ? 'claude' : 'iris');
+    }, [selectedModel]);
+
     return (
         <>
-            <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-                <DropdownMenuTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 bg-transparent border-0 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/50 flex items-center gap-1.5"
-                        aria-label="Config menu"
-                    >
-                        {onAgentSelect ? (
-                            <div className="flex items-center gap-2 min-w-0 max-w-[180px]">
-                                {/* {renderAgentIcon(displayAgent)} */}
-                                <span className="truncate text-sm font-medium">
-                                    {displayAgent?.name || 'Iris'}
-                                </span>
-                                <ChevronDown size={12} className="opacity-60 flex-shrink-0" />
-                            </div>
-                        ) : (
-                            <div className="flex items-center gap-1.5">
-                                <Cpu className="h-4 w-4" />
-                                <ChevronDown size={12} className="opacity-60" />
-                            </div>
-                        )}
-                    </Button>
-                </DropdownMenuTrigger>
+            <div className="flex items-center gap-1">
+                {/* Agent Model Type Toggle: Iris Pro / Claude */}
+                {onAgentSelect && (
+                    <div className="flex items-center gap-0.5 p-0.5 bg-white/5 rounded-xl border border-white/10 backdrop-blur-sm light:bg-black/5 light:border-black/10">
+                        <button
+                            onClick={() => handleAgentModelTypeChange('iris')}
+                            className={cn(
+                                "px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200",
+                                agentModelType === 'iris'
+                                    ? "bg-white/10 text-white light:bg-black/10 light:text-black"
+                                    : "text-white/60 hover:text-white/80 hover:bg-white/5 light:text-black/60 light:hover:text-black/80 light:hover:bg-black/5"
+                            )}
+                        >
+                            Iris Pro
+                        </button>
+                        <button
+                            onClick={() => handleAgentModelTypeChange('claude')}
+                            className={cn(
+                                "px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200",
+                                agentModelType === 'claude'
+                                    ? "bg-white/10 text-white light:bg-black/10 light:text-black"
+                                    : "text-white/60 hover:text-white/80 hover:bg-white/5 light:text-black/60 light:hover:text-black/80 light:hover:bg-black/5"
+                            )}
+                        >
+                            Claude
+                        </button>
+                    </div>
+                )}
+                
+                <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2 bg-transparent border-0 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/50 flex items-center gap-1.5"
+                            aria-label="Config menu"
+                        >
+                            {onAgentSelect ? (
+                                <div className="flex items-center gap-2 min-w-0 max-w-[180px]">
+                                    {/* {renderAgentIcon(displayAgent)} */}
+                                    <span className="truncate text-sm font-medium">
+                                        {displayAgent?.name || 'Iris'}
+                                    </span>
+                                    <ChevronDown size={12} className="opacity-60 flex-shrink-0" />
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-1.5">
+                                    <Cpu className="h-4 w-4" />
+                                    <ChevronDown size={12} className="opacity-60" />
+                                </div>
+                            )}
+                        </Button>
+                    </DropdownMenuTrigger>
 
                 <DropdownMenuContent align="end" className="w-80 p-0 rounded-2xl border border-black/20 bg-gradient-to-br from-white/20 via-white/10 to-white/20 backdrop-blur-2xl shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.2),inset_0_0_0_1px_rgba(0,0,0,0.1)] dark:border-white/10 dark:bg-gradient-to-br dark:from-white/5 dark:via-white/2 dark:to-white/5 dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.1),inset_0_0_0_1px_rgba(255,255,255,0.1)] transition-all duration-300 relative overflow-hidden" sideOffset={6}>
                     {/* Advanced Glassmorphism Effects */}
@@ -419,7 +512,8 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
                         </div>
                     )}
                 </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenu>
+            </div>
             <Dialog open={integrationsOpen} onOpenChange={setIntegrationsOpen}>
                 <DialogContent className="p-0 max-w-6xl h-[90vh] overflow-hidden">
                     <DialogHeader className="sr-only">

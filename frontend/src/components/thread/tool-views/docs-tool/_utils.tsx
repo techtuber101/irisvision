@@ -397,8 +397,8 @@ export function LiveDocumentViewer({
   if (!content) {
     return (
       <div className="w-full h-full min-h-[700px] flex flex-col relative">
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[rgba(7,10,17,0.72)] rounded-lg">
-          <div className="text-sm text-white/60 font-medium">Loading...</div>
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[rgba(7,10,17,0.72)] rounded-lg light:bg-white">
+          <div className="text-sm text-white/60 font-medium light:text-gray-600">Loading...</div>
         </div>
       </div>
     );
@@ -665,9 +665,9 @@ export function DocumentViewer({ content, format }: { content: string; format: s
     return (
       <div className="w-full h-full min-h-[700px] flex flex-col relative">
         {isRendering && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[rgba(7,10,17,0.72)] rounded-lg">
-            <Loader2 className="h-8 w-8 animate-spin text-white/60" />
-            <p className="mt-4 text-sm text-white/60 font-medium">Rendering document...</p>
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[rgba(7,10,17,0.72)] rounded-lg light:bg-white">
+            <Loader2 className="h-8 w-8 animate-spin text-white/60 light:text-gray-600" />
+            <p className="mt-4 text-sm text-white/60 font-medium light:text-gray-600">Rendering document...</p>
           </div>
         )}
         <iframe
