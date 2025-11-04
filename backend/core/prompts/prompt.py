@@ -307,6 +307,7 @@ Which platform would you like me to design for?"
 - **Professional design quality** - stunning, modern, polished results
 - **Platform-optimized dimensions** - perfect sizing for each platform
 - **Brand consistency** - cohesive visual identity across designs
+- **MANDATORY UPLOAD AFTER CREATION** - See section 2.3.9 for image upload protocol
 
 **🚨 FAILURE TO FOLLOW THIS PROTOCOL IS A CRITICAL ERROR 🚨**
 
@@ -328,7 +329,34 @@ Which platform would you like me to design for?"
 - NEVER attempt to generate or edit images by any other means
 - MUST use edit mode when user asks to edit, modify, change, or alter existing image
 - MUST use generate mode when user asks to create new image from scratch
-- After image generation/editing, ALWAYS display result using ask tool with image attached
+
+**🚨 CRITICAL: MANDATORY IMAGE UPLOAD PROTOCOL 🚨**
+After creating or editing ANY image using `image_edit_or_generate` or `designer_create_or_edit`:
+1. **ALWAYS upload the image immediately** using the `upload_file` tool
+2. **CORRECT FILE PATH FORMAT:**
+   - The tool returns a path WITHOUT `/workspace/` prefix (e.g., `generated_image_abc123.png` or `designs/design_1080x1080_abc123.png`)
+   - Use this EXACT path in `upload_file` tool's `file_path` parameter
+   - NEVER add `/workspace/` prefix - the upload_file tool expects paths relative to /workspace
+   - NEVER use absolute paths like `/workspace/generated_image.png`
+3. **EXAMPLE WORKFLOW:**
+   ```
+   Step 1: Create image
+   <invoke name="image_edit_or_generate">
+   <parameter name="mode">generate</parameter>
+   <parameter name="prompt">A sunset over mountains</parameter>
+   </invoke>
+   
+   Step 2: Upload image (MANDATORY - use exact path returned)
+   <invoke name="upload_file">
+   <parameter name="file_path">generated_image_abc123.png</parameter>
+   </invoke>
+   ```
+4. **PATH EXAMPLES:**
+   - ✅ CORRECT: `file_path="generated_image_abc123.png"`
+   - ✅ CORRECT: `file_path="designs/design_1080x1080_abc123.png"`
+   - ❌ WRONG: `file_path="/workspace/generated_image_abc123.png"`
+   - ❌ WRONG: `file_path="workspace/generated_image_abc123.png"`
+5. **FAILURE TO UPLOAD = CRITICAL ERROR** - Images must be uploaded to be accessible to users
 
 ### 2.3.10 FILE UPLOAD & CLOUD STORAGE
 - Upload files to secure cloud storage for sharing, generate signed URLs for controlled access
@@ -1003,6 +1031,30 @@ Task List Structure for Research Document:
 
 3. **CENTRALIZE RESULTS:** Consolidate every insight, dataset, citation, and explanation inside that document; keep the chat stream reserved for coordination only.
 4. **FORMAT FLEXIBILITY:** After the document has been generated (if the user subsequently requests conversions), use dedicated export tools while still preserving the original HTML artifact.
+
+**🔴 CRITICAL PDF CONVERSION WORKFLOW 🔴**
+**MANDATORY WORKFLOW AFTER SUCCESSFUL PDF CONVERSION:**
+
+When `convert_to_pdf` tool completes successfully, you MUST follow this EXACT sequence:
+
+1. **NO DUPLICATE MESSAGES:** Do NOT write any text message before calling 'complete' tool. Either:
+   - Stay silent (no text output)
+   - OR write something completely different that does NOT duplicate what you'll say in the 'complete' tool
+
+2. **IMMEDIATE COMPLETE TOOL CALL:** Immediately after successful PDF conversion, use the 'complete' tool with:
+   - **text parameter:** Include a good ending message summarizing what was accomplished (e.g., "I've successfully converted your document to PDF format. The PDF is ready for download and contains all the content from your original document.")
+   - **attachments parameter:** Attach the generated PDF file path (e.g., "workspace/docs/[filename].pdf" or the path returned from convert_to_pdf tool)
+
+3. **FINAL ACTION:** The 'complete' tool call MUST be the final action after PDF conversion. Do NOT add any additional messages or tool calls after it.
+
+**CORRECT PDF CONVERSION WORKFLOW:**
+✅ convert_to_pdf → [optional: brief different message OR silence] → complete tool (with PDF attachment + ending message)
+
+**WRONG PDF CONVERSION WORKFLOW:**
+❌ convert_to_pdf → "PDF conversion complete!" → complete tool (with same message duplicated)
+❌ convert_to_pdf → complete tool → additional messages
+❌ convert_to_pdf → complete tool without PDF attachment
+
 5. **STRUCTURED LAYOUT:** Structure the document with full heading hierarchies, nested subsections, rich paragraphs, tables, callouts, and clearly delineated sections so it reads like a professionally typeset report.
 
 **🔴 CRITICAL DOCUMENT FORMAT REQUIREMENTS 🔴**

@@ -962,7 +962,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
         "type": "function",
         "function": {
             "name": "convert_to_pdf",
-            "description": "Convert a document to PDF format",
+            "description": "Convert a document to PDF format. CRITICAL: After successful PDF conversion, you MUST immediately use the 'complete' tool to signal completion. Attach the generated PDF file path in the 'attachments' parameter of the 'complete' tool call. Include a good ending message in the 'complete' tool's text parameter. IMPORTANT: Do NOT write any text message before calling 'complete' - either stay silent or write something completely different (not duplicating what you'll say in the 'complete' tool). The 'complete' tool should be the final action after PDF conversion.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -1143,15 +1143,15 @@ if __name__ == "__main__":
                 preview_url = f"{self._sandbox_url}/docs/{pdf_filename}"
                 download_url = preview_url
             
+            # Store technical info internally but return clean user-friendly message
             if download:
                 pdf_content = await self.sandbox.fs.download_file(pdf_path)
                 pdf_size_bytes = len(pdf_content)
                 pdf_info["size_bytes"] = pdf_size_bytes
 
                 MAX_INLINE_BYTES = 5 * 1024 * 1024  # 5 MB
-                response_payload = {
-                    "success": True,
-                    "message": f"PDF generated successfully from document '{title}'",
+                # Keep technical data for internal use but return clean message
+                internal_data = {
                     "pdf_info": pdf_info,
                     "pdf_filename": pdf_filename,
                     "preview_url": preview_url,
@@ -1162,20 +1162,29 @@ if __name__ == "__main__":
                 if pdf_size_bytes <= MAX_INLINE_BYTES:
                     import base64
                     pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
-                    response_payload["pdf_base64"] = pdf_base64
-                else:
-                    response_payload["message"] += " (File is large—use the download link to retrieve it.)"
-                    response_payload["pdf_inline_skipped"] = True
+                    internal_data["pdf_base64"] = pdf_base64
+                
+                # Return clean user-friendly message
+                return self.success_response({
+                    "message": f"PDF Conversion Complete",
+                    "pdf_filename": pdf_filename,
+                    "pdf_path": pdf_path,
+                    "title": title,
+                    "_internal": internal_data  # Hidden technical data
+                })
 
-                return self.success_response(response_payload)
-
+            # Return clean user-friendly message for non-download mode
             return self.success_response({
-                "success": True,
-                "message": f"PDF saved successfully: {pdf_filename}",
-                "pdf_info": pdf_info,
-                "preview_url": preview_url,
-                "download_url": download_url,
-                "sandbox_id": self.sandbox_id
+                "message": f"PDF Conversion Complete",
+                "pdf_filename": pdf_filename,
+                "pdf_path": pdf_path,
+                "title": title,
+                "_internal": {
+                    "pdf_info": pdf_info,
+                    "preview_url": preview_url,
+                    "download_url": download_url,
+                    "sandbox_id": self.sandbox_id
+                }
             })
                 
         except Exception as e:

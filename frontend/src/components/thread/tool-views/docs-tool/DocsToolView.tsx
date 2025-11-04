@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Loader2,
   Share,
+  ExternalLink,
 } from 'lucide-react';
 import { ToolViewProps } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -512,7 +513,48 @@ export function DocsToolView({
           </div>
         ) : (
           <div className="flex-1 flex flex-col min-h-0">
-            {data.document && !data.documents ? (
+            {/* PDF Conversion Success Display */}
+            {(toolName === 'convert_to_pdf' || toolName === 'convert-to-pdf' || toolName.includes('convert')) && data.pdf_path ? (
+              data.success !== false ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-12 space-y-6">
+                  <div className="text-center space-y-4">
+                    <div className="flex items-center justify-center gap-2 mb-4">
+                      <CheckCircle className="h-8 w-8 text-emerald-500" />
+                    </div>
+                    <h2 className="text-2xl font-semibold text-foreground">
+                      PDF Converted Successfully
+                    </h2>
+                    <div className="space-y-2 text-muted-foreground">
+                      <p className="text-base">Document: {data.title || data.pdf_filename || 'PDF'}</p>
+                      <p className="text-sm">Filename: {data.pdf_filename || 'document.pdf'}</p>
+                    </div>
+                    <Button
+                      size="lg"
+                      onClick={() => {
+                        const sandboxId = data?.sandbox_id || data?._internal?.sandbox_id || project?.sandbox?.id || project?.id;
+                        const pdfPath = data.pdf_path || data?._internal?.pdf_info?.pdf_path;
+                        if (sandboxId && pdfPath) {
+                          setSelectedDocPath(pdfPath);
+                          setFileViewerOpen(true);
+                        }
+                      }}
+                      className="mt-6 bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 text-base"
+                    >
+                      <ExternalLink className="h-5 w-5 mr-2" />
+                      Open PDF
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center p-12">
+                  <AlertTriangle className="h-8 w-8 text-rose-500 mb-4" />
+                  <p className="text-lg text-muted-foreground">
+                    {data.error || 'PDF conversion failed'}
+                  </p>
+                </div>
+              )
+            ) : null}
+            {data.document && !data.documents && (toolName !== 'convert_to_pdf' && toolName !== 'convert-to-pdf') ? (
               <div className="flex-1 min-h-0">
                 {(data.document.path || data.content || data.document.content) && (
                   <div className="h-full overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">

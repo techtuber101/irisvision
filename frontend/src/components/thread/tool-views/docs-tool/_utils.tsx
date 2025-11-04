@@ -39,6 +39,18 @@ export interface DocsToolData {
   export_path?: string;
   count?: number;
   sandbox_id?: string;
+  // PDF conversion fields
+  pdf_path?: string;
+  pdf_filename?: string;
+  title?: string;
+  _internal?: {
+    sandbox_id?: string;
+    pdf_info?: {
+      pdf_path?: string;
+      [key: string]: any;
+    };
+    [key: string]: any;
+  };
 }
 
 export function extractDocsData(toolContent?: any): DocsToolData | null {
@@ -78,6 +90,10 @@ export function extractDocsData(toolContent?: any): DocsToolData | null {
           if (!data.sandbox_id && parsed.sandbox_id) {
             data.sandbox_id = parsed.sandbox_id;
           }
+          // Extract sandbox_id from _internal if available (for PDF conversion)
+          if (!data.sandbox_id && data._internal?.sandbox_id) {
+            data.sandbox_id = data._internal.sandbox_id;
+          }
         } else {
           data = parsed;
         }
@@ -99,6 +115,10 @@ export function extractDocsData(toolContent?: any): DocsToolData | null {
           }
           if (!data.sandbox_id && parsed.sandbox_id) {
             data.sandbox_id = parsed.sandbox_id;
+          }
+          // Extract sandbox_id from _internal if available (for PDF conversion)
+          if (!data.sandbox_id && data._internal?.sandbox_id) {
+            data.sandbox_id = data._internal.sandbox_id;
           }
         } else {
           data = parsed;
@@ -173,11 +193,44 @@ export function extractDocsData(toolContent?: any): DocsToolData | null {
 
 export function extractToolName(toolContent?: any): string {
   try {
+    // Check metadata first
     if (toolContent?.metadata?.tool_name) {
       return toolContent.metadata.tool_name;
     }
+    // Check top-level tool_name
     if (toolContent?.tool_name) {
       return toolContent.tool_name;
+    }
+    // Check tool_execution format (for convert_to_pdf and other tools)
+    if (typeof toolContent === 'string') {
+      try {
+        const parsed = JSON.parse(toolContent);
+        if (parsed.tool_execution?.function_name) {
+          return parsed.tool_execution.function_name;
+        }
+        if (parsed.tool_execution?.xml_tag_name) {
+          return parsed.tool_execution.xml_tag_name;
+        }
+      } catch {}
+    }
+    // Check object format
+    if (toolContent?.tool_execution?.function_name) {
+      return toolContent.tool_execution.function_name;
+    }
+    if (toolContent?.tool_execution?.xml_tag_name) {
+      return toolContent.tool_execution.xml_tag_name;
+    }
+    // Check nested content format
+    if (toolContent?.content && typeof toolContent.content === 'string') {
+      try {
+        const parsed = JSON.parse(toolContent.content);
+        if (parsed.tool_execution?.function_name) {
+          return parsed.tool_execution.function_name;
+        }
+        if (parsed.tool_execution?.xml_tag_name) {
+          return parsed.tool_execution.xml_tag_name;
+        }
+      } catch {}
     }
   } catch (e) {
   }

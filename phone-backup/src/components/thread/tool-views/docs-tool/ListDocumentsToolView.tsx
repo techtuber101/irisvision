@@ -197,7 +197,7 @@ export function ListDocumentsToolView({
                             </span>
                             {doc.format && (
                               <Badge variant="outline" className="text-xs px-2 py-0">
-                                {doc.format === 'doc' ? 'TipTap' : doc.format.toUpperCase()}
+                                {doc.format === 'doc' ? 'Iris Document' : doc.format.toUpperCase()}
                               </Badge>
                             )}
                           </div>

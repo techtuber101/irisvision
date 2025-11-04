@@ -200,7 +200,10 @@ class SandboxDesignerTool(SandboxToolsBase):
                 "dimensions": {"width": actual_width, "height": actual_height},
                 "style": design_style,
                 "quality": quality,
-                "message": f"Successfully created professional design{platform_text} ({dimensions_text}){style_text}. Design saved at: {design_path}"
+                "message": f"Successfully created professional design{platform_text} ({dimensions_text}){style_text}. Design saved at: {design_path}. "
+                f"⚠️ CRITICAL: You MUST now upload this design using the upload_file tool. "
+                f"Use file_path='{design_path}' (relative to /workspace, without /workspace/ prefix). "
+                f"This will make the design accessible to the user."
             })
 
         except Exception as e:

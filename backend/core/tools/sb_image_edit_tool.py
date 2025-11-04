@@ -100,7 +100,10 @@ class SandboxImageEditTool(SandboxToolsBase):
                 return image_filename
 
             return self.success_response(
-                f"Successfully generated image using mode '{mode}'. Image saved as: {image_filename}. You can use the ask tool to display the image."
+                f"Successfully generated image using mode '{mode}'. Image saved as: {image_filename}. "
+                f"⚠️ CRITICAL: You MUST now upload this image using the upload_file tool. "
+                f"Use file_path='{image_filename}' (relative to /workspace, without /workspace/ prefix). "
+                f"This will make the image accessible to the user."
             )
 
         except Exception as e:
