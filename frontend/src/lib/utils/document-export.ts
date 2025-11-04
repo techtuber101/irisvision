@@ -495,9 +495,6 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
 
       case 'png':
       case 'jpg': {
-        // Sanitize HTML content to prevent JavaScript errors during image generation
-        const sanitizedHtml = sanitizeHtmlForPdf(htmlContent);
-        
         const element = document.createElement('div');
         element.innerHTML = `
           <style>
@@ -580,7 +577,7 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
               margin: 2em 0;
             }
           </style>
-          ${sanitizedHtml}
+          ${htmlContent}
         `;
         element.style.cssText = `
           position: absolute;
@@ -611,11 +608,8 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
       }
 
       case 'images': {
-        // Sanitize HTML content to prevent JavaScript errors during image generation
-        const sanitizedHtml = sanitizeHtmlForPdf(htmlContent);
-        
         const container = document.createElement('div');
-        container.innerHTML = `${standardDocumentStyles}<div id="iris-document-export">${sanitizedHtml}</div>`;
+        container.innerHTML = `${standardDocumentStyles}<div id="iris-document-export">${htmlContent}</div>`;
 
         const element = document.createElement('div');
         element.style.cssText = `

@@ -134,6 +134,11 @@ class SandboxFilesTool(SandboxToolsBase):
             await self.sandbox.fs.upload_file(file_contents.encode(), full_path)
             await self.sandbox.fs.set_file_permissions(full_path, permissions)
             
+            # Verify the file was actually created
+            if not await self._file_exists(full_path):
+                logger.error(f"File creation reported success but file '{file_path}' does not exist at '{full_path}'")
+                return self.fail_response(f"File creation failed: file '{file_path}' was not created despite no errors reported.")
+            
             message = f"File '{file_path}' created successfully."
             
             # Check if index.html was created and add 8080 server info (only in root workspace)
