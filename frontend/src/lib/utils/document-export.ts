@@ -32,6 +32,84 @@ function cleanCSSForCanvas(html: string): string {
     .replace(/mix-blend-mode:[^;]+;?/gi, '');
 }
 
+// Helper function to sanitize HTML content for PDF export
+// Removes JavaScript, event handlers, and React-specific attributes that could cause errors
+function sanitizeHtmlForPdf(html: string): string {
+  // Return empty string if input is invalid
+  if (!html || typeof html !== 'string') {
+    return '';
+  }
+
+  try {
+    // Create a temporary DOM element to parse and clean the HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+
+    // Remove all script tags
+    const scripts = tempDiv.querySelectorAll('script');
+    scripts.forEach(script => script.remove());
+
+    // Remove all event handlers and React-specific attributes
+    const allElements = tempDiv.querySelectorAll('*');
+    allElements.forEach(element => {
+      // Remove all attributes that start with 'on' (event handlers)
+      Array.from(element.attributes).forEach(attr => {
+        if (attr.name.startsWith('on') || 
+            (attr.name.startsWith('data-') && (attr.name.includes('react') || attr.name.includes('toolCall')))) {
+          element.removeAttribute(attr.name);
+        }
+      });
+
+      // Remove specific problematic attributes
+      ['data-reactroot', 'data-reactid', 'data-react-checksum'].forEach(attr => {
+        element.removeAttribute(attr);
+      });
+
+      // Remove any inline styles that might contain JavaScript
+      if (element.getAttribute('style')) {
+        const style = element.getAttribute('style') || '';
+        if (style.includes('javascript:') || style.includes('expression(')) {
+          element.removeAttribute('style');
+        }
+      }
+    });
+
+    // Get the cleaned HTML
+    let cleanedHtml = tempDiv.innerHTML;
+
+    // Additional regex-based cleaning for any remaining JavaScript references
+    // Remove any script tags that might have been missed
+    cleanedHtml = cleanedHtml.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    
+    // Remove inline event handlers that might have been missed
+    cleanedHtml = cleanedHtml.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
+    cleanedHtml = cleanedHtml.replace(/\s*on\w+\s*=\s*{[^}]*}/gi, '');
+    
+    // Remove data attributes that reference toolCall or React components
+    cleanedHtml = cleanedHtml.replace(/\s*data-[^=]*toolCall[^=]*=\s*["'][^"']*["']/gi, '');
+    cleanedHtml = cleanedHtml.replace(/\s*data-react[^=]*=\s*["'][^"']*["']/gi, '');
+
+    return cleanedHtml;
+  } catch (error) {
+    // If DOM parsing fails, fall back to regex-only cleaning
+    console.warn('Failed to sanitize HTML using DOM parser, falling back to regex:', error);
+    let cleanedHtml = html;
+    
+    // Remove script tags
+    cleanedHtml = cleanedHtml.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    
+    // Remove inline event handlers
+    cleanedHtml = cleanedHtml.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
+    cleanedHtml = cleanedHtml.replace(/\s*on\w+\s*=\s*{[^}]*}/gi, '');
+    
+    // Remove data attributes that reference toolCall or React components
+    cleanedHtml = cleanedHtml.replace(/\s*data-[^=]*toolCall[^=]*=\s*["'][^"']*["']/gi, '');
+    cleanedHtml = cleanedHtml.replace(/\s*data-react[^=]*=\s*["'][^"']*["']/gi, '');
+    
+    return cleanedHtml;
+  }
+}
+
 export async function exportDocument({ content, fileName, format }: DocumentExportOptions): Promise<void> {
   let htmlContent = content;
   if (typeof content === 'string' && !content.includes('<')) {
@@ -156,8 +234,12 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
   try {
     switch (format) {
       case 'pdf': {
+        // Sanitize HTML content to remove JavaScript, event handlers, and React-specific attributes
+        // This prevents errors like "toolCall is not defined" during PDF generation
+        const sanitizedHtml = sanitizeHtmlForPdf(htmlContent);
+        
         const element = document.createElement('div');
-        element.innerHTML = `${standardDocumentStyles}${htmlContent}`;
+        element.innerHTML = `${standardDocumentStyles}${sanitizedHtml}`;
         
         const options = {
           margin: 1,
@@ -413,6 +495,9 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
 
       case 'png':
       case 'jpg': {
+        // Sanitize HTML content to prevent JavaScript errors during image generation
+        const sanitizedHtml = sanitizeHtmlForPdf(htmlContent);
+        
         const element = document.createElement('div');
         element.innerHTML = `
           <style>
@@ -495,7 +580,7 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
               margin: 2em 0;
             }
           </style>
-          ${htmlContent}
+          ${sanitizedHtml}
         `;
         element.style.cssText = `
           position: absolute;
@@ -526,8 +611,11 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
       }
 
       case 'images': {
+        // Sanitize HTML content to prevent JavaScript errors during image generation
+        const sanitizedHtml = sanitizeHtmlForPdf(htmlContent);
+        
         const container = document.createElement('div');
-        container.innerHTML = `${standardDocumentStyles}<div id="iris-document-export">${htmlContent}</div>`;
+        container.innerHTML = `${standardDocumentStyles}<div id="iris-document-export">${sanitizedHtml}</div>`;
 
         const element = document.createElement('div');
         element.style.cssText = `
