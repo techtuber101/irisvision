@@ -3,6 +3,7 @@ from core.sandbox.tool_base import SandboxToolsBase
 from core.agentpress.thread_manager import ThreadManager
 import asyncio
 import time
+from core.sandbox.sandbox import get_preview_link_info
 
 @tool_metadata(
     display_name="Port Exposure",
@@ -60,10 +61,8 @@ class SandboxExposeTool(SandboxToolsBase):
                     pass
 
             # Get the preview link for the specified port
-            preview_link = await self.sandbox.get_preview_link(port)
-            
-            # Extract the actual URL from the preview link object
-            url = preview_link.url if hasattr(preview_link, 'url') else str(preview_link)
+            preview_info = await get_preview_link_info(self.sandbox, port)
+            url = preview_info.url or preview_info.original_url
             
             return self.success_response({
                 "url": url,

@@ -287,6 +287,9 @@ class Configuration:
     DAYTONA_API_KEY: str
     DAYTONA_SERVER_URL: str
     DAYTONA_TARGET: str
+    SANDBOX_PROXY_DOMAIN: Optional[str] = None
+    SANDBOX_PROXY_PROTOCOL: str = "https"
+    SANDBOX_PROXY_PORT: Optional[int] = None
     
     # Search and other API keys
     TAVILY_API_KEY: str

@@ -20,6 +20,7 @@ import {
 import { useAuth } from '@/components/AuthProvider';
 import { useAuthMethodTracking } from '@/lib/stores/auth-tracking';
 import { toast } from 'sonner';
+import { useTheme } from 'next-themes';
 
 import {
   Dialog,
@@ -37,6 +38,7 @@ function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading } = useAuth();
+  const { setTheme } = useTheme();
   const mode = searchParams.get('mode');
   const returnUrl = searchParams.get('returnUrl') || searchParams.get('redirect');
   const message = searchParams.get('message');
@@ -59,7 +61,10 @@ function LoginContent() {
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    // Enforce dark mode immediately when component mounts
+    document.documentElement.classList.add('dark');
+    setTheme('dark');
+  }, [setTheme]);
 
   // Handle successful authentication
   const handleAuthSuccess = useCallback((result: any) => {
@@ -226,18 +231,11 @@ function LoginContent() {
           <div className="relative z-10 text-center mb-8">
             <div className="mb-6">
               <Image
-                src="/irislogoblack.png"
-                alt="Iris Logo"
-                width={120}
-                height={22}
-                className="mx-auto h-6 w-auto drop-shadow-lg dark:hidden"
-              />
-              <Image
                 src="/irislogowhitebig.png"
                 alt="Iris Logo"
                 width={120}
                 height={22}
-                className="mx-auto h-6 w-auto drop-shadow-lg hidden dark:block"
+                className="mx-auto h-6 w-auto drop-shadow-lg"
               />
             </div>
             <h1 className="text-2xl font-semibold text-white/90 mb-2">

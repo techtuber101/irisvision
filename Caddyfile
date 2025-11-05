@@ -34,6 +34,20 @@ irisvision.ai, www.irisvision.ai {
 	}
 }
 
+vault.irisvision.ai, *.vault.irisvision.ai {
+	encode zstd gzip
+
+	@health path /health
+	respond @health "OK" 200
+
+	reverse_proxy sandbox-proxy:1234
+
+	log {
+		output stdout
+		format json
+	}
+}
+
 # Optional: Plain HTTP listener for health + redirect to HTTPS
 :80 {
 	@health path /health

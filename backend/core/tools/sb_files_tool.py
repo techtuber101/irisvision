@@ -4,6 +4,7 @@ from core.utils.files_utils import should_exclude_file, clean_path
 from core.agentpress.thread_manager import ThreadManager
 from core.utils.logger import logger
 from core.utils.config import config
+from core.sandbox.sandbox import get_preview_link_info
 import os
 import json
 import litellm
@@ -144,8 +145,8 @@ class SandboxFilesTool(SandboxToolsBase):
             # Check if index.html was created and add 8080 server info (only in root workspace)
             if file_path.lower() == 'index.html':
                 try:
-                    website_link = await self.sandbox.get_preview_link(8080)
-                    website_url = website_link.url if hasattr(website_link, 'url') else str(website_link).split("url='")[1].split("'")[0]
+                    website_info = await get_preview_link_info(self.sandbox, 8080)
+                    website_url = website_info.url or website_info.original_url
                     message += f"\n\n[Auto-detected index.html - HTTP server available at: {website_url}]"
                     message += "\n[Note: Use the provided HTTP server URL above instead of starting a new server]"
                 except Exception as e:
@@ -266,8 +267,8 @@ class SandboxFilesTool(SandboxToolsBase):
             # Check if index.html was rewritten and add 8080 server info (only in root workspace)
             if file_path.lower() == 'index.html':
                 try:
-                    website_link = await self.sandbox.get_preview_link(8080)
-                    website_url = website_link.url if hasattr(website_link, 'url') else str(website_link).split("url='")[1].split("'")[0]
+                    website_info = await get_preview_link_info(self.sandbox, 8080)
+                    website_url = website_info.url or website_info.original_url
                     message += f"\n\n[Auto-detected index.html - HTTP server available at: {website_url}]"
                     message += "\n[Note: Use the provided HTTP server URL above instead of starting a new server]"
                 except Exception as e:

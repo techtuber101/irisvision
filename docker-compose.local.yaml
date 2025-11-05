@@ -35,6 +35,8 @@ services:
         condition: service_healthy
       worker:
         condition: service_started
+      sandbox-proxy:
+        condition: service_started
     networks:
       - local-network
 
@@ -73,6 +75,18 @@ services:
       - NEXT_PUBLIC_BACKEND_URL=http://localhost:8000/api
     depends_on:
       - backend
+      - sandbox-proxy
+    networks:
+      - local-network
+
+  sandbox-proxy:
+    build:
+      context: ./backend/daytona-proxy
+      dockerfile: Dockerfile
+    ports:
+      - "1234:1234"
+    env_file:
+      - ./backend/.env.local
     networks:
       - local-network
 
@@ -82,4 +96,3 @@ networks:
 
 volumes:
   redis_data:
-

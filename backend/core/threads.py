@@ -8,7 +8,8 @@ from fastapi.responses import StreamingResponse
 
 from core.utils.auth_utils import verify_and_get_user_id_from_jwt, verify_and_authorize_thread_access, require_thread_access, AuthorizedThreadAccess
 from core.utils.logger import logger
-from core.sandbox.sandbox import create_sandbox, delete_sandbox
+from core.sandbox.sandbox import create_sandbox, delete_sandbox, get_preview_link_info
+from core.sandbox.proxy import ensure_custom_domain_metadata
 
 from .api_models import CreateThreadResponse, MessageCreateRequest
 from . import core_utils as utils
@@ -81,11 +82,26 @@ async def get_user_threads(
             project_data = None
             if thread.get('project_id') and thread['project_id'] in projects_by_id:
                 project = projects_by_id[thread['project_id']]
+                sandbox_meta = project.get('sandbox', {}) or {}
+                updated_sandbox_meta, changed = ensure_custom_domain_metadata(sandbox_meta)
+                if changed:
+                    try:
+                        await client.table('projects').update({'sandbox': updated_sandbox_meta}).eq(
+                            'project_id', project['project_id']
+                        ).execute()
+                        sandbox_meta = updated_sandbox_meta
+                    except Exception as exc:
+                        logger.warning(
+                            "Failed to persist custom sandbox URLs for project %s: %s",
+                            project['project_id'],
+                            exc,
+                        )
+                        sandbox_meta = updated_sandbox_meta
                 project_data = {
                     "project_id": project['project_id'],
                     "name": project.get('name', ''),
                     "description": project.get('description', ''),
-                    "sandbox": project.get('sandbox', {}),
+                    "sandbox": sandbox_meta,
                     "is_public": project.get('is_public', False),
                     "created_at": project['created_at'],
                     "updated_at": project['updated_at']
@@ -237,15 +253,11 @@ async def create_thread(
             logger.debug(f"Created new sandbox {sandbox_id} for project {project_id}")
             
             # Get preview links
-            vnc_link = await sandbox.get_preview_link(6080)
-            website_link = await sandbox.get_preview_link(8080)
-            vnc_url = vnc_link.url if hasattr(vnc_link, 'url') else str(vnc_link).split("url='")[1].split("'")[0]
-            website_url = website_link.url if hasattr(website_link, 'url') else str(website_link).split("url='")[1].split("'")[0]
-            token = None
-            if hasattr(vnc_link, 'token'):
-                token = vnc_link.token
-            elif "token='" in str(vnc_link):
-                token = str(vnc_link).split("token='")[1].split("'")[0]
+            vnc_info = await get_preview_link_info(sandbox, 6080)
+            website_info = await get_preview_link_info(sandbox, 8080)
+            vnc_url = vnc_info.url
+            website_url = website_info.url
+            token = vnc_info.token
         except Exception as e:
             logger.error(f"Error creating sandbox: {str(e)}")
             await client.table('projects').delete().eq('project_id', project_id).execute()

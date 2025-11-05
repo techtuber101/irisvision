@@ -86,17 +86,17 @@ class SessionManager:
         client = await self._db.client
         
         try:
-            from core.sandbox.sandbox import create_sandbox, delete_sandbox
+            from core.sandbox.sandbox import create_sandbox, delete_sandbox, get_preview_link_info
             
             sandbox_pass = str(uuid.uuid4())
             sandbox = await create_sandbox(sandbox_pass, project_id)
             sandbox_id = sandbox.id
             
-            vnc_link = await sandbox.get_preview_link(6080)
-            website_link = await sandbox.get_preview_link(8080)
-            vnc_url = self._extract_url(vnc_link)
-            website_url = self._extract_url(website_link)
-            token = self._extract_token(vnc_link)
+            vnc_info = await get_preview_link_info(sandbox, 6080)
+            website_info = await get_preview_link_info(sandbox, 8080)
+            vnc_url = vnc_info.url
+            website_url = website_info.url
+            token = vnc_info.token
             
             update_result = await client.table('projects').update({
                 'sandbox': {
@@ -116,19 +116,6 @@ class SessionManager:
             await client.table('projects').delete().eq('project_id', project_id).execute()
             raise Exception(f"Failed to create sandbox: {str(e)}")
     
-    def _extract_url(self, link) -> str:
-        if hasattr(link, 'url'):
-            return link.url
-        return str(link).split("url='")[1].split("'")[0]
-    
-    def _extract_token(self, link) -> str:
-        if hasattr(link, 'token'):
-            return link.token
-        if "token='" in str(link):
-            return str(link).split("token='")[1].split("'")[0]
-        return None
-
-
 class AgentExecutor:
     def __init__(self, db_connection: DBConnection, session_manager: SessionManager):
         self._db = db_connection

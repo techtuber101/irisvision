@@ -125,6 +125,9 @@ def load_existing_env_vars():
             "DAYTONA_API_KEY": backend_env.get("DAYTONA_API_KEY", ""),
             "DAYTONA_SERVER_URL": backend_env.get("DAYTONA_SERVER_URL", ""),
             "DAYTONA_TARGET": backend_env.get("DAYTONA_TARGET", ""),
+            "SANDBOX_PROXY_DOMAIN": backend_env.get("SANDBOX_PROXY_DOMAIN", ""),
+            "SANDBOX_PROXY_PROTOCOL": backend_env.get("SANDBOX_PROXY_PROTOCOL", "https"),
+            "SANDBOX_PROXY_PORT": backend_env.get("SANDBOX_PROXY_PORT", ""),
         },
         "llm": {
             "OPENAI_API_KEY": backend_env.get("OPENAI_API_KEY", ""),
@@ -218,6 +221,35 @@ def validate_url(url, allow_empty=False):
         re.IGNORECASE,
     )
     return bool(pattern.match(url))
+
+
+def validate_domain(domain, allow_empty=False):
+    """Validates a bare domain (no protocol)."""
+    if allow_empty and not domain:
+        return True
+    pattern = re.compile(
+        r"^(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,63}$",
+        re.IGNORECASE,
+    )
+    return bool(pattern.match(domain))
+
+
+def validate_protocol(protocol, allow_empty=False):
+    """Validates http/https protocol strings."""
+    if not protocol:
+        return allow_empty
+    return protocol.lower() in {"http", "https"}
+
+
+def validate_port(port, allow_empty=False):
+    """Validates a port number between 1 and 65535."""
+    if allow_empty and not port:
+        return True
+    try:
+        value = int(port)
+        return 1 <= value <= 65535
+    except (TypeError, ValueError):
+        return False
 
 
 def validate_api_key(api_key, allow_empty=False):
@@ -677,7 +709,36 @@ class SetupWizard:
         if not self.env_vars["daytona"]["DAYTONA_TARGET"]:
             self.env_vars["daytona"]["DAYTONA_TARGET"] = "us"
 
+        self.env_vars["daytona"]["SANDBOX_PROXY_DOMAIN"] = self._get_input(
+            "Optional wildcard domain for sandbox previews (e.g. irisvision.ai): ",
+            validate_domain,
+            "Enter a valid domain (example: irisvision.ai) or leave blank.",
+            allow_empty=True,
+            default_value=self.env_vars["daytona"].get("SANDBOX_PROXY_DOMAIN", ""),
+        )
+
+        self.env_vars["daytona"]["SANDBOX_PROXY_PROTOCOL"] = self._get_input(
+            "Preview URL protocol [http/https]: ",
+            validate_protocol,
+            "Protocol must be http or https.",
+            allow_empty=False,
+            default_value=self.env_vars["daytona"].get("SANDBOX_PROXY_PROTOCOL", "https"),
+        )
+
+        self.env_vars["daytona"]["SANDBOX_PROXY_PORT"] = self._get_input(
+            "Optional proxy port (leave blank for default 80/443): ",
+            validate_port,
+            "Port must be an integer between 1 and 65535 or left blank.",
+            allow_empty=True,
+            default_value=self.env_vars["daytona"].get("SANDBOX_PROXY_PORT", ""),
+        )
+
         print_success("Daytona information saved.")
+
+        if self.env_vars["daytona"]["SANDBOX_PROXY_DOMAIN"]:
+            print_info(
+                "Sandbox previews will resolve via your custom domain. Configure a wildcard DNS record to point at your Iris proxy."
+            )
 
         print_warning(
             "IMPORTANT: You must create a Iris snapshot in Daytona for it to work properly."

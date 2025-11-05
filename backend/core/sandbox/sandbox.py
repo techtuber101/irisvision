@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from core.utils.logger import logger
 from core.utils.config import config
 from core.utils.config import Configuration
+from core.sandbox.proxy import PreviewLinkInfo, normalize_preview_link
 
 load_dotenv()
 
@@ -29,6 +30,12 @@ else:
     logger.warning("No Daytona target found in environment variables")
 
 daytona = AsyncDaytona(daytona_config)
+
+
+async def get_preview_link_info(sandbox: AsyncSandbox, port: int) -> PreviewLinkInfo:
+    """Fetch metadata for a sandbox preview link with custom domain handling."""
+    link = await sandbox.get_preview_link(port)
+    return normalize_preview_link(link, sandbox.id, port)
 
 async def get_or_start_sandbox(sandbox_id: str) -> AsyncSandbox:
     """Retrieve a sandbox by ID, check its state, and start it if needed."""

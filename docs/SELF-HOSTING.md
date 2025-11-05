@@ -72,6 +72,9 @@ Backend keys (by purpose):
 | Agent sandbox | DAYTONA_API_KEY               |                                      Yes | -                          | Required by Daytona SDK                                             |
 |               | DAYTONA_SERVER_URL            |                                      Yes | https://app.daytona.io/api |                                                                     |
 |               | DAYTONA_TARGET                |                                      Yes | us                         | region/target                                                       |
+|               | SANDBOX_PROXY_DOMAIN          |                                       No | -                          | Wildcard domain served by the Iris Daytona proxy                    |
+|               | SANDBOX_PROXY_PROTOCOL        |                                       No | https                      | Scheme used for preview URLs                                        |
+|               | SANDBOX_PROXY_PORT            |                                       No | -                          | Optional explicit port for the proxy (e.g., 1234 in local dev)      |
 | Observability | LANGFUSE_PUBLIC_KEY           |                                       No | -                          | Optional tracing                                                    |
 |               | LANGFUSE_SECRET_KEY           |                                       No | -                          |                                                                     |
 |               | LANGFUSE_HOST                 |                                       No | https://cloud.langfuse.com |                                                                     |
@@ -152,6 +155,9 @@ FIRECRAWL_API_KEY=YOUR_FIRECRAWL_API_KEY
 DAYTONA_API_KEY=YOUR_DAYTONA_API_KEY
 DAYTONA_SERVER_URL=https://app.daytona.io/api
 DAYTONA_TARGET=us
+SANDBOX_PROXY_DOMAIN=vault.irisvision.ai
+SANDBOX_PROXY_PROTOCOL=https
+SANDBOX_PROXY_PORT=
 
 # Data APIs required by configuration
 RAPID_API_KEY=YOUR_RAPID_API_KEY
@@ -169,6 +175,51 @@ from cryptography.fernet import Fernet
 print(Fernet.generate_key().decode())
 PY
 ```
+
+#### Daytona sandbox proxy (custom preview domains)
+
+Iris ships with a dedicated Daytona proxy (`backend/daytona-proxy`) that allows every sandbox
+preview to be served from your own wildcard domain (for example,
+`8080-f3f0b21c.vault.irisvision.ai`). When `SANDBOX_PROXY_DOMAIN` is set:
+
+- Backend preview URLs and VNC links are rewritten to the new domain.
+- The proxy automatically retrieves Daytona preview tokens and sets
+  `X-Daytona-Skip-Preview-Warning`, removing Daytona’s interstitial warning page.
+
+To enable it in production:
+
+1. Create a wildcard DNS record pointing to your Iris load balancer or Caddy host, e.g.
+   `*.vault.irisvision.ai → your-load-balancer-ip`.
+2. Set `SANDBOX_PROXY_DOMAIN` (and optionally `SANDBOX_PROXY_PROTOCOL` / `SANDBOX_PROXY_PORT`) in
+   `backend/.env`.
+3. Ensure the `sandbox-proxy` service is running (included in `docker-compose.yaml`).
+4. Update TLS certificates if you use a domain other than `vault.irisvision.ai` by editing the
+   `Caddyfile` wildcard entry.
+
+For staging or multi-tenant setups you can point the domain to a subdomain
+(`preview.example.com`). Adjust the DNS wildcard and the Caddyfile wildcard host pattern
+accordingly.
+
+##### Local development with the custom proxy
+
+If you prefer to keep the Daytona warning disabled while working locally:
+
+1. Set the following values in `backend/.env.local` (or whichever env file you use for local runs):
+   ```env
+   SANDBOX_PROXY_DOMAIN=localhost
+   SANDBOX_PROXY_PROTOCOL=http
+   SANDBOX_PROXY_PORT=1234
+   ```
+2. Run the sandbox proxy locally (defaults to port 1234):
+   ```bash
+   cd backend/daytona-proxy
+   npm install
+   npm run dev
+   ```
+   (or start the `sandbox-proxy` service from `docker-compose.local.yaml`).
+3. Preview URLs will include `:1234`; make sure your browser can reach the proxy on that port.
+
+If you do not need the custom proxy while developing, simply leave `SANDBOX_PROXY_DOMAIN` unset in the local env file; the application will fall back to Daytona’s original preview URLs.
 
 ### Frontend (`frontend/.env.local`)
 
