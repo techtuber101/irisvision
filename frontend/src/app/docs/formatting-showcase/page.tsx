@@ -458,7 +458,7 @@ npm start`
             <a href="/docs/introduction">Introduction Page</a> - Internal link to another docs page
           </p>
           <p>
-            <a href="https://github.com/irisvision-ai/iris">GitHub Repository</a> - Link to source code
+            <a href="https://irisvision.ai/dashboard">Dashboard</a> - Link to Iris dashboard
           </p>
         </div>
 
@@ -470,7 +470,7 @@ npm start`
               filename: "links.md",
               code: `[Visit Iris Website](https://irisvision.ai)
 [Introduction Page](/docs/introduction)
-[GitHub Repository](https://github.com/irisvision-ai/iris)`
+[Dashboard](https://irisvision.ai/dashboard)`
             }]}
             defaultValue="markdown"
           >

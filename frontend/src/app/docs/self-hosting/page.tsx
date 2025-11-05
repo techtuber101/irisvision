@@ -61,8 +61,8 @@ export default function QuickStartPage() {
             data={[{
               language: "bash",
               filename: "terminal",
-              code: `git clone https://github.com/iris-ai/iris.git
-cd iris`
+              code: `git clone https://github.com/techtuber101/irissecond.git
+cd irissecond`
             }]}
             defaultValue="bash"
           >

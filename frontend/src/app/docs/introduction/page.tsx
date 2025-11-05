@@ -35,7 +35,7 @@ export default function IntroductionPage() {
     <>
       <DocsHeader
         title="What is Iris?"
-        subtitle="An open source platform for building AI agents that actually get things done"
+        subtitle="A powerful platform for building AI agents that actually get things done"
         breadcrumbs={breadcrumbs}
         lastUpdated="August 2025"
         showSeparator
@@ -54,7 +54,7 @@ export default function IntroductionPage() {
       <DocsBody className="mb-8">
         <h2 id="overview">What is Iris?</h2>
         <p className="text-lg mb-6">
-          Iris is an open source platform where you can build AI agents that handle real work. Think of it as the infrastructure and tools you need to create agents that can browse the web, manage files, analyze data, and automate workflows.
+          Iris is a powerful platform where you can build AI agents that handle real work. Think of it as the infrastructure and tools you need to create agents that can browse the web, manage files, analyze data, and automate workflows.
         </p>
         
         <h3 id="meet-iris">Iris - Our Flagship Agent</h3>
@@ -69,7 +69,7 @@ export default function IntroductionPage() {
           <li>Execute complex multi-step workflows</li>
         </ul>
         <p className="mb-6">
-          Iris is completely open source and shows you what you can build with the Iris platform.
+          Iris demonstrates what's possible with the Iris platform. It's a generalist AI worker that shows you what you can build.
         </p>
   
         <h3 id="build-your-own" className="mb-4">Build Your Own Agents</h3>
@@ -86,7 +86,7 @@ export default function IntroductionPage() {
           <li><strong>Database</strong> - Stores your agent configs, conversation history, and results</li>
         </ul>
         
-        <h3 id="why-open-source" className="mb-4">Why Open Source?</h3>
+        <h3 id="why-iris" className="mb-4">Why Iris?</h3>
         <p className="mb-6">
           We believe you should own your agents and your data. No vendor lock-in, no usage limits based on monthly fees, no mysterious black boxes. You can see exactly how everything works, modify it for your needs, and run it wherever you want.
         </p>
