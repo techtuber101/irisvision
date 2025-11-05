@@ -5,6 +5,8 @@ import {
   DocsHeader,
   DocsCard,
   DocsBody,
+  DocsBullets,
+  DocsBulletItem,
 } from '@/components/ui/docs-index';
 import type { BundledLanguage } from '@/components/ui/shadcn-io/code-block';
 import {
