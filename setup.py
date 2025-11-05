@@ -128,6 +128,7 @@ def load_existing_env_vars():
             "SANDBOX_PROXY_DOMAIN": backend_env.get("SANDBOX_PROXY_DOMAIN", ""),
             "SANDBOX_PROXY_PROTOCOL": backend_env.get("SANDBOX_PROXY_PROTOCOL", "https"),
             "SANDBOX_PROXY_PORT": backend_env.get("SANDBOX_PROXY_PORT", ""),
+            "CLOUDFLARE_API_TOKEN": backend_env.get("CLOUDFLARE_API_TOKEN", ""),
         },
         "llm": {
             "OPENAI_API_KEY": backend_env.get("OPENAI_API_KEY", ""),
@@ -731,6 +732,14 @@ class SetupWizard:
             "Port must be an integer between 1 and 65535 or left blank.",
             allow_empty=True,
             default_value=self.env_vars["daytona"].get("SANDBOX_PROXY_PORT", ""),
+        )
+
+        self.env_vars["daytona"]["CLOUDFLARE_API_TOKEN"] = self._get_input(
+            "Cloudflare API token for wildcard TLS (leave blank if not using Cloudflare): ",
+            lambda value, allow_empty=False: bool(value) or allow_empty,
+            "Enter a value or leave blank.",
+            allow_empty=True,
+            default_value=self.env_vars["daytona"].get("CLOUDFLARE_API_TOKEN", ""),
         )
 
         print_success("Daytona information saved.")

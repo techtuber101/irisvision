@@ -1,6 +1,8 @@
 services:
   caddy:
-    image: caddy:2-alpine
+    build:
+      context: .
+      dockerfile: infra/caddy/Dockerfile
     ports:
       - "80:80"
       - "443:443"
@@ -10,6 +12,7 @@ services:
       - caddy_config:/config
     environment:
       - CADDY_DOCKER_CADDYFILE_PATH=/etc/caddy/Caddyfile
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
     depends_on:
       - frontend
       - backend

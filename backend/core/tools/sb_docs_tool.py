@@ -324,6 +324,7 @@ class SandboxDocsTool(SandboxToolsBase):
                     h1 { color: #333; }
                     .metadata { color: #666; font-size: 0.9rem; margin: 1rem 0; }
                     .content { line-height: 1.6; }
+                    .content img { max-width: 85%; height: auto; display: block; margin: 1rem auto; }
                 </style>
             </head>
             <body>
@@ -714,24 +715,28 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 src: url('{regular_font}') format('opentype');
                 font-weight: 400;
                 font-style: normal;
+                font-display: swap;
             }}
             @font-face {{
                 font-family: 'LMRoman';
                 src: url('{bold_font}') format('opentype');
                 font-weight: 700;
                 font-style: normal;
+                font-display: swap;
             }}
             @font-face {{
                 font-family: 'LMRoman';
                 src: url('{italic_font}') format('opentype');
                 font-weight: 400;
                 font-style: italic;
+                font-display: swap;
             }}
             @font-face {{
                 font-family: 'LMRoman';
                 src: url('{bold_italic_font}') format('opentype');
                 font-weight: 700;
                 font-style: italic;
+                font-display: swap;
             }}
             """
 
@@ -749,7 +754,8 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
             }
             body {
                 font-family: 'LMRoman', 'Times New Roman', Times, serif;
-                line-height: 1.6;
+                font-size: 14pt;
+                line-height: 1.8;
                 color: #333;
                 background: white;
                 max-width: 100%;
@@ -760,7 +766,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 border-bottom: 2px solid #e5e7eb;
             }
             .title {
-                font-size: 2.5rem;
+                font-size: 3rem;
                 font-weight: 700;
                 color: #111827;
                 margin-bottom: 0.5rem;
@@ -769,7 +775,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 display: flex;
                 gap: 1.5rem;
                 color: #6b7280;
-                font-size: 0.9rem;
+                font-size: 11pt;
                 margin-top: 0.5rem;
             }
             .metadata-item {
@@ -783,7 +789,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 background: #eff6ff;
                 color: #1e40af;
                 border-radius: 0.25rem;
-                font-size: 0.875rem;
+                font-size: 11pt;
                 margin-right: 0.25rem;
             }
             .content {
@@ -791,7 +797,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
             }
             h1 { 
                 font-family: 'LMRoman', 'Times New Roman', Times, serif;
-                font-size: 2rem; 
+                font-size: 24pt; 
                 font-weight: 700; 
                 margin: 1.5rem 0 0.75rem; 
                 color: #111827;
@@ -799,32 +805,38 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
             }
             h2 { 
                 font-family: 'LMRoman', 'Times New Roman', Times, serif;
-                font-size: 1.5rem; 
-                font-weight: 600; 
+                font-size: 20pt; 
+                font-weight: 700; 
                 margin: 1.25rem 0 0.625rem; 
                 color: #374151;
                 page-break-after: avoid;
             }
             h3 { 
                 font-family: 'LMRoman', 'Times New Roman', Times, serif;
-                font-size: 1.25rem; 
-                font-weight: 600; 
+                font-size: 18pt; 
+                font-weight: 700; 
                 margin: 1rem 0 0.5rem; 
                 color: #4b5563;
                 page-break-after: avoid;
             }
             p { 
+                font-size: 14pt;
                 margin-bottom: 1rem; 
-                text-align: justify;
+                text-align: left;
+                line-height: 1.8;
             }
             ul, ol { 
+                font-size: 14pt;
                 margin: 0.75rem 0 0.75rem 1.5rem; 
                 page-break-inside: avoid;
+                line-height: 1.8;
             }
             li { 
-                margin-bottom: 0.25rem; 
+                margin-bottom: 0.5rem; 
+                line-height: 1.8;
             }
             blockquote {
+                font-size: 14pt;
                 border-left: 4px solid #3b82f6;
                 padding-left: 1rem;
                 margin: 1rem 0;
@@ -833,6 +845,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 background: #f9fafb;
                 padding: 0.75rem 1rem;
                 page-break-inside: avoid;
+                line-height: 1.8;
             }
             pre {
                 background: #1f2937;
@@ -842,8 +855,9 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 border-radius: 0.5rem;
                 overflow-x: auto;
                 font-family: 'Courier New', monospace;
-                font-size: 0.9rem;
+                font-size: 12pt;
                 page-break-inside: avoid;
+                line-height: 1.6;
             }
             code {
                 background: #f3f4f6;
@@ -851,7 +865,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 padding: 0.125rem 0.375rem;
                 border-radius: 0.25rem;
                 font-family: 'Courier New', monospace;
-                font-size: 0.9em;
+                font-size: 12pt;
             }
             pre code {
                 background: transparent;
@@ -868,22 +882,36 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 border: 1px solid #e5e7eb;
                 padding: 0.75rem;
                 text-align: left;
+                font-size: 14pt;
+                line-height: 1.8;
             }
             th {
                 background: #f9fafb;
-                font-weight: 600;
+                font-weight: 700;
                 color: #374151;
             }
             img {
-                max-width: 100%;
+                float: right;
+                max-width: 40%;
+                max-height: 300px;
                 height: auto;
-                display: block;
-                margin: 1rem 0;
+                margin: 0.5rem 0 0.5rem 1.5rem;
+                border-radius: 0.25rem;
+                clear: right;
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+            /* Clear float after images to prevent text wrapping issues */
+            p:has(img), 
+            div:has(img),
+            figure:has(img) {
+                overflow: auto;
             }
             a {
                 color: #2563eb;
                 text-decoration: none;
                 border-bottom: 1px solid transparent;
+                font-size: 14pt;
             }
             a:hover {
                 border-bottom-color: #2563eb;
@@ -898,7 +926,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 padding-top: 1rem;
                 border-top: 1px solid #e5e7eb;
                 color: #6b7280;
-                font-size: 0.875rem;
+                font-size: 11pt;
                 text-align: center;
             }
         </style>
@@ -923,7 +951,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                         <span>Generated on {current_time}</span>
                     </div>
                     <div class="metadata-item">
-                        <span>Created by Iris Intelligence For You</span>
+                        <span>Created by <a href="https://irisvision.ai" target="_blank">Iris Intelligence For You</a></span>
                     </div>
         """
         

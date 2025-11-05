@@ -97,6 +97,7 @@ DAYTONA_TARGET=us
 SANDBOX_PROXY_DOMAIN=vault.irisvision.ai
 SANDBOX_PROXY_PROTOCOL=https
 SANDBOX_PROXY_PORT=
+CLOUDFLARE_API_TOKEN=
 
 WEBHOOK_BASE_URL=https://yourdomain.com
 
@@ -119,6 +120,7 @@ When running services individually, make sure to:
 
 - To keep using Daytona’s default preview URLs locally, leave `SANDBOX_PROXY_DOMAIN` unset in `backend/.env.local`.
 - To exercise the custom proxy locally, set `SANDBOX_PROXY_DOMAIN=localhost`, `SANDBOX_PROXY_PROTOCOL=http`, and `SANDBOX_PROXY_PORT=1234`, then run the proxy (`npm run dev` inside `backend/daytona-proxy` or start the compose service). Preview URLs will include `:1234` and route through the local proxy.
+- If you deploy the wildcard domain behind Cloudflare, set `CLOUDFLARE_API_TOKEN` so Caddy can provision certificates automatically.
 
 ### Important: Redis Host Configuration
 

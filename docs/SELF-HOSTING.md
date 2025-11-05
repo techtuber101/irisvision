@@ -75,6 +75,7 @@ Backend keys (by purpose):
 |               | SANDBOX_PROXY_DOMAIN          |                                       No | -                          | Wildcard domain served by the Iris Daytona proxy                    |
 |               | SANDBOX_PROXY_PROTOCOL        |                                       No | https                      | Scheme used for preview URLs                                        |
 |               | SANDBOX_PROXY_PORT            |                                       No | -                          | Optional explicit port for the proxy (e.g., 1234 in local dev)      |
+|               | CLOUDFLARE_API_TOKEN          |                                       No | -                          | Required if using Cloudflare DNS automation for wildcard TLS        |
 | Observability | LANGFUSE_PUBLIC_KEY           |                                       No | -                          | Optional tracing                                                    |
 |               | LANGFUSE_SECRET_KEY           |                                       No | -                          |                                                                     |
 |               | LANGFUSE_HOST                 |                                       No | https://cloud.langfuse.com |                                                                     |
@@ -188,13 +189,17 @@ preview to be served from your own wildcard domain (for example,
 
 To enable it in production:
 
-1. Create a wildcard DNS record pointing to your Iris load balancer or Caddy host, e.g.
-   `*.vault.irisvision.ai → your-load-balancer-ip`.
-2. Set `SANDBOX_PROXY_DOMAIN` (and optionally `SANDBOX_PROXY_PROTOCOL` / `SANDBOX_PROXY_PORT`) in
+1. Delegate DNS for `vault.irisvision.ai` (or the domain of your choice) to Cloudflare and add records
+   for `vault` and `*.vault` that point at your Caddy load balancer. Keep the orange proxy toggle enabled
+   so Cloudflare can serve traffic while certificates are provisioned.
+2. Generate a Cloudflare API token with `Zone → DNS edit` permissions for your domain and add it as
+   `CLOUDFLARE_API_TOKEN` in `backend/.env.production`.
+3. Build the Caddy image with the Cloudflare DNS module (`infra/caddy/Dockerfile`) by running
+   `docker compose build caddy`, then restart the stack. The updated image allows Caddy to solve DNS-01
+   challenges automatically for wildcard certificates.
+4. Set `SANDBOX_PROXY_DOMAIN` (and optionally `SANDBOX_PROXY_PROTOCOL` / `SANDBOX_PROXY_PORT`) in
    `backend/.env`.
-3. Ensure the `sandbox-proxy` service is running (included in `docker-compose.yaml`).
-4. Update TLS certificates if you use a domain other than `vault.irisvision.ai` by editing the
-   `Caddyfile` wildcard entry.
+5. Ensure the `sandbox-proxy` service is running (included in `docker-compose.yaml`).
 
 For staging or multi-tenant setups you can point the domain to a subdomain
 (`preview.example.com`). Adjust the DNS wildcard and the Caddyfile wildcard host pattern

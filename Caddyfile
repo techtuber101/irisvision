@@ -1,4 +1,4 @@
-# Caddy v2, no extra modules required
+# Caddy v2 with Cloudflare DNS module
 
 irisvision.ai, www.irisvision.ai {
 	encode zstd gzip
@@ -36,6 +36,10 @@ irisvision.ai, www.irisvision.ai {
 
 vault.irisvision.ai, *.vault.irisvision.ai {
 	encode zstd gzip
+
+	ls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+	}
 
 	@health path /health
 	respond @health "OK" 200
