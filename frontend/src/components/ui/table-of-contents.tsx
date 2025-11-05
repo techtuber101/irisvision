@@ -25,6 +25,25 @@ export function TableOfContents({ className }: TableOfContentsProps) {
     const headingItems: HeadingItem[] = [];
 
     headingElements.forEach((heading) => {
+      // Skip headings in the sidebar or header
+      const isInSidebar = heading.closest('[data-sidebar]') !== null;
+      const isInHeader = heading.closest('header') !== null;
+      const isInFooter = heading.closest('footer') !== null;
+      
+      if (isInSidebar || isInHeader || isInFooter) {
+        return;
+      }
+
+      // Auto-generate ID if heading doesn't have one
+      if (!heading.id) {
+        const text = heading.textContent || '';
+        const id = text
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        heading.id = id;
+      }
+      
       if (heading.id) {
         headingItems.push({
           id: heading.id,
@@ -48,10 +67,19 @@ export function TableOfContents({ className }: TableOfContentsProps) {
       }
     };
     
-    updateHeadings();
-    const timeout = setTimeout(updateHeadings, 200);
+    // Wait for DOM to be ready
+    if (document.readyState === 'complete') {
+      updateHeadings();
+    } else {
+      window.addEventListener('load', updateHeadings);
+    }
     
-    return () => clearTimeout(timeout);
+    const timeout = setTimeout(updateHeadings, 300);
+    
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener('load', updateHeadings);
+    };
   }, [getHeadings, pathname]);
 
   useEffect(() => {
@@ -120,7 +148,7 @@ export function TableOfContents({ className }: TableOfContentsProps) {
     <div className={cn('space-y-2', className)}>
       <div className="flex items-center gap-2 mb-4">
         <Menu className="w-4 h-4" />
-        <h4 className="font-semibold text-foreground">On this page</h4>
+        <h4 className="font-semibold text-foreground">What's on this page</h4>
       </div>
       
       <nav className="space-y-1">
@@ -129,10 +157,14 @@ export function TableOfContents({ className }: TableOfContentsProps) {
             key={heading.id}
             onClick={() => scrollToSection(heading.id)}
             className={cn(
-              'mb-4 block w-full text-left text-sm transition-all duration-200 py-0.5 px-3 hover:text-accent-foreground',
+              'mb-1 block w-full text-left text-sm transition-all duration-200 py-1 px-3 hover:text-accent-foreground rounded-md',
               activeId === heading.id
-                ? 'text-primary font-semibold border-l-2 border-primary'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'text-primary font-semibold border-l-2 border-primary bg-primary/5'
+                : 'text-muted-foreground hover:text-foreground',
+              heading.level === 2 && 'pl-3',
+              heading.level === 3 && 'pl-6',
+              heading.level === 4 && 'pl-9',
+              heading.level >= 5 && 'pl-12'
             )}
           >
             {heading.text}

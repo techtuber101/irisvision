@@ -1,7 +1,7 @@
 export const siteConfig = {
   name: 'Iris',
   url: 'https://irisvision.ai/',
-  description: 'Iris - Open Source AI Assistant',
+  description: 'Iris Intelligence',
   links: {
     twitter: 'https://x.com/irisvisionai',
     github: 'https://github.com/irisvision-ai/',

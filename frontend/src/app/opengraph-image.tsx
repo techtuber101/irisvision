@@ -26,7 +26,7 @@ export default async function Image() {
             color: 'white',
           }}
         >
-          Iris - Open Source AI Assistant
+          Iris Intelligence
         </div>
       ),
       { ...size },

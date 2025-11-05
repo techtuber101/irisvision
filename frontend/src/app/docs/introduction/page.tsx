@@ -8,13 +8,11 @@ import {
   DocsImage
 } from '@/components/ui/docs-index';
 import { useTheme } from 'next-themes';
-import { Separator } from '@/components/ui/separator';
-import { Card, CardHeader } from '@/components/ui/card';
-import { ArrowRight, Bot, Lightbulb, BookOpen } from 'lucide-react';
+import { ArrowRight, Lightbulb, BookOpen, Bot, Rocket, Sparkles } from 'lucide-react';
 
 const breadcrumbs = [
   { title: 'Documentation', onClick: () => window.location.href = '/docs' },
-  { title: 'Introduction' }
+  { title: 'What is Iris?' }
 ];
 
 export default function IntroductionPage() {
@@ -52,104 +50,132 @@ export default function IntroductionPage() {
       />
     
       <DocsBody className="mb-8">
-        <h2 id="overview">What is Iris?</h2>
         <p className="text-lg mb-6">
-          Iris is a powerful platform where you can build AI agents that handle real work. Think of it as the infrastructure and tools you need to create agents that can browse the web, manage files, analyze data, and automate workflows.
-        </p>
-        
-        <h3 id="meet-iris">Iris - Our Flagship Agent</h3>
-        <p className="mb-4">
-          Iris is our showcase agent that demonstrates what's possible with Iris. It's a generalist AI worker that can:
-        </p>
-        <ul className="list-disc pl-6 mb-6 space-y-1">
-          <li>Research topics and gather information from across the web</li>
-          <li>Analyze documents and data files</li>
-          <li>Automate browser tasks and web scraping</li>
-          <li>Manage files and handle document processing</li>
-          <li>Execute complex multi-step workflows</li>
-        </ul>
-        <p className="mb-6">
-          Iris demonstrates what's possible with the Iris platform. It's a generalist AI worker that shows you what you can build.
-        </p>
-  
-        <h3 id="build-your-own" className="mb-4">Build Your Own Agents</h3>
-        <p className="mb-6">
-          The real power comes when you create agents for your specific needs. Maybe you need an agent that monitors customer support tickets, or one that processes invoices, or handles your social media posting schedule. With Iris, you get the building blocks to create agents that work exactly how you want them to.
-        </p>
-
-        <h3 id="how-it-works" className="mb-4">How It Works</h3>
-        <p className="mb-4">Iris gives you four main pieces:</p>
-        <ul className="list-disc pl-6 mb-6 space-y-2">
-          <li><strong>Backend API</strong> - Handles the heavy lifting: talking to AI models, managing tasks, storing data</li>
-          <li><strong>Web Dashboard</strong> - Where you build, test, and monitor your agents</li>
-          <li><strong>Secure Runtime</strong> - Isolated environments where your agents run safely</li>
-          <li><strong>Database</strong> - Stores your agent configs, conversation history, and results</li>
-        </ul>
-        
-        <h3 id="why-iris" className="mb-4">Why Iris?</h3>
-        <p className="mb-6">
-          We believe you should own your agents and your data. No vendor lock-in, no usage limits based on monthly fees, no mysterious black boxes. You can see exactly how everything works, modify it for your needs, and run it wherever you want.
+          Iris is a powerful platform where you can build AI agents that handle real work. Learn more about what makes Iris special and how it works.
         </p>
       </DocsBody>
-      <Separator className="my-6 w-full" />
+
+      <div className="grid md:grid-cols-2 gap-6 mb-8">
+        <DocsCard
+          title="Overview"
+          description="What is Iris?"
+          icon={Bot}
+          variant="default"
+          hover
+          clickable
+          onClick={() => window.location.href = '/docs/introduction/overview'}
+        >
+          <div className="flex items-center gap-2 mt-2 text-sm text-primary">
+            <span>Learn more</span>
+            <ArrowRight className="h-4 w-4" />
+          </div>
+        </DocsCard>
+
+        <DocsCard
+          title="Meet Iris"
+          description="Our flagship agent"
+          icon={Bot}
+          variant="default"
+          hover
+          clickable
+          onClick={() => window.location.href = '/docs/introduction/meet-iris'}
+        >
+          <div className="flex items-center gap-2 mt-2 text-sm text-primary">
+            <span>Learn more</span>
+            <ArrowRight className="h-4 w-4" />
+          </div>
+        </DocsCard>
+
+        <DocsCard
+          title="Build Your Own Agents"
+          description="Create agents for your specific needs"
+          icon={Sparkles}
+          variant="default"
+          hover
+          clickable
+          onClick={() => window.location.href = '/docs/introduction/build-your-own'}
+        >
+          <div className="flex items-center gap-2 mt-2 text-sm text-primary">
+            <span>Learn more</span>
+            <ArrowRight className="h-4 w-4" />
+          </div>
+        </DocsCard>
+
+        <DocsCard
+          title="How It Works"
+          description="The four main pieces of Iris"
+          icon={Rocket}
+          variant="default"
+          hover
+          clickable
+          onClick={() => window.location.href = '/docs/introduction/how-it-works'}
+        >
+          <div className="flex items-center gap-2 mt-2 text-sm text-primary">
+            <span>Learn more</span>
+            <ArrowRight className="h-4 w-4" />
+          </div>
+        </DocsCard>
+
+        <DocsCard
+          title="Why Iris?"
+          description="Own your agents and your data"
+          icon={Lightbulb}
+          variant="default"
+          hover
+          clickable
+          onClick={() => window.location.href = '/docs/introduction/why-iris'}
+        >
+          <div className="flex items-center gap-2 mt-2 text-sm text-primary">
+            <span>Learn more</span>
+            <ArrowRight className="h-4 w-4" />
+          </div>
+        </DocsCard>
+      </div>
+
       <div className='grid md:grid-cols-2 gap-4 pb-8'>
-        <Card onClick={() => window.location.href = '/docs/quick-start'} className="p-4 group rounded-xl hover:opacity-80 transition-opacity cursor-pointer">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center gap-2 bg-primary/10 w-12 h-12 rounded-xl">
-                <Lightbulb className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">Quick Start Guide</h3>
-                <p className="text-sm text-muted-foreground">Get started in 5 minutes</p>
-              </div>
-            </div>
-            <ArrowRight className="w-4 h-4 mr-2 group-hover:translate-x-1 transition-transform" />
+        <DocsCard
+          title="Quick Start Guide"
+          description="Get started in 5 minutes"
+          icon={Lightbulb}
+          variant="outline"
+          hover
+          clickable
+          onClick={() => window.location.href = '/docs/quick-start'}
+        >
+          <div className="flex items-center gap-2 mt-2 text-sm text-primary">
+            <span>Get started</span>
+            <ArrowRight className="h-4 w-4" />
           </div>
-        </Card>
-        <Card onClick={() => window.location.href = '/docs/user-guide'} className="p-4 group rounded-xl hover:opacity-80 transition-opacity cursor-pointer">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center gap-2 bg-primary/10 w-12 h-12 rounded-xl">
-                <BookOpen className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">Complete User Guide</h3>
-                <p className="text-sm text-muted-foreground">All features explained</p>
-              </div>
-            </div>
-            <ArrowRight className="w-4 h-4 mr-2 group-hover:translate-x-1 transition-transform" />
+        </DocsCard>
+        <DocsCard
+          title="Iris Capabilities"
+          description="All features explained"
+          icon={BookOpen}
+          variant="outline"
+          hover
+          clickable
+          onClick={() => window.location.href = '/docs/capabilities/research'}
+        >
+          <div className="flex items-center gap-2 mt-2 text-sm text-primary">
+            <span>Explore capabilities</span>
+            <ArrowRight className="h-4 w-4" />
           </div>
-        </Card>
-        <Card onClick={() => window.location.href = '/docs/formatting-showcase'} className="p-4 group rounded-xl hover:opacity-80 transition-opacity cursor-pointer">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center gap-2 bg-primary/10 w-12 h-12 rounded-xl">
-                <Lightbulb className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">Formatting Showcase</h3>
-                <p className="text-sm text-muted-foreground">See all formatting options</p>
-              </div>
-            </div>
-            <ArrowRight className="w-4 h-4 mr-2 group-hover:translate-x-1 transition-transform" />
+        </DocsCard>
+        <DocsCard
+          title="Formatting Showcase"
+          description="See all formatting options"
+          icon={Lightbulb}
+          variant="outline"
+          hover
+          clickable
+          onClick={() => window.location.href = '/docs/formatting-showcase'}
+        >
+          <div className="flex items-center gap-2 mt-2 text-sm text-primary">
+            <span>View formatting guide</span>
+            <ArrowRight className="h-4 w-4" />
           </div>
-        </Card>
-        <Card onClick={() => window.location.href = '/docs/self-hosting'} className="p-4 group rounded-xl hover:opacity-80 transition-opacity cursor-pointer">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center gap-2 bg-primary/10 w-12 h-12 rounded-xl">
-                <Lightbulb className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">Self-Hosting Guide</h3>
-                <p className="text-sm text-muted-foreground">Host your own instance</p>
-              </div>
-            </div>
-            <ArrowRight className="w-4 h-4 mr-2 group-hover:translate-x-1 transition-transform" />
-          </div>
-        </Card>
+        </DocsCard>
       </div>
     </>
   );
-} 
+}

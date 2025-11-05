@@ -57,7 +57,7 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: 'Iris - Open Source AI Assistant',
+    title: 'Iris Intelligence',
     description:
       'Iris is a fully open source AI assistant that helps you accomplish real-world tasks with ease through natural conversation.',
     url: siteConfig.url,
@@ -67,7 +67,7 @@ export const metadata: Metadata = {
         url: '/banner.png',
         width: 1200,
         height: 568,
-        alt: 'Iris - Open Source AI Assistant',
+        alt: 'Iris Intelligence',
         type: 'image/png',
       },
     ],
@@ -76,7 +76,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Iris - Open Source AI Assistant',
+    title: 'Iris Intelligence',
     description:
       'Iris is a fully open source AI assistant that helps you accomplish real-world tasks with ease through natural conversation.',
     creator: '@irisvisionai',
@@ -86,7 +86,7 @@ export const metadata: Metadata = {
         url: '/banner.png',
         width: 1200,
         height: 568,
-        alt: 'Iris - Open Source AI Assistant',
+        alt: 'Iris Intelligence',
       },
     ],
   },
