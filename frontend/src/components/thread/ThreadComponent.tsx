@@ -49,6 +49,7 @@ import { useAgentSelection } from '@/lib/stores/agent-selection-store';
 import { useModelSelection } from '@/hooks/use-model-selection';
 import { useQueryClient } from '@tanstack/react-query';
 import { threadKeys } from '@/hooks/react-query/threads/keys';
+import { threadKeys as sidebarThreadKeys } from '@/hooks/react-query/sidebar/keys';
 import { useProjectRealtime } from '@/hooks/useProjectRealtime';
 import { fastGeminiChatStream } from '@/lib/fast-gemini-chat';
 import { continueSimpleChatStream } from '@/lib/simple-chat';
@@ -716,6 +717,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
               },
               onDone: () => {
                 console.log(`Simple chat streaming completed`);
+                
+                // Invalidate threads list to update ordering when simple chat completes
+                queryClient.invalidateQueries({ queryKey: sidebarThreadKeys.lists() });
                 
                 if (useTypewriterEffect) {
                   // Wait for all characters to be typed before marking complete

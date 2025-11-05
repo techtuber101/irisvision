@@ -1,6 +1,8 @@
 import { createMutationHook, createQueryHook } from "@/hooks/use-query";
 import { threadKeys } from "./keys";
 import { addUserMessage, addAssistantMessage, getMessages } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { threadKeys as sidebarThreadKeys } from "../sidebar/keys";
 
 export const useMessagesQuery = (threadId: string) =>
   createQueryHook(
@@ -15,19 +17,28 @@ export const useMessagesQuery = (threadId: string) =>
     }
   )();
 
-export const useAddUserMessageMutation = () =>
-  createMutationHook(
+export const useAddUserMessageMutation = () => {
+  const queryClient = useQueryClient();
+  return createMutationHook(
     ({
       threadId,
       message,
     }: {
       threadId: string;
       message: string;
-    }) => addUserMessage(threadId, message)
+    }) => addUserMessage(threadId, message),
+    {
+      onSuccess: () => {
+        // Invalidate threads list to update ordering when a message is added
+        queryClient.invalidateQueries({ queryKey: sidebarThreadKeys.lists() });
+      },
+    }
   )();
+};
 
-export const useAddAssistantMessageMutation = () =>
-  createMutationHook(
+export const useAddAssistantMessageMutation = () => {
+  const queryClient = useQueryClient();
+  return createMutationHook(
     ({
       threadId,
       content,
@@ -36,5 +47,12 @@ export const useAddAssistantMessageMutation = () =>
       threadId: string;
       content: string;
       metadata?: any;
-    }) => addAssistantMessage(threadId, content, metadata)
+    }) => addAssistantMessage(threadId, content, metadata),
+    {
+      onSuccess: () => {
+        // Invalidate threads list to update ordering when a message is added
+        queryClient.invalidateQueries({ queryKey: sidebarThreadKeys.lists() });
+      },
+    }
   )();
+};
