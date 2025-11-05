@@ -9,7 +9,6 @@ import {
   DocsBullets,
   DocsBulletItem,
   DocsTable,
-  createDocsTableColumn,
 } from '@/components/ui/docs-index';
 import type { BundledLanguage } from '@/components/ui/shadcn-io/code-block';
 import {
@@ -352,11 +351,11 @@ npm start`
 
         <h3 id="basic-table">Basic Table</h3>
         <DocsTable
-          columns={createDocsTableColumn([
+          columns={[
             { key: 'feature', title: 'Feature', width: '200px' },
             { key: 'description', title: 'Description' },
             { key: 'status', title: 'Status', width: '100px', align: 'center' },
-          ])}
+          ]}
           data={[
             {
               feature: 'Web Search',
@@ -385,12 +384,12 @@ npm start`
 
         <h3 id="complex-table">Complex Table</h3>
         <DocsTable
-          columns={createDocsTableColumn([
+          columns={[
             { key: 'tool', title: 'Tool', width: '150px' },
             { key: 'category', title: 'Category', width: '150px' },
             { key: 'capabilities', title: 'Capabilities' },
             { key: 'example', title: 'Example Usage', width: '200px' },
-          ])}
+          ]}
           data={[
             {
               tool: 'sb_files_tool',
@@ -648,11 +647,11 @@ npm start`
         </p>
 
         <DocsTable
-          columns={createDocsTableColumn([
+          columns={[
             { key: 'element', title: 'Element', width: '150px' },
             { key: 'description', title: 'Description' },
             { key: 'usage', title: 'Usage' },
-          ])}
+          ]}
           data={[
             {
               element: 'Headings',
