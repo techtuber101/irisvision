@@ -10,7 +10,7 @@ import {
 import { useTheme } from 'next-themes';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardHeader } from '@/components/ui/card';
-import { ArrowRight, Bot, Lightbulb } from 'lucide-react';
+import { ArrowRight, Bot, Lightbulb, BookOpen } from 'lucide-react';
 
 const breadcrumbs = [
   { title: 'Documentation', onClick: () => window.location.href = '/docs' },
@@ -92,14 +92,59 @@ export default function IntroductionPage() {
         </p>
       </DocsBody>
       <Separator className="my-6 w-full" />
-      <div className='w-full items-center justify-end flex pb-8'>
-        <Card onClick={() => window.location.href = '/docs/quick-start'} className="p-2 group rounded-xl w-full lg:w-[400px] hover:opacity-80 transition-opacity">
+      <div className='grid md:grid-cols-2 gap-4 pb-8'>
+        <Card onClick={() => window.location.href = '/docs/quick-start'} className="p-4 group rounded-xl hover:opacity-80 transition-opacity cursor-pointer">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <div className="flex items-center justify-center gap-2 bg-primary/10 w-12 h-12 rounded-xl">
                 <Lightbulb className="w-6 h-6 text-primary" />
               </div>
-              <h3 className="text-lg font-semibold">Self-Hosting Guide</h3>
+              <div>
+                <h3 className="text-lg font-semibold">Quick Start Guide</h3>
+                <p className="text-sm text-muted-foreground">Get started in 5 minutes</p>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 mr-2 group-hover:translate-x-1 transition-transform" />
+          </div>
+        </Card>
+        <Card onClick={() => window.location.href = '/docs/user-guide'} className="p-4 group rounded-xl hover:opacity-80 transition-opacity cursor-pointer">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center gap-2 bg-primary/10 w-12 h-12 rounded-xl">
+                <BookOpen className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Complete User Guide</h3>
+                <p className="text-sm text-muted-foreground">All features explained</p>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 mr-2 group-hover:translate-x-1 transition-transform" />
+          </div>
+        </Card>
+        <Card onClick={() => window.location.href = '/docs/formatting-showcase'} className="p-4 group rounded-xl hover:opacity-80 transition-opacity cursor-pointer">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center gap-2 bg-primary/10 w-12 h-12 rounded-xl">
+                <Lightbulb className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Formatting Showcase</h3>
+                <p className="text-sm text-muted-foreground">See all formatting options</p>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 mr-2 group-hover:translate-x-1 transition-transform" />
+          </div>
+        </Card>
+        <Card onClick={() => window.location.href = '/docs/self-hosting'} className="p-4 group rounded-xl hover:opacity-80 transition-opacity cursor-pointer">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center gap-2 bg-primary/10 w-12 h-12 rounded-xl">
+                <Lightbulb className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Self-Hosting Guide</h3>
+                <p className="text-sm text-muted-foreground">Host your own instance</p>
+              </div>
             </div>
             <ArrowRight className="w-4 h-4 mr-2 group-hover:translate-x-1 transition-transform" />
           </div>

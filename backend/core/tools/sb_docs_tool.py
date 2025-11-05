@@ -892,8 +892,8 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
             }
             img {
                 float: right;
-                max-width: 40%;
-                max-height: 300px;
+                max-width: 55%;
+                max-height: 450px;
                 height: auto;
                 margin: 0.5rem 0 0.5rem 1.5rem;
                 border-radius: 0.25rem;

@@ -16,6 +16,7 @@ Environment variables:
 - `DAYTONA_API_KEY` (**required**): Daytona API key with access to the sandbox.
 - `DAYTONA_API_URL` (optional): Override the Daytona API base URL. Defaults to `https://app.daytona.io/api`.
 - `PORT` (optional): Listening port, defaults to `1234`.
+- `PREVIEW_CACHE_TTL_MS` (optional): TTL for cached Daytona preview lookups in milliseconds (defaults to 60000).
 
 For local testing:
 

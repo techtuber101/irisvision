@@ -251,7 +251,7 @@ export function AIWorkerTemplates({ onSelectWorker, isMobile = false }: AIWorker
                 "shrink-0 transition-all duration-200 rounded-lg px-4 h-9",
                 selectedCategory === category.id
                   ? "bg-primary/10 text-primary hover:bg-primary/15"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/80 dark:hover:bg-background/60"
               )}
             >
               {category.label}

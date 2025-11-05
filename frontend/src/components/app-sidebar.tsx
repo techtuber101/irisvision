@@ -52,6 +52,18 @@ const data = {
           url: "/docs/introduction",
         },
         {
+          title: "Quick Start Guide",
+          url: "/docs/quick-start",
+        },
+        {
+          title: "Complete User Guide",
+          url: "/docs/user-guide",
+        },
+        {
+          title: "Formatting Showcase",
+          url: "/docs/formatting-showcase",
+        },
+        {
           title: "Self Hosting",
           url: "/docs/self-hosting",
         },

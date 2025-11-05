@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   getMessages,
-  getProject,
-  getThread,
   Project,
   Message as BaseApiMessageType,
 } from '@/lib/api';
+import { getPublicProject, getPublicThread } from '@/lib/actions/share';
+import type { Thread } from '@/lib/api';
 import {
   UnifiedMessage,
   ParsedMetadata,
@@ -73,7 +73,7 @@ export function useShareThreadData(threadId: string): UseShareThreadDataReturn {
         if (!threadId) throw new Error('Thread ID is required');
 
         const [threadData, messagesData] = await Promise.all([
-          getThread(threadId).catch((err) => {
+          getPublicThread(threadId).catch((err) => {
             if (threadErrorCodeMessages[err.code]) {
               setError(threadErrorCodeMessages[err.code]);
             } else {
@@ -89,8 +89,9 @@ export function useShareThreadData(threadId: string): UseShareThreadDataReturn {
 
         if (!isMounted) return;
 
+        // Use server action to fetch public project (works for anonymous users)
         const projectData = threadData?.project_id
-          ? await getProject(threadData.project_id).catch((err) => {
+          ? await getPublicProject(threadData.project_id).catch((err) => {
             console.warn('[SHARE] Could not load project data:', err);
             return null;
           })

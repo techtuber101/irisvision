@@ -10,6 +10,7 @@ dotenv.config({ override: true });
 const DAYTONA_API_KEY = process.env.DAYTONA_API_KEY;
 const DAYTONA_API_URL = process.env.DAYTONA_API_URL || 'https://app.daytona.io/api';
 const APP_PORT = Number(process.env.PORT || 1234);
+const CACHE_TTL_MS = Number(process.env.PREVIEW_CACHE_TTL_MS || 100_000);
 
 if (!DAYTONA_API_KEY) {
   throw new Error('DAYTONA_API_KEY is not set');
@@ -27,6 +28,23 @@ const sandboxApi = new SandboxApi(
 );
 
 const ERROR_PAGE_PATH = path.join(__dirname, 'error.html');
+
+type CacheEntry = {
+  url: string;
+  token?: string;
+  expiresAt: number;
+};
+
+const previewCache = new Map<string, CacheEntry>();
+
+const pruneExpired = () => {
+  const now = Date.now();
+  for (const [key, entry] of previewCache.entries()) {
+    if (entry.expiresAt <= now) {
+      previewCache.delete(key);
+    }
+  }
+};
 
 function parseHost(host?: string) {
   if (!host) {
@@ -79,8 +97,28 @@ const proxyMiddleware = createProxyMiddleware<Request, Response>({
   xfwd: true,
   router: async (req) => {
     try {
-      const { sandboxId, port } = parseHost(req.headers.host);
+      const host = req.headers.host ?? '';
+      const cacheKey = host.toLowerCase();
+      const cached = previewCache.get(cacheKey);
+      const now = Date.now();
+
+      if (cached && cached.expiresAt > now) {
+        (req as Request & { _previewToken?: string })._previewToken = cached.token;
+        return cached.url;
+      }
+
+      const { sandboxId, port } = parseHost(host);
       const response = await sandboxApi.getPortPreviewUrl(sandboxId, port);
+
+      previewCache.set(cacheKey, {
+        url: response.data.url,
+        token: response.data.token ?? undefined,
+        expiresAt: now + CACHE_TTL_MS,
+      });
+
+      if (previewCache.size > 100) {
+        pruneExpired();
+      }
 
       // Store token so proxyReq hook can attach it.
       (req as Request & { _previewToken?: string })._previewToken = response.data.token ?? undefined;

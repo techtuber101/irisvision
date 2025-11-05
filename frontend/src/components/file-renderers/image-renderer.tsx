@@ -150,7 +150,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 w-7 p-0 hover:bg-muted"
+            className="h-7 w-7 p-0 hover:bg-background/80 dark:hover:bg-background/60"
             onClick={handleZoomOut}
             title="Zoom out"
             disabled={imgError}
@@ -163,7 +163,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 w-7 p-0 hover:bg-muted"
+            className="h-7 w-7 p-0 hover:bg-background/80 dark:hover:bg-background/60"
             onClick={handleZoomIn}
             title="Zoom in"
             disabled={imgError}
@@ -176,7 +176,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 w-7 p-0 hover:bg-muted"
+            className="h-7 w-7 p-0 hover:bg-background/80 dark:hover:bg-background/60"
             onClick={handleRotate}
             title="Rotate"
             disabled={imgError}
@@ -186,7 +186,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 w-7 p-0 hover:bg-muted"
+            className="h-7 w-7 p-0 hover:bg-background/80 dark:hover:bg-background/60"
             onClick={toggleFitToScreen}
             title={isFitToScreen ? 'Actual size' : 'Fit to screen'}
             disabled={imgError}
@@ -203,7 +203,7 @@ export function ImageRenderer({ url, className }: ImageRendererProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 w-7 p-0 hover:bg-muted"
+            className="h-7 w-7 p-0 hover:bg-background/80 dark:hover:bg-background/60"
             onClick={() => setShowInfo(!showInfo)}
             title="Image information"
           >

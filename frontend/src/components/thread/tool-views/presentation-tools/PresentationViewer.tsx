@@ -722,7 +722,7 @@ export function PresentationViewer({
                         setFullScreenInitialSlide(slide.number);
                         setIsFullScreenOpen(true);
                       }}
-                      className="h-8 w-8 p-0 opacity-60 group-hover:opacity-100 transition-opacity"
+                      className="h-8 w-8 p-0 opacity-60 group-hover:opacity-100 transition-opacity hover:bg-background/80 dark:hover:bg-background/60"
                       title="Open in full screen"
                     >
                       <Maximize2 className="h-4 w-4" />

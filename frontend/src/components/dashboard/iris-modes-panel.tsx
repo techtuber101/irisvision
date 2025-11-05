@@ -140,44 +140,21 @@ const modes: Mode[] = [
     },
   },
   {
-    id: 'data',
-    label: 'Data',
-    icon: <BarChart3 className="w-4 h-4" />,
+    id: 'research',
+    label: 'Research',
+    icon: <Search className="w-4 h-4" />,
     samplePrompts: [
-      'Build a financial model projecting ARR growth with different pricing scenarios',
-      'Create an interactive sales dashboard tracking metrics by region and quarter',
-      'Analyze 50K customer reviews and visualize sentiment trends over time',
-      'Design a content calendar tracking campaigns with ROI and engagement charts',
-      'Build a cohort analysis showing user retention and churn patterns',
-      'Create a marketing attribution model comparing channel performance',
-      'Develop a hiring tracker with pipeline metrics and time-to-fill analysis',
-      'Build a budget planning spreadsheet with scenario modeling',
-      'Analyze website traffic data and visualize conversion funnels',
-      'Create an inventory management system with automated reorder alerts',
+      'Analyze emerging trends in quantum computing and potential business applications',
+      'Research top 10 competitors in the AI-powered CRM space with feature comparison',
+      'Investigate regulatory requirements for launching a fintech app in the EU',
+      'Compile market analysis on electric vehicle adoption rates across major markets',
+      'Study the impact of remote work on commercial real estate demand in major cities',
+      'Research Web3 adoption patterns among Fortune 500 companies',
+      'Analyze consumer sentiment towards sustainable fashion brands',
+      'Investigate the latest developments in gene therapy for rare diseases',
+      'Study pricing strategies of successful D2C subscription box companies',
+      'Research the competitive landscape of AI-powered cybersecurity solutions',
     ],
-    options: {
-      title: 'Choose output format',
-      items: [
-        { id: 'spreadsheet', name: 'Spreadsheet', description: 'Table with formulas' },
-        { id: 'dashboard', name: 'Dashboard', description: 'Interactive charts' },
-        { id: 'report', name: 'Report', description: 'Analysis with visuals' },
-        { id: 'slides', name: 'Slides', description: 'Presentation format' },
-      ],
-    },
-    chartTypes: {
-      title: 'Preferred charts',
-      items: [
-        { id: 'bar', name: 'Bar', description: 'Vertical bar chart' },
-        { id: 'line', name: 'Line', description: 'Line chart' },
-        { id: 'pie', name: 'Pie', description: 'Pie chart' },
-        { id: 'scatter', name: 'Scatter', description: 'Scatter plot' },
-        { id: 'heatmap', name: 'Heat map', description: 'Heat map' },
-        { id: 'bubble', name: 'Bubble', description: 'Bubble chart' },
-        { id: 'wordcloud', name: 'Word cloud', description: 'Word cloud visualization' },
-        { id: 'stacked', name: 'Stacked bar', description: 'Stacked bar chart' },
-        { id: 'area', name: 'Area', description: 'Area chart' },
-      ],
-    },
   },
   {
     id: 'docs',
@@ -227,21 +204,44 @@ const modes: Mode[] = [
     ],
   },
   {
-    id: 'research',
-    label: 'Research',
-    icon: <Search className="w-4 h-4" />,
+    id: 'data',
+    label: 'Data',
+    icon: <BarChart3 className="w-4 h-4" />,
     samplePrompts: [
-      'Analyze emerging trends in quantum computing and potential business applications',
-      'Research top 10 competitors in the AI-powered CRM space with feature comparison',
-      'Investigate regulatory requirements for launching a fintech app in the EU',
-      'Compile market analysis on electric vehicle adoption rates across major markets',
-      'Study the impact of remote work on commercial real estate demand in major cities',
-      'Research Web3 adoption patterns among Fortune 500 companies',
-      'Analyze consumer sentiment towards sustainable fashion brands',
-      'Investigate the latest developments in gene therapy for rare diseases',
-      'Study pricing strategies of successful D2C subscription box companies',
-      'Research the competitive landscape of AI-powered cybersecurity solutions',
+      'Build a financial model projecting ARR growth with different pricing scenarios',
+      'Create an interactive sales dashboard tracking metrics by region and quarter',
+      'Analyze 50K customer reviews and visualize sentiment trends over time',
+      'Design a content calendar tracking campaigns with ROI and engagement charts',
+      'Build a cohort analysis showing user retention and churn patterns',
+      'Create a marketing attribution model comparing channel performance',
+      'Develop a hiring tracker with pipeline metrics and time-to-fill analysis',
+      'Build a budget planning spreadsheet with scenario modeling',
+      'Analyze website traffic data and visualize conversion funnels',
+      'Create an inventory management system with automated reorder alerts',
     ],
+    options: {
+      title: 'Choose output format',
+      items: [
+        { id: 'spreadsheet', name: 'Spreadsheet', description: 'Table with formulas' },
+        { id: 'dashboard', name: 'Dashboard', description: 'Interactive charts' },
+        { id: 'report', name: 'Report', description: 'Analysis with visuals' },
+        { id: 'slides', name: 'Slides', description: 'Presentation format' },
+      ],
+    },
+    chartTypes: {
+      title: 'Preferred charts',
+      items: [
+        { id: 'bar', name: 'Bar', description: 'Vertical bar chart' },
+        { id: 'line', name: 'Line', description: 'Line chart' },
+        { id: 'pie', name: 'Pie', description: 'Pie chart' },
+        { id: 'scatter', name: 'Scatter', description: 'Scatter plot' },
+        { id: 'heatmap', name: 'Heat map', description: 'Heat map' },
+        { id: 'bubble', name: 'Bubble', description: 'Bubble chart' },
+        { id: 'wordcloud', name: 'Word cloud', description: 'Word cloud visualization' },
+        { id: 'stacked', name: 'Stacked bar', description: 'Stacked bar chart' },
+        { id: 'area', name: 'Area', description: 'Area chart' },
+      ],
+    },
   },
 ];
 
@@ -694,7 +694,7 @@ export function IrisModesPanel({
                 variant="outline"
                 size="sm"
                 onClick={() => onModeSelect(mode.id)}
-                className="flex items-center gap-2 shrink-0 transition-all duration-200 bg-background hover:bg-accent rounded-xl text-muted-foreground hover:text-foreground border-border cursor-pointer"
+                className="flex items-center gap-2 shrink-0 transition-all duration-200 bg-background hover:bg-background/80 dark:hover:bg-background/60 rounded-xl text-muted-foreground hover:text-foreground border-border cursor-pointer"
               >
                 {mode.icon}
                 <span>{mode.label}</span>
@@ -713,7 +713,7 @@ export function IrisModesPanel({
               variant="ghost"
               size="sm"
               onClick={handleRefreshPrompts}
-              className="h-7 px-2 text-muted-foreground hover:text-foreground transition-colors duration-200"
+              className="h-7 px-2 text-muted-foreground hover:text-foreground transition-colors duration-200 hover:bg-background/80 dark:hover:bg-background/60"
             >
               <motion.div
                 animate={{ rotate: isRefreshing ? 360 : 0 }}
@@ -734,7 +734,7 @@ export function IrisModesPanel({
                   delay: index * 0.03,
                   ease: "easeOut"
                 }}
-                className="group cursor-pointer rounded-lg hover:bg-accent/50 transition-colors duration-150"
+                className="group cursor-pointer rounded-lg hover:bg-background/80 dark:hover:bg-background/60 transition-colors duration-150"
                 onClick={() => handlePromptSelect(prompt)}
               >
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5">
@@ -758,7 +758,7 @@ export function IrisModesPanel({
               variant="ghost"
               size="sm"
               onClick={handleRefreshPrompts}
-              className="h-7 px-2 text-muted-foreground hover:text-foreground transition-colors duration-200"
+              className="h-7 px-2 text-muted-foreground hover:text-foreground transition-colors duration-200 hover:bg-background/80 dark:hover:bg-background/60"
             >
               <motion.div
                 animate={{ rotate: isRefreshing ? 360 : 0 }}
