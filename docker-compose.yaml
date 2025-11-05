@@ -13,6 +13,7 @@ services:
     depends_on:
       - frontend
       - backend
+      - sandbox-proxy
     restart: unless-stopped
 
   redis:
@@ -49,6 +50,8 @@ services:
         condition: service_healthy
       worker:
         condition: service_started
+      sandbox-proxy:
+        condition: service_started
 
   worker:
     build:
@@ -83,6 +86,17 @@ services:
       - NEXT_PUBLIC_BACKEND_URL=http://backend:8000/api
     depends_on:
       - backend
+      - sandbox-proxy
+
+  sandbox-proxy:
+    build:
+      context: ./backend/daytona-proxy
+      dockerfile: Dockerfile
+    ports:
+      - "1234:1234"
+    env_file:
+      - ./backend/.env.production
+    restart: unless-stopped
 
 volumes:
   redis_data:

@@ -5,10 +5,16 @@ import asyncio
 from core.agentpress.thread_manager import ThreadManager
 from core.agentpress.tool import Tool
 from daytona_sdk import AsyncSandbox
-from core.sandbox.sandbox import get_or_start_sandbox, create_sandbox, delete_sandbox
+from core.sandbox.sandbox import (
+    get_or_start_sandbox,
+    create_sandbox,
+    delete_sandbox,
+    get_preview_link_info,
+)
 from core.utils.logger import logger
 from core.utils.files_utils import clean_path
 from core.utils.config import config
+from core.sandbox.proxy import ensure_custom_domain_metadata
 
 class SandboxToolsBase(Tool):
     """Base class for all sandbox tools that provides project-based sandbox access."""
@@ -57,11 +63,11 @@ class SandboxToolsBase(Tool):
                     
                     # Gather preview links and token (best-effort parsing)
                     try:
-                        vnc_link = await sandbox_obj.get_preview_link(6080)
-                        website_link = await sandbox_obj.get_preview_link(8080)
-                        vnc_url = vnc_link.url if hasattr(vnc_link, 'url') else str(vnc_link).split("url='")[1].split("'")[0]
-                        website_url = website_link.url if hasattr(website_link, 'url') else str(website_link).split("url='")[1].split("'")[0]
-                        token = vnc_link.token if hasattr(vnc_link, 'token') else (str(vnc_link).split("token='")[1].split("'")[0] if "token='" in str(vnc_link) else None)
+                        vnc_info = await get_preview_link_info(sandbox_obj, 6080)
+                        website_info = await get_preview_link_info(sandbox_obj, 8080)
+                        vnc_url = vnc_info.url
+                        website_url = website_info.url
+                        token = vnc_info.token
                     except Exception:
                         # If preview link extraction fails, still proceed but leave fields None
                         logger.warning(f"Failed to extract preview links for sandbox {sandbox_id}", exc_info=True)
@@ -98,6 +104,21 @@ class SandboxToolsBase(Tool):
                     self._sandbox_pass = sandbox_info.get('pass')
                     self._sandbox = await get_or_start_sandbox(self._sandbox_id)
 
+                    # If a custom proxy domain is configured, make sure stored URLs match it
+                    if config.SANDBOX_PROXY_DOMAIN:
+                        updated_info, changed = ensure_custom_domain_metadata(sandbox_info)
+                        if changed:
+                            try:
+                                await client.table('projects').update({'sandbox': updated_info}).eq(
+                                    'project_id', self.project_id
+                                ).execute()
+                            except Exception as exc:
+                                logger.warning(
+                                    "Failed to persist custom sandbox URLs for project %s: %s",
+                                    self.project_id,
+                                    exc,
+                                )
+                            sandbox_info = updated_info
             except Exception as e:
                 logger.error(f"Error retrieving/creating sandbox for project {self.project_id}: {str(e)}")
                 raise e

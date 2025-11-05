@@ -94,6 +94,9 @@ FIRECRAWL_URL=https://api.firecrawl.dev
 DAYTONA_API_KEY=your-daytona-key
 DAYTONA_SERVER_URL=https://app.daytona.io/api
 DAYTONA_TARGET=us
+SANDBOX_PROXY_DOMAIN=vault.irisvision.ai
+SANDBOX_PROXY_PROTOCOL=https
+SANDBOX_PROXY_PORT=
 
 WEBHOOK_BASE_URL=https://yourdomain.com
 
@@ -111,6 +114,11 @@ When running services individually, make sure to:
 1. Check your `.env` file and adjust any necessary environment variables
 2. Ensure Redis connection settings match your local setup (default: `localhost:6379`)
 3. Update any service-specific environment variables if needed
+
+**Local sandbox previews without Daytona warnings**
+
+- To keep using Daytona’s default preview URLs locally, leave `SANDBOX_PROXY_DOMAIN` unset in `backend/.env.local`.
+- To exercise the custom proxy locally, set `SANDBOX_PROXY_DOMAIN=localhost`, `SANDBOX_PROXY_PROTOCOL=http`, and `SANDBOX_PROXY_PORT=1234`, then run the proxy (`npm run dev` inside `backend/daytona-proxy` or start the compose service). Preview URLs will include `:1234` and route through the local proxy.
 
 ### Important: Redis Host Configuration
 
