@@ -95,7 +95,25 @@ export async function downloadPresentation(
   presentationName: string
 ): Promise<void> {
   try {
-    const response = await fetch(`${sandboxUrl}/presentation/convert-to-${format}`, {
+    if (!sandboxUrl) {
+      throw new Error('Sandbox URL is missing');
+    }
+    
+    if (!presentationPath) {
+      throw new Error('Presentation path is missing');
+    }
+
+    // Ensure sandboxUrl doesn't have trailing slash
+    const cleanSandboxUrl = sandboxUrl.replace(/\/$/, '');
+    const endpoint = `${cleanSandboxUrl}/presentation/convert-to-${format}`;
+    
+    console.log(`[Export] Requesting export to ${format.toUpperCase()}:`, {
+      endpoint,
+      presentationPath,
+      presentationName
+    });
+
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -107,22 +125,111 @@ export async function downloadPresentation(
       })
     });
     
+    console.log(`[Export] Response status: ${response.status} ${response.statusText}`);
+    console.log(`[Export] Response headers:`, Object.fromEntries(response.headers.entries()));
+    
+    // Check content type first to determine how to handle the response
+    const contentType = response.headers.get('content-type') || '';
+    
     if (!response.ok) {
-      throw new Error(`Failed to download ${format}`);
+      // Try to extract error message from response
+      let errorMessage = `Failed to export to ${format.toUpperCase()} (${response.status})`;
+      
+      try {
+        // Try to read as text first (works for both JSON and plain text)
+        const errorText = await response.text();
+        if (errorText) {
+          try {
+            // Try to parse as JSON
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.detail || errorData.message || errorMessage;
+          } catch {
+            // Not JSON, use text as-is if it's meaningful
+            if (errorText.trim().length > 0 && errorText.length < 500) {
+              errorMessage = errorText;
+            }
+          }
+        }
+      } catch (parseError) {
+        console.error('[Export] Failed to parse error response:', parseError);
+        // Use default error message
+      }
+      
+      throw new Error(errorMessage);
     }
     
+    // Verify we're getting the expected content type for successful responses
+    const isPDF = contentType.includes('application/pdf');
+    const isPPTX = contentType.includes('application/vnd.openxmlformats');
+    
+    // Read the response as blob
     const blob = await response.blob();
+    
+    // Check if blob is empty
+    if (blob.size === 0) {
+      throw new Error(`Empty response from server when exporting to ${format.toUpperCase()}`);
+    }
+    
+    // Verify blob type matches expected format
+    const isValidBlobType = 
+      blob.type.includes('pdf') || 
+      blob.type.includes('openxmlformats') || 
+      blob.type.includes('octet-stream') ||
+      blob.type === ''; // Some servers don't set blob type correctly
+    
+    // If content type header was wrong OR blob type is wrong, check if it's an error
+    if ((!isPDF && !isPPTX) || !isValidBlobType) {
+      // Clone blob before reading as text (so we can still use original if it's valid)
+      const blobClone = blob.slice();
+      const responseText = await blobClone.text();
+      
+      // Check if it's a JSON error response
+      try {
+        const jsonData = JSON.parse(responseText);
+        if (jsonData.detail || jsonData.message) {
+          throw new Error(jsonData.detail || jsonData.message);
+        }
+      } catch (parseError) {
+        // Not JSON, check if it's an HTML error page
+        if (responseText.includes('error') || responseText.includes('Error') || responseText.includes('failed')) {
+          throw new Error(`Server returned error: ${responseText.substring(0, 200)}`);
+        }
+        // If we got here and content type/blob type is wrong, it's an error
+        if (!isPDF && !isPPTX && !isValidBlobType) {
+          throw new Error(`Unexpected response type: ${contentType}, blob type: ${blob.type}. Expected PDF or PPTX.`);
+        }
+      }
+    }
+    
+    // Create download link and trigger download
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `${presentationName}.${format}`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    a.style.display = 'none';
+    
+    // Append to body, click, then remove
+    document.body.appendChild(a);
+    
+    // Use setTimeout to ensure the element is in the DOM before clicking
+    setTimeout(() => {
+      a.click();
+      // Clean up after a short delay
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+    }, 0);
+    
     toast.success(`Downloaded ${presentationName} as ${format.toUpperCase()}`, {
       duration: 8000,
     });
   } catch (error) {
-    console.error(`Error downloading ${format}:`, error);
+    console.error(`[Export] Error downloading ${format}:`, error);
+    const errorMessage = error instanceof Error ? error.message : `Failed to export to ${format.toUpperCase()}`;
+    toast.error(errorMessage, {
+      duration: 8000,
+    });
     throw error; // Re-throw to allow calling code to handle
   }
 }

@@ -31,6 +31,7 @@ import { ToolViewProps } from '../types';
 import { formatTimestamp, extractToolData, getToolTitle } from '../utils';
 import { downloadPresentation, handleGoogleSlidesUpload, sanitizePresentationSlug, DownloadFormat } from '../utils/presentation-utils';
 import { constructHtmlPreviewUrl } from '@/lib/utils/url';
+import { toast } from 'sonner';
 import { CodeBlockCode } from '@/components/ui/code-block';
 import { LoadingState } from '../shared/LoadingState';
 import { FullScreenPresentationViewer } from './FullScreenPresentationViewer';
@@ -492,7 +493,10 @@ export function PresentationViewer({
   }, [SlideIframe]);
 
   const handleDownload = async (setIsDownloading: (isDownloading: boolean) => void, format: DownloadFormat) => {
-    if (!resolvedSandboxUrl || !sanitizedPresentationName) return;
+    if (!resolvedSandboxUrl || !sanitizedPresentationName) {
+      toast.error('Missing presentation information. Please try again.');
+      return;
+    }
 
     setIsDownloading(true);
     try {
@@ -514,6 +518,7 @@ export function PresentationViewer({
         );
       }
     } catch (error) {
+      // Error is already handled and shown in downloadPresentation function
       console.error(`Error downloading ${format}:`, error);
     } finally {
       setIsDownloading(false);

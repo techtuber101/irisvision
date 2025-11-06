@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { constructHtmlPreviewUrl } from '@/lib/utils/url';
 import { downloadPresentation, DownloadFormat, handleGoogleSlidesUpload, sanitizePresentationSlug } from '../utils/presentation-utils';
+import { toast } from 'sonner';
 
 interface SlideMetadata {
   title: string;
@@ -275,7 +276,10 @@ export function FullScreenPresentationViewer({
 
   // Download handlers
   const handleDownload = async (format: DownloadFormat) => {
-    if (!resolvedSandboxUrl || !sanitizedPresentationName) return;
+    if (!resolvedSandboxUrl || !sanitizedPresentationName) {
+      toast.error('Missing presentation information. Please try again.');
+      return;
+    }
 
     const setDownloadState = format === DownloadFormat.PDF ? setIsDownloadingPDF : 
                            format === DownloadFormat.PPTX ? setIsDownloadingPPTX : 
@@ -292,6 +296,7 @@ export function FullScreenPresentationViewer({
         await downloadPresentation(format, resolvedSandboxUrl, `/workspace/presentations/${sanitizedPresentationName}`, sanitizedPresentationName);
       }
     } catch (error) {
+      // Error is already handled and shown in downloadPresentation function
       console.error(`Error downloading ${format}:`, error);
     } finally {
       setDownloadState(false);
