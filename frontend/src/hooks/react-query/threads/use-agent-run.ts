@@ -1,6 +1,6 @@
 import { createMutationHook, createQueryHook } from "@/hooks/use-query";
 import { threadKeys } from "./keys";
-import { BillingError, AgentRunLimitError, getAgentRuns, startAgent, stopAgent } from "@/lib/api";
+import { BillingError, AgentRunLimitError, getAgentRuns, startAgent, stopAgent, sendAdaptiveInput } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { threadKeys as sidebarThreadKeys } from "../sidebar/keys";
 
@@ -44,3 +44,20 @@ export const useStartAgentMutation = () => {
 
 export const useStopAgentMutation = () =>
   createMutationHook((agentRunId: string) => stopAgent(agentRunId))();
+
+export const useSendAdaptiveInputMutation = () => {
+  const queryClient = useQueryClient();
+  return createMutationHook(
+    ({ agentRunId, message, threadId }: { agentRunId: string; message: string; threadId: string }) =>
+      sendAdaptiveInput(agentRunId, message),
+    {
+      onSuccess: (result, variables) => {
+        // Invalidate messages to show the new adaptive input message
+        const threadIdToUse = variables.threadId || result.thread_id;
+        if (threadIdToUse) {
+          queryClient.invalidateQueries({ queryKey: threadKeys.messages(threadIdToUse) });
+        }
+      },
+    }
+  )();
+};

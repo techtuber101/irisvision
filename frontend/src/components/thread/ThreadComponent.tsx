@@ -22,6 +22,7 @@ import { useSidebarRefresh } from '@/hooks/use-sidebar-refresh';
 import {
   useStartAgentMutation,
   useStopAgentMutation,
+  useSendAdaptiveInputMutation,
 } from '@/hooks/react-query/threads/use-agent-run';
 import { useSharedSubscription } from '@/contexts/SubscriptionContext';
 export type SubscriptionStatus = 'no_subscription' | 'active';
@@ -225,6 +226,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const addAssistantMessageMutation = useAddAssistantMessageMutation();
   const startAgentMutation = useStartAgentMutation();
   const stopAgentMutation = useStopAgentMutation();
+  const sendAdaptiveInputMutation = useSendAdaptiveInputMutation();
   const { data: threadAgentData } = useThreadAgent(threadId);
   const agent = threadAgentData?.agent;
 
@@ -925,6 +927,26 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     setUserInitiatedRun,
   ]);
 
+  const handleSendAdaptiveInput = useCallback(async (message: string) => {
+    if (!agentRunId) {
+      console.error('Cannot send adaptive input: no agent run ID');
+      return;
+    }
+
+    try {
+      await sendAdaptiveInputMutation.mutateAsync({
+        agentRunId,
+        message,
+        threadId,
+      });
+      setNewMessage('');
+      toast.success('Message sent to agent');
+    } catch (error) {
+      console.error('Error sending adaptive input:', error);
+      toast.error('Failed to send message to agent');
+    }
+  }, [agentRunId, threadId, sendAdaptiveInputMutation]);
+
   const handleOpenFileViewer = useCallback(
     (filePath?: string, filePathList?: string[]) => {
       if (filePath) {
@@ -1419,6 +1441,8 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
                 agentStatus === 'running' || agentStatus === 'connecting'
               }
               onStopAgent={handleStopAgent}
+              onSendAdaptiveInput={handleSendAdaptiveInput}
+              agentRunId={agentRunId || undefined}
               autoFocus={!isLoading}
               enableAdvancedConfig={false}
               onFileBrowse={handleOpenFileViewer}
@@ -1562,6 +1586,8 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
                 agentStatus === 'running' || agentStatus === 'connecting'
               }
               onStopAgent={handleStopAgent}
+              onSendAdaptiveInput={handleSendAdaptiveInput}
+              agentRunId={agentRunId || undefined}
               autoFocus={!isLoading}
               enableAdvancedConfig={false}
               onFileBrowse={handleOpenFileViewer}

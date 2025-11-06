@@ -701,14 +701,16 @@ class AgentRunner:
                 self.config.trace.update(input=data['content'])
         
         # Track the last message count to detect new adaptive input
-        last_message_count = len(await self.client.table('messages').select('message_id').eq('thread_id', self.config.thread_id).eq('is_llm_message', True).execute().data or [])
+        last_message_result = await self.client.table('messages').select('message_id').eq('thread_id', self.config.thread_id).eq('is_llm_message', True).execute()
+        last_message_count = len(last_message_result.data or [])
 
         while continue_execution and iteration_count < self.config.max_iterations:
             iteration_count += 1
             should_continue = False
             
             # Check for new adaptive input messages
-            current_message_count = len(await self.client.table('messages').select('message_id').eq('thread_id', self.config.thread_id).eq('is_llm_message', True).execute().data or [])
+            current_message_result = await self.client.table('messages').select('message_id').eq('thread_id', self.config.thread_id).eq('is_llm_message', True).execute()
+            current_message_count = len(current_message_result.data or [])
             if current_message_count > last_message_count:
                 new_message_count = current_message_count - last_message_count
                 logger.info(f"🔄 Detected {new_message_count} new adaptive input message(s) for thread {self.config.thread_id}")

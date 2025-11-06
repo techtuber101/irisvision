@@ -90,6 +90,8 @@ export interface ChatInputProps {
   disabled?: boolean;
   isAgentRunning?: boolean;
   onStopAgent?: () => void;
+  onSendAdaptiveInput?: (message: string) => void;
+  agentRunId?: string;
   autoFocus?: boolean;
   value?: string;
   onChange?: (value: string) => void;
@@ -143,6 +145,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
       disabled = false,
       isAgentRunning = false,
       onStopAgent,
+      onSendAdaptiveInput,
+      agentRunId,
       autoFocus = true,
       value: controlledValue,
       onChange: controlledOnChange,
@@ -446,6 +450,24 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // If agent is running and there's text, send adaptive input
+    if (isAgentRunning && value.trim() && onSendAdaptiveInput && agentRunId) {
+      onSendAdaptiveInput(value.trim());
+      if (!isControlled) {
+        setUncontrolledValue('');
+      } else {
+        controlledOnChange?.('');
+      }
+      return;
+    }
+
+    // If agent is running and there's no text, stop the agent
+    if (isAgentRunning && onStopAgent && (!value.trim() && uploadedFiles.length === 0)) {
+      await onStopAgent();
+      return;
+    }
+
     if (
       (!value.trim() && uploadedFiles.length === 0) ||
       loading ||
@@ -453,11 +475,6 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
       isUploading // Prevent submission while files are uploading
     )
       return;
-
-    if (isAgentRunning && onStopAgent) {
-      await onStopAgent();
-      return;
-    }
 
       let message = value;
 
@@ -489,7 +506,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
       }
 
       setUploadedFiles([]);
-    }, [value, uploadedFiles, loading, disabled, isAgentRunning, isUploading, onStopAgent, generateDataOptionsMarkdown, getActualModelId, selectedModel, onSubmit, selectedAgentId, isControlled]);
+    }, [value, uploadedFiles, loading, disabled, isAgentRunning, isUploading, onStopAgent, onSendAdaptiveInput, agentRunId, generateDataOptionsMarkdown, getActualModelId, selectedModel, onSubmit, selectedAgentId, isControlled, controlledOnChange]);
 
     const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const newValue = e.target.value;
@@ -1057,24 +1074,18 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                       </TooltipProvider>
 
                       <Button
-                      type={isAgentRunning && onStopAgent ? "button" : "submit"}
-                      onClick={
-                        isAgentRunning && onStopAgent
-                          ? (event) => {
-                              event.preventDefault();
-                              onStopAgent();
-                            }
-                          : undefined
-                      }
+                      type="submit"
                       disabled={
-                        (!value.trim() && uploadedFiles.length === 0 && !isAgentRunning) ||
+                        (isAgentRunning && !value.trim() && uploadedFiles.length === 0 && !onStopAgent) ||
+                        (!isAgentRunning && !value.trim() && uploadedFiles.length === 0) ||
                         loading ||
                         (disabled && !isAgentRunning) ||
                         isUploading
                       }
                       className={cn(
                         'h-9 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm px-4 text-sm font-medium text-white/90 shadow-[0_2px_8px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-200 hover:border-white/30 hover:bg-white/15 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] active:scale-[0.98] ml-2 light:border-black/10 light:bg-black/5 light:text-black/90 light:shadow-[0_2px_8px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(0,0,0,0.1)] light:hover:border-black/15 light:hover:bg-black/8 light:hover:shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(0,0,0,0.15)]',
-                        ((!value.trim() && uploadedFiles.length === 0 && !isAgentRunning) ||
+                        ((isAgentRunning && !value.trim() && uploadedFiles.length === 0 && !onStopAgent) ||
+                          (!isAgentRunning && !value.trim() && uploadedFiles.length === 0) ||
                           loading ||
                           (disabled && !isAgentRunning) ||
                           isUploading) && 'opacity-[0.55] cursor-not-allowed'
@@ -1082,8 +1093,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
                     >
                       {loading || isUploading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : isAgentRunning ? (
+                      ) : isAgentRunning && (!value.trim() && uploadedFiles.length === 0) ? (
                         <span>Stop</span>
+                      ) : isAgentRunning && (value.trim() || uploadedFiles.length > 0) ? (
+                        <span>Follow Up</span>
                       ) : (
                         <span>Send</span>
                       )}

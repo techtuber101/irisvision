@@ -1039,6 +1039,41 @@ export const stopAgent = async (agentRunId: string): Promise<void> => {
   }
 };
 
+export const sendAdaptiveInput = async (
+  agentRunId: string,
+  message: string,
+): Promise<{ status: string; message_id: string; thread_id: string; message: string }> => {
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    const authError = new NoAccessTokenAvailableError();
+    handleApiError(authError, { operation: 'send adaptive input', resource: 'AI assistant' });
+    throw authError;
+  }
+
+  const response = await fetch(`${API_URL}/agent-run/${agentRunId}/adaptive-input`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ message }),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => 'No error details available');
+    const adaptiveInputError = new Error(`Error sending adaptive input: ${response.statusText} (${response.status})`);
+    handleApiError(adaptiveInputError, { operation: 'send adaptive input', resource: 'AI assistant' });
+    throw adaptiveInputError;
+  }
+
+  return await response.json();
+};
+
 export const getAgentStatus = async (agentRunId: string): Promise<AgentRun> => {
   if (nonRunningAgentRuns.has(agentRunId)) {
     throw new Error(`Agent run ${agentRunId} is not running`);
