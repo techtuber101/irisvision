@@ -231,7 +231,46 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
       let enhancedContent = '';
 
       try {
-        const enhancementPrompt = `please generate an enhanced prompt of the following prompt, answer directly only the prompt, make prompt 10 lines. After the initial paragraph, write in bullet points.\n\n${value}`;
+        const enhancementPrompt = `You are enhancing a user prompt to make it more effective for Iris, an autonomous AI agent with powerful capabilities.
+
+CRITICAL INSTRUCTIONS:
+1. **OUTPUT ONLY THE ENHANCED PROMPT** - Do NOT include any introductory text, explanations, or phrases like "here's your enhanced prompt", "here's the improved version", etc. Start directly with the enhanced prompt content.
+2. **LEVERAGE IRIS'S CAPABILITIES** - Enhance the prompt to take advantage of Iris's full capabilities:
+   - File operations: Create, read, edit, delete files; process documents; manage file systems
+   - Web search: Research information; gather data from multiple sources; find current information
+   - Code execution: Write and run code in Python, JavaScript, and other languages; execute scripts
+   - Browser automation: Navigate websites; interact with web pages; scrape data; automate web tasks
+   - Terminal commands: Execute system commands; manage processes; configure environments
+   - Data processing: Analyze data; create visualizations; process spreadsheets and databases
+   - Image processing: Analyze images; extract text; process visual content
+   - API integrations: Connect to external services; make API calls; integrate with 2700+ tools
+   - Document creation: Generate comprehensive reports; create presentations; build documentation
+   - Website creation: Build complete websites with HTML, CSS, JavaScript; create interactive web applications; design responsive layouts
+   - Slides creation: Generate professional presentations with beautiful designs; create multi-slide presentations with consistent themes; build engaging visual presentations
+   - Knowledge base: Search through documents; manage knowledge repositories
+
+3. **ENHANCEMENT GUIDELINES**:
+   - **MANDATORY FIRST LINE**: Always start the enhanced prompt with a role assignment for Iris. Format: "You are the best [ROLE/EXPERTISE] for [CONTEXT/TASK]". Examples:
+     * "You are the best Software Engineer for building world-class applications"
+     * "You are the best Data Analyst for extracting insights from complex datasets"
+     * "You are the best Research Specialist for comprehensive information gathering"
+     * "You are the best Content Creator for engaging and professional content"
+     * Determine the most appropriate role based on the user's prompt
+   - Make the prompt more specific and actionable
+   - Suggest concrete deliverables (files, documents, code, reports, etc.)
+   - Include specific tools or capabilities that would be useful
+   - Add context about desired format, structure, or output type
+   - Specify any research, analysis, or multi-step processes needed
+   - Make it clear what success looks like
+
+4. **FORMAT**: 
+   - **FIRST LINE**: Role assignment (e.g., "You are the best [ROLE] for [CONTEXT]")
+   - **SECOND PARAGRAPH**: Clear, concise opening paragraph (2-3 sentences) explaining the task
+   - **BULLET POINTS**: Specific requirements and capabilities to leverage
+
+5. **LENGTH**: Aim for approximately 10-15 lines total (role assignment + opening paragraph + bullet points).
+
+Now enhance this prompt:\n\n${value}`;
 
         await simpleChatStream(enhancementPrompt, {
           onContent: (content: string) => {

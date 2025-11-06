@@ -468,6 +468,31 @@ When using the tools:
         
         system_content += datetime_info
 
+        # Add adaptive input handling guidance
+        adaptive_input_guidance = """
+
+=== ADAPTIVE INPUT HANDLING ===
+When you see a new user message that appears mid-conversation (while you're working on a task), this is adaptive input - the user is providing additional guidance or corrections while you're executing.
+
+CRITICAL INSTRUCTIONS FOR ADAPTIVE INPUT:
+1. **Natural Acknowledgment**: When you see adaptive input, naturally acknowledge it as part of your response while immediately acting on it. For example:
+   - "Got it, I'll add error handling to the code..." (then proceed to add it)
+   - "Understood, switching to feature B..." (then immediately switch)
+   - "Perfect, I'll make sure to include rate limiting..." (then add it)
+
+2. **No Separate Acknowledgments**: Do NOT create a separate acknowledgment message. The acknowledgment should be seamlessly merged with your action/response.
+
+3. **Immediate Action**: Once you see adaptive input, prioritize it and incorporate it into your current work immediately. Don't wait or create artificial delays.
+
+4. **Natural Flow**: Make your response feel natural and conversational - acknowledge what the user said while showing you're acting on it right away.
+
+5. **Context Awareness**: If the adaptive input relates to what you're currently doing, acknowledge the connection naturally: "I see you want me to also add X while I'm working on Y - I'll incorporate that now..."
+
+Remember: The user sent this message because they want you to respond to it NOW. Acknowledge naturally and act immediately - all in one smooth response.
+=== END ADAPTIVE INPUT HANDLING ===
+"""
+        system_content += adaptive_input_guidance
+
         system_message = {"role": "system", "content": system_content}
         return system_message
 
@@ -901,6 +926,17 @@ class AgentRunner:
                             if chunk.get('type') == 'tool':
                                 tool_activity_detected = True
                                 logger.debug(f"Tool activity detected: tool chunk (thread {self.config.thread_id})")
+                                
+                                # Check for adaptive input after tool calls to respond immediately
+                                current_message_result = await self.client.table('messages').select('message_id').eq('thread_id', self.config.thread_id).eq('is_llm_message', True).execute()
+                                current_message_count = len(current_message_result.data or [])
+                                if current_message_count > last_message_count:
+                                    new_message_count = current_message_count - last_message_count
+                                    logger.info(f"🔄 Detected {new_message_count} new adaptive input message(s) during tool execution - will prioritize in next iteration (thread {self.config.thread_id})")
+                                    last_message_count = current_message_count
+                                    # Force continuation to process adaptive input immediately
+                                    should_continue = True
+                                    tool_activity_detected = True
 
                             yield chunk
                     else:
@@ -950,9 +986,20 @@ class AgentRunner:
                         final_termination_reason = 'explicit'
                     else:
                         auto_continue_reasons = {"length", "tool_calls"}
+                        # Check for adaptive input before deciding continuation
+                        # This ensures adaptive input is processed immediately
+                        current_message_result = await self.client.table('messages').select('message_id').eq('thread_id', self.config.thread_id).eq('is_llm_message', True).execute()
+                        current_message_count = len(current_message_result.data or [])
+                        adaptive_input_detected = current_message_count > last_message_count
+                        if adaptive_input_detected:
+                            new_message_count = current_message_count - last_message_count
+                            logger.info(f"🔄 Detected {new_message_count} new adaptive input message(s) - prioritizing immediate response (thread {self.config.thread_id})")
+                            last_message_count = current_message_count
+                            should_continue = True
+                            logger.debug(f"Continuing execution to process adaptive input immediately (thread {self.config.thread_id})")
                         # Priority 1: If tool activity was detected, always continue
                         # This ensures the agent continues after executing tools to process results
-                        if tool_activity_detected:
+                        elif tool_activity_detected:
                             should_continue = True
                             logger.debug(f"Continuing execution due to tool activity detected (thread {self.config.thread_id})")
                         # Priority 2: Check finish_reason for auto-continue reasons
