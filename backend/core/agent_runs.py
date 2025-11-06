@@ -218,6 +218,81 @@ async def stop_agent(agent_run_id: str, user_id: str = Depends(verify_and_get_us
     await stop_agent_run(agent_run_id)
     return {"status": "stopped"}
 
+@router.post("/agent-run/{agent_run_id}/adaptive-input", summary="Send Adaptive Input", operation_id="send_adaptive_input")
+async def send_adaptive_input(
+    agent_run_id: str,
+    message: str = Body(..., embed=True),
+    user_id: str = Depends(verify_and_get_user_id_from_jwt)
+):
+    """
+    Send adaptive input to a running agent. This allows you to provide additional
+    prompts or instructions while the agent is executing, and the agent will
+    incorporate them in its next iteration.
+    """
+    structlog.contextvars.bind_contextvars(
+        agent_run_id=agent_run_id,
+    )
+    logger.info(f"Received adaptive input for agent run: {agent_run_id}")
+    client = await utils.db.client
+    
+    # Verify access and get agent run data
+    agent_run_data = await _get_agent_run_with_access_check(client, agent_run_id, user_id)
+    
+    # Check if agent run is still running
+    if agent_run_data['status'] != 'running':
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot send adaptive input to agent run with status: {agent_run_data['status']}"
+        )
+    
+    thread_id = agent_run_data['thread_id']
+    structlog.contextvars.bind_contextvars(
+        thread_id=thread_id,
+    )
+    
+    try:
+        # 1. Add the message to the thread (as a user message)
+        message_payload = {
+            "role": "user",
+            "content": message
+        }
+        
+        message_result = await client.table('messages').insert({
+            'message_id': str(uuid.uuid4()),
+            'thread_id': thread_id,
+            'type': 'user',
+            'is_llm_message': True,
+            'content': message_payload,
+            'created_at': datetime.now(timezone.utc).isoformat(),
+            'metadata': {
+                'adaptive_input': True,
+                'agent_run_id': agent_run_id
+            }
+        }).execute()
+        
+        message_id = message_result.data[0]['message_id']
+        logger.info(f"Added adaptive input message {message_id} to thread {thread_id}")
+        
+        # 2. Publish notification to Redis adaptive input channel
+        adaptive_input_channel = f"agent_run:{agent_run_id}:adaptive_input"
+        try:
+            await redis.publish(adaptive_input_channel, "new_input")
+            logger.debug(f"Published adaptive input notification to channel: {adaptive_input_channel}")
+        except Exception as redis_error:
+            logger.warning(f"Failed to publish adaptive input notification: {redis_error}")
+            # Don't fail the request if Redis publish fails - the message is already in DB
+        
+        return {
+            "status": "success",
+            "message_id": message_id,
+            "thread_id": thread_id,
+            "message": "Adaptive input sent successfully. The agent will process it in the next iteration."
+        }
+        
+    except Exception as e:
+        logger.error(f"Error sending adaptive input for agent run {agent_run_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to send adaptive input: {str(e)}")
+
 @router.get("/thread/{thread_id}/agent-runs", summary="List Thread Agent Runs", operation_id="list_thread_agent_runs")
 async def get_agent_runs(thread_id: str, user_id: str = Depends(verify_and_get_user_id_from_jwt)):
     """Get all agent runs for a thread."""
