@@ -699,10 +699,21 @@ class AgentRunner:
                 data = json.loads(data)
             if self.config.trace:
                 self.config.trace.update(input=data['content'])
+        
+        # Track the last message count to detect new adaptive input
+        last_message_count = len(await self.client.table('messages').select('message_id').eq('thread_id', self.config.thread_id).eq('is_llm_message', True).execute().data or [])
 
         while continue_execution and iteration_count < self.config.max_iterations:
             iteration_count += 1
             should_continue = False
+            
+            # Check for new adaptive input messages
+            current_message_count = len(await self.client.table('messages').select('message_id').eq('thread_id', self.config.thread_id).eq('is_llm_message', True).execute().data or [])
+            if current_message_count > last_message_count:
+                new_message_count = current_message_count - last_message_count
+                logger.info(f"🔄 Detected {new_message_count} new adaptive input message(s) for thread {self.config.thread_id}")
+                last_message_count = current_message_count
+                # New messages will be automatically picked up by thread_manager.get_llm_messages()
 
             can_run, message, reservation_id = await billing_integration.check_and_reserve_credits(self.account_id)
             if not can_run:

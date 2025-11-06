@@ -123,6 +123,7 @@ async def run_agent_background(
     response_channel = f"agent_run:{agent_run_id}:new_response"
     instance_control_channel = f"agent_run:{agent_run_id}:control:{instance_id}"
     global_control_channel = f"agent_run:{agent_run_id}:control"
+    adaptive_input_channel = f"agent_run:{agent_run_id}:adaptive_input"
     instance_active_key = f"active_run:{instance_id}:{agent_run_id}"
 
     async def check_for_stop_signal():
@@ -152,15 +153,15 @@ async def run_agent_background(
     trace = langfuse.trace(name="agent_run", id=agent_run_id, session_id=thread_id, metadata={"project_id": project_id, "instance_id": instance_id})
 
     try:
-        # Setup Pub/Sub listener for control signals
+        # Setup Pub/Sub listener for control signals and adaptive input
         pubsub = await redis.create_pubsub()
         try:
-            await retry(lambda: pubsub.subscribe(instance_control_channel, global_control_channel))
+            await retry(lambda: pubsub.subscribe(instance_control_channel, global_control_channel, adaptive_input_channel))
         except Exception as e:
             logger.error(f"Redis failed to subscribe to control channels: {e}", exc_info=True)
             raise e
 
-        logger.info(f"Subscribed to control channels: {instance_control_channel}, {global_control_channel}")
+        logger.info(f"Subscribed to control channels: {instance_control_channel}, {global_control_channel}, {adaptive_input_channel}")
         stop_checker = asyncio.create_task(check_for_stop_signal())
 
         # Ensure active run key exists and has TTL
