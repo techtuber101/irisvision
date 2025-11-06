@@ -25,8 +25,14 @@ from .core_utils import (
     _get_version_service, generate_and_update_project_name,
     check_agent_run_limit, check_project_count_limit
 )
+from pydantic import BaseModel
 
 router = APIRouter(tags=["agent-runs"])
+
+
+class AdaptiveInputRequest(BaseModel):
+    """Request model for adaptive input to a running agent."""
+    prompt: str
 
 
 async def _get_agent_run_with_access_check(client, agent_run_id: str, user_id: str):
@@ -217,6 +223,64 @@ async def stop_agent(agent_run_id: str, user_id: str = Depends(verify_and_get_us
     await _get_agent_run_with_access_check(client, agent_run_id, user_id)
     await stop_agent_run(agent_run_id)
     return {"status": "stopped"}
+
+@router.post("/agent-run/{agent_run_id}/adaptive-input", summary="Send Adaptive Input to Running Agent", operation_id="send_adaptive_input")
+async def send_adaptive_input(
+    agent_run_id: str,
+    body: AdaptiveInputRequest = Body(...),
+    user_id: str = Depends(verify_and_get_user_id_from_jwt)
+):
+    """
+    Send an adaptive input (additional prompt) to a running agent.
+    The agent will process this input and continue execution accordingly.
+    """
+    structlog.contextvars.bind_contextvars(
+        agent_run_id=agent_run_id,
+    )
+    logger.info(f"Received adaptive input for agent run: {agent_run_id}")
+    client = await utils.db.client
+    
+    # Verify access and get agent run data
+    agent_run_data = await _get_agent_run_with_access_check(client, agent_run_id, user_id)
+    
+    # Check if agent is still running
+    if agent_run_data['status'] != 'running':
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot send input to agent run with status '{agent_run_data['status']}'. Agent must be running."
+        )
+    
+    thread_id = agent_run_data['thread_id']
+    
+    # Add the adaptive input to Redis queue
+    adaptive_input_key = f"agent_run:{agent_run_id}:adaptive_inputs"
+    adaptive_input_channel = f"agent_run:{agent_run_id}:adaptive_input"
+    
+    input_data = {
+        "prompt": body.prompt,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "user_id": user_id
+    }
+    
+    try:
+        # Store the input in Redis list
+        await redis.rpush(adaptive_input_key, json.dumps(input_data))
+        # Set TTL on the list (24 hours)
+        await redis.expire(adaptive_input_key, 3600 * 24)
+        # Publish notification to the agent
+        await redis.publish(adaptive_input_channel, "new_input")
+        
+        logger.info(f"Adaptive input queued for agent run {agent_run_id}: {body.prompt[:50]}...")
+        
+        return {
+            "status": "queued",
+            "message": "Your input has been sent to the running agent",
+            "agent_run_id": agent_run_id,
+            "thread_id": thread_id
+        }
+    except Exception as e:
+        logger.error(f"Failed to queue adaptive input for agent run {agent_run_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to send adaptive input: {str(e)}")
 
 @router.get("/thread/{thread_id}/agent-runs", summary="List Thread Agent Runs", operation_id="list_thread_agent_runs")
 async def get_agent_runs(thread_id: str, user_id: str = Depends(verify_and_get_user_id_from_jwt)):

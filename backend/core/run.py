@@ -543,6 +543,51 @@ class AgentRunner:
         
         return get_enabled_methods_for_tool(tool_name, migrated_tools)
     
+    async def _check_and_process_adaptive_inputs(self, agent_run_id: str, last_processed_index: int) -> Optional[int]:
+        """
+        Check for new adaptive inputs in Redis and add them to the thread.
+        Returns the new last processed index if inputs were found, None otherwise.
+        """
+        from core.services import redis
+        
+        try:
+            adaptive_input_key = f"agent_run:{agent_run_id}:adaptive_inputs"
+            
+            # Get all inputs from Redis
+            inputs_json = await redis.lrange(adaptive_input_key, 0, -1)
+            
+            if not inputs_json or len(inputs_json) <= last_processed_index + 1:
+                # No new inputs
+                return None
+            
+            # Process new inputs
+            new_index = last_processed_index
+            for i in range(last_processed_index + 1, len(inputs_json)):
+                input_data = json.loads(inputs_json[i])
+                prompt = input_data.get('prompt', '')
+                
+                if prompt:
+                    logger.info(f"📩 Processing adaptive input for agent run {agent_run_id}: {prompt[:50]}...")
+                    
+                    # Add the input as a user message to the thread
+                    message_payload = {"role": "user", "content": prompt}
+                    await self.thread_manager.add_message(
+                        thread_id=self.config.thread_id,
+                        type="user",
+                        content=message_payload,
+                        is_llm_message=True,
+                        metadata={"adaptive_input": True, "agent_run_id": agent_run_id}
+                    )
+                    
+                    new_index = i
+                    logger.info(f"✅ Adaptive input added to thread {self.config.thread_id}")
+            
+            return new_index if new_index > last_processed_index else None
+            
+        except Exception as e:
+            logger.error(f"Error processing adaptive inputs for agent run {agent_run_id}: {str(e)}")
+            return None
+    
     def _register_iris_specific_tools(self, disabled_tools: List[str]):
         if 'agent_creation_tool' not in disabled_tools:
             from core.tools.agent_creation_tool import AgentCreationTool
@@ -670,7 +715,7 @@ class AgentRunner:
         mcp_manager = MCPManager(self.thread_manager, self.account_id)
         return await mcp_manager.register_mcp_tools(self.config.agent_config)
     
-    async def run(self) -> AsyncGenerator[Dict[str, Any], None]:
+    async def run(self, agent_run_id: Optional[str] = None) -> AsyncGenerator[Dict[str, Any], None]:
         await self.setup()
         await self.setup_tools()
         mcp_wrapper_instance = await self.setup_mcp_tools()
@@ -691,6 +736,9 @@ class AgentRunner:
         final_termination_reason = None  # Track why execution stopped: None, 'explicit', 'max_iterations', 'unknown'
         fallback_triggered = self.config.fallback_triggered  # Track if fallback model has been used
         system_message_needs_rebuild = False  # Track if system message needs to be rebuilt after fallback
+        
+        # Track the last processed adaptive input index
+        last_adaptive_input_index = -1
 
         latest_user_message = await self.client.table('messages').select('*').eq('thread_id', self.config.thread_id).eq('type', 'user').order('created_at', desc=True).limit(1).execute()
         if latest_user_message.data and len(latest_user_message.data) > 0:
@@ -703,6 +751,18 @@ class AgentRunner:
         while continue_execution and iteration_count < self.config.max_iterations:
             iteration_count += 1
             should_continue = False
+            
+            # Check for adaptive inputs before processing iteration
+            if agent_run_id:
+                adaptive_input_processed = await self._check_and_process_adaptive_inputs(agent_run_id, last_adaptive_input_index)
+                if adaptive_input_processed:
+                    last_adaptive_input_index = adaptive_input_processed
+                    # Yield a notification that we received new input
+                    yield {
+                        "type": "status",
+                        "status": "adaptive_input_received",
+                        "message": "Processing new user input..."
+                    }
 
             can_run, message, reservation_id = await billing_integration.check_and_reserve_credits(self.account_id)
             if not can_run:
@@ -1080,7 +1140,8 @@ async def run_agent(
     max_iterations: int = 100,
     model_name: str = "gemini/gemini-2.5-flash",
     agent_config: Optional[dict] = None,    
-    trace: Optional[StatefulTraceClient] = None
+    trace: Optional[StatefulTraceClient] = None,
+    agent_run_id: Optional[str] = None,
 ):
     effective_model = model_name
 
@@ -1104,5 +1165,5 @@ async def run_agent(
     )
     
     runner = AgentRunner(config)
-    async for chunk in runner.run():
+    async for chunk in runner.run(agent_run_id=agent_run_id):
         yield chunk

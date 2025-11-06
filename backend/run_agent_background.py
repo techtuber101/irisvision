@@ -172,6 +172,7 @@ async def run_agent_background(
             model_name=effective_model,
             agent_config=agent_config,
             trace=trace,
+            agent_run_id=agent_run_id,
         )
 
         final_status = "running"
