@@ -1123,6 +1123,12 @@ Now enhance this prompt:\n\n${value}`;
                       }
                       className={cn(
                         'h-9 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm px-4 text-sm font-medium text-white/90 shadow-[0_2px_8px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-200 hover:border-white/30 hover:bg-white/15 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] active:scale-[0.98] ml-2 light:border-black/10 light:bg-black/5 light:text-black/90 light:shadow-[0_2px_8px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(0,0,0,0.1)] light:hover:border-black/15 light:hover:bg-black/8 light:hover:shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(0,0,0,0.15)]',
+                        // Red tint for Stop button (task ongoing)
+                        isAgentRunning && (!value.trim() && uploadedFiles.length === 0) && 
+                          'bg-red-500/20 border-red-400/30 hover:bg-red-500/25 hover:border-red-400/40 light:bg-red-500/15 light:border-red-400/25 light:hover:bg-red-500/20 light:hover:border-red-400/35',
+                        // Green tint for Follow Up button
+                        isAgentRunning && (value.trim() || uploadedFiles.length > 0) && 
+                          'bg-green-500/20 border-green-400/30 hover:bg-green-500/25 hover:border-green-400/40 light:bg-green-500/15 light:border-green-400/25 light:hover:bg-green-500/20 light:hover:border-green-400/35',
                         ((isAgentRunning && !value.trim() && uploadedFiles.length === 0 && !onStopAgent) ||
                           (!isAgentRunning && !value.trim() && uploadedFiles.length === 0) ||
                           loading ||
