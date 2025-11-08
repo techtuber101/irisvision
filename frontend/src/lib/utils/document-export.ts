@@ -116,8 +116,11 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
     htmlContent = content.split('\n').map(line => line.trim() ? `<p>${line}</p>` : '').join('');
   }
   
-  // Clean the HTML content for canvas compatibility
-  htmlContent = cleanCSSForCanvas(htmlContent);
+  // Clean the HTML content for canvas compatibility only when necessary
+  const shouldCleanForCanvas = format === 'pdf' || format === 'png' || format === 'jpg' || format === 'images';
+  if (shouldCleanForCanvas) {
+    htmlContent = cleanCSSForCanvas(htmlContent);
+  }
 
   const standardDocumentStyles = `
     <style>
@@ -211,7 +214,8 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
         background-color: #f8f9fa;
       }
       img { 
-        max-width: 100%; 
+        max-width: 115%; 
+        width: 115%;
         height: auto; 
         display: block;
         margin: 1em 0;
@@ -281,12 +285,27 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
         });
 
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to export DOCX');
+          let errorMessage = 'Failed to export DOCX';
+          try {
+            const contentType = response.headers.get('content-type');
+            if (contentType?.includes('application/json')) {
+              const error = await response.json();
+              errorMessage = error?.error || error?.message || errorMessage;
+            } else {
+              const text = await response.text();
+              if (text) {
+                errorMessage = text.slice(0, 200);
+              }
+            }
+          } catch {
+            // Fallback to default error message
+          }
+          throw new Error(errorMessage);
         }
 
         const blob = await response.blob();
-        saveAs(blob, `${fileName}.docx`);
+        const safeFileName = fileName?.trim() || 'document';
+        saveAs(blob, safeFileName.endsWith('.docx') ? safeFileName : `${safeFileName}.docx`);
         toast.success('DOCX exported successfully');
         break;
       }

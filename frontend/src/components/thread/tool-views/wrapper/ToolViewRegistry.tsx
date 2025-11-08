@@ -194,6 +194,8 @@ const defaultRegistry: ToolViewRegistryType = {
   'list_documents': ListDocumentsToolView,
   'delete_document': DeleteDocumentToolView,
   'export_document': DocsToolView,
+  'convert_to_pdf': DocsToolView,
+  'convert-to-pdf': DocsToolView,
   'get_tiptap_format_guide': DocsToolView,
 
   'default': GenericToolView,

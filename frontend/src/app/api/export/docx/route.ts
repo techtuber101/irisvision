@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import HTMLtoDOCX from 'html-to-docx';
 
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 const baseTypography = `
   body { 
@@ -323,12 +324,16 @@ export async function POST(request: NextRequest) {
 
     // Convert HTML to DOCX with enhanced options
     const docxBuffer = await HTMLtoDOCX(docxContent, null, docxOptions);
-    
+
+    // Ensure filename ends with .docx and contains safe characters
+    const normalizedFileName = fileName.trim().replace(/\s+/g, '_').replace(/[^\w.-]/g, '') || 'document';
+    const finalFileName = normalizedFileName.endsWith('.docx') ? normalizedFileName : `${normalizedFileName}.docx`;
+
     return new NextResponse(docxBuffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': `attachment; filename="${fileName}.docx"`,
+        'Content-Disposition': `attachment; filename="${finalFileName}"`,
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',
