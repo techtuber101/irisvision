@@ -268,16 +268,34 @@ function polishContent(raw: string): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const { content, fileName } = await request.json();
+    const body = await request.json();
+    const { content, fileName } = body;
 
-    if (!content || !fileName) {
+    // Validate inputs
+    if (!content) {
       return NextResponse.json(
-        { error: 'Content and fileName are required' },
+        { error: 'Content is required' },
         { status: 400 }
       );
     }
 
-    const styledContent = polishContent(content);
+    if (!fileName || typeof fileName !== 'string' || fileName.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'Valid fileName is required' },
+        { status: 400 }
+      );
+    }
+
+    // Ensure content is a string and not empty
+    const contentString = typeof content === 'string' ? content : String(content);
+    if (contentString.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'Content cannot be empty' },
+        { status: 400 }
+      );
+    }
+
+    const styledContent = polishContent(contentString);
 
     // Enhanced HTML content with comprehensive styling for better DOCX conversion
     const docxContent = `
@@ -298,32 +316,42 @@ export async function POST(request: NextRequest) {
       </html>
     `;
 
-    // Enhanced DOCX options for better formatting
-    const docxOptions = {
-      orientation: 'portrait',
-      margins: {
-        top: 720,    // 0.5 inch
-        bottom: 720, // 0.5 inch
-        left: 720,   // 0.5 inch
-        right: 720,  // 0.5 inch
-      },
-      title: fileName,
-      creator: 'Iris Intelligence For You',
-      description: 'Professional document exported from Iris Intelligence',
-      font: 'Calibri',
-      fontSize: 22,
-      table: {
-        row: {
-          cantSplit: true,
-        },
-      },
-      footer: true,
-      header: true,
-      pageNumber: true,
-    };
-
-    // Convert HTML to DOCX with enhanced options
-    const docxBuffer = await HTMLtoDOCX(docxContent, null, docxOptions);
+    // Convert HTML to DOCX - html-to-docx returns a Promise<Buffer>
+    // Using minimal options to avoid any compatibility issues
+    let docxBuffer: Buffer;
+    try {
+      // Try with basic options first
+      const basicOptions = {
+        table: { row: { cantSplit: true } },
+      };
+      docxBuffer = await HTMLtoDOCX(docxContent, null, basicOptions);
+      
+      // Validate that we got a valid buffer
+      if (!docxBuffer || !Buffer.isBuffer(docxBuffer)) {
+        throw new Error('HTMLtoDOCX did not return a valid buffer');
+      }
+    } catch (conversionError) {
+      console.error('HTMLtoDOCX conversion error:', conversionError);
+      // Try with no options at all if basic options fail
+      try {
+        docxBuffer = await HTMLtoDOCX(docxContent, null, {});
+        if (!docxBuffer || !Buffer.isBuffer(docxBuffer)) {
+          throw new Error('HTMLtoDOCX did not return a valid buffer with empty options');
+        }
+      } catch (emptyOptionsError) {
+        console.error('HTMLtoDOCX conversion failed even with empty options:', emptyOptionsError);
+        // Last resort: try with just the HTML content
+        try {
+          docxBuffer = await HTMLtoDOCX(docxContent);
+          if (!docxBuffer || !Buffer.isBuffer(docxBuffer)) {
+            throw new Error('HTMLtoDOCX did not return a valid buffer with no options');
+          }
+        } catch (finalError) {
+          console.error('HTMLtoDOCX conversion failed completely:', finalError);
+          throw new Error(`DOCX conversion failed: ${conversionError instanceof Error ? conversionError.message : 'Unknown error'}`);
+        }
+      }
+    }
 
     // Ensure filename ends with .docx and contains safe characters
     const normalizedFileName = fileName.trim().replace(/\s+/g, '_').replace(/[^\w.-]/g, '') || 'document';
@@ -341,8 +369,23 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('DOCX export error:', error);
+    
+    // Provide more detailed error information
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    // Log full error details for debugging
+    if (errorStack) {
+      console.error('DOCX export error stack:', errorStack);
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to generate DOCX file', details: error instanceof Error ? error.message : 'Unknown error' },
+      { 
+        error: 'Failed to generate DOCX file',
+        message: errorMessage,
+        // Only include details in development
+        ...(process.env.NODE_ENV === 'development' && { details: errorStack })
+      },
       { status: 500 }
     );
   }

@@ -42,7 +42,6 @@ import {
   DocumentViewer
 } from './_utils';
 import { fileQueryKeys } from '@/hooks/react-query/files/use-file-queries';
-import { WaveformAnimation } from '@/components/ui/waveform-animation';
 
 // File type icon mapping
 const FILE_TYPE_ICONS: Record<string, string> = {
@@ -310,6 +309,18 @@ export function DocsToolView({
     return <CheckCircle className="w-2 h-2 text-emerald-500" />;
   };
   
+  const resolvedSandboxId =
+    data?.sandbox_id ||
+    data?._internal?.sandbox_id ||
+    project?.sandbox?.id ||
+    project?.id ||
+    '';
+
+  const normalizeWorkspacePath = (path?: string | null) => {
+    if (!path || typeof path !== 'string') return null;
+    return path.startsWith('/workspace') ? path : `/workspace/${path.replace(/^\//, '')}`;
+  };
+
   return (
     <>
     <Card className="gap-0 flex border shadow-none border-t border-b-0 border-x-0 p-0 rounded-none flex-col h-full overflow-hidden bg-[rgba(7,10,17,0.95)] backdrop-blur-xl light:bg-white light:text-zinc-800 light:border-black/10">
@@ -517,28 +528,51 @@ export function DocsToolView({
             {/* PDF Conversion Success Display */}
             {(toolName === 'convert_to_pdf' || toolName === 'convert-to-pdf' || toolName.includes('convert')) && data.pdf_path ? (
               data.success !== false ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-12 space-y-8">
-                  <div className="text-center space-y-6">
-                    <WaveformAnimation className="h-12 mb-4" barCount={5} color="bg-emerald-500 dark:bg-emerald-400" />
-                    <h2 className="text-2xl font-semibold text-foreground bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-400 dark:to-teal-400 bg-clip-text text-transparent">
-                      Successfully Converted Iris Doc to PDF
+                <div className="flex-1 flex flex-col items-center justify-center p-10 text-center space-y-8">
+                  <div className="relative flex flex-col items-center">
+                    <div className="absolute inset-0 blur-[90px] opacity-30 dark:opacity-40 pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.35) 0%, rgba(16,185,129,0) 70%)' }} />
+                    <div className="relative w-32 h-40 rounded-3xl border border-white/15 dark:border-white/10 bg-gradient-to-br from-emerald-400/15 via-sky-500/10 to-blue-600/15 shadow-[0_20px_50px_-20px_rgba(14,165,233,0.9)] light:border-black/10 light:bg-gradient-to-br light:from-white light:via-slate-100 light:to-slate-200 flex items-center justify-center">
+                      <div className="absolute inset-x-4 top-4 h-4 rounded-full bg-white/70 dark:bg-white/10 blur-sm" />
+                      <div className="w-20 h-28 rounded-2xl bg-white/95 dark:bg-white/5 border border-white/40 dark:border-white/10 shadow-inner flex flex-col items-center justify-center gap-1">
+                        <span className="text-xs font-semibold tracking-[0.25em] text-rose-500 dark:text-rose-300">PDF</span>
+                        <div className="w-10 h-px bg-black/10 dark:bg-white/10" />
+                        <div className="space-y-1">
+                          <div className="w-12 h-1.5 rounded-full bg-emerald-500/70 dark:bg-emerald-400/60" />
+                          <div className="w-12 h-1.5 rounded-full bg-sky-400/70 dark:bg-sky-400/50" />
+                          <div className="w-8 h-1.5 rounded-full bg-indigo-400/70 dark:bg-indigo-300/60 mx-auto" />
+                        </div>
+                      </div>
+                      <div className="absolute -bottom-4 right-4 h-11 w-11 rounded-full bg-emerald-400 text-white flex items-center justify-center border border-white/40 shadow-[0_10px_25px_rgba(16,185,129,0.65)] dark:bg-emerald-500">
+                        <CheckCircle className="h-6 w-6" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-3 px-6">
+                    <h2 className="text-2xl font-semibold text-white light:text-black">
+                      PDF ready to open
                     </h2>
+                    <p className="text-sm text-white/70 light:text-black/60 max-w-xl mx-auto">
+                      {data.title || 'Your document'} has been converted with full formatting intact.
+                      Open it instantly or download to keep working offline.
+                    </p>
+                  </div>
                     <Button
                       size="lg"
                       onClick={() => {
-                        const sandboxId = data?.sandbox_id || data?._internal?.sandbox_id || project?.sandbox?.id || project?.id;
-                        const pdfPath = data.pdf_path || data?._internal?.pdf_info?.pdf_path;
+                        const sandboxId = resolvedSandboxId;
+                        const pdfPath =
+                          normalizeWorkspacePath(data.pdf_path) ||
+                          normalizeWorkspacePath(data?._internal?.pdf_info?.pdf_path);
                         if (sandboxId && pdfPath) {
                           setSelectedDocPath(pdfPath);
                           setFileViewerOpen(true);
                         }
                       }}
-                      className="mt-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 text-white px-8 py-6 text-base shadow-lg hover:shadow-xl transition-all duration-200"
-                    >
-                      <ExternalLink className="h-5 w-5 mr-2" />
-                      Open PDF
-                    </Button>
-                  </div>
+                    className="h-12 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm px-8 text-base font-semibold text-white shadow-[0_8px_30px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.15)] transition-all duration-200 hover:border-white/30 hover:bg-white/15 hover:shadow-[0_12px_40px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.2)] active:scale-[0.98] light:border-black/10 light:bg-black/5 light:text-black light:shadow-[0_8px_20px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(0,0,0,0.08)] light:hover:border-black/15 light:hover:bg-black/8 light:hover:shadow-[0_12px_30px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(0,0,0,0.12)]"
+                  >
+                    <ExternalLink className="h-5 w-5 mr-2" />
+                    Open PDF
+                  </Button>
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center p-12">
@@ -597,12 +631,12 @@ export function DocsToolView({
         )}
       </CardContent>
     </Card>
-    {(data?.sandbox_id || project?.id) && selectedDocPath && (
+    {(resolvedSandboxId && selectedDocPath) && (
       <FileViewerModal
         open={fileViewerOpen}
         onOpenChange={setFileViewerOpen}
-        sandboxId={data?.sandbox_id || project?.id || ''}
-        initialFilePath={selectedDocPath}
+        sandboxId={resolvedSandboxId}
+        initialFilePath={normalizeWorkspacePath(selectedDocPath) || undefined}
         project={project}
       />
     )}

@@ -273,40 +273,72 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
       }
 
       case 'docx': {
-        const response = await fetch('/api/export/docx', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            content: htmlContent,
-            fileName: fileName,
-          }),
-        });
+        try {
+          const response = await fetch('/api/export/docx', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              content: htmlContent,
+              fileName: fileName,
+            }),
+          });
 
-        if (!response.ok) {
-          let errorMessage = 'Failed to export DOCX';
-          try {
-            const contentType = response.headers.get('content-type');
-            if (contentType?.includes('application/json')) {
-              const error = await response.json();
-              errorMessage = error?.error || error?.message || errorMessage;
-            } else {
-              const text = await response.text();
-              if (text) {
-                errorMessage = text.slice(0, 200);
+          if (!response.ok) {
+            let errorMessage = 'Failed to export DOCX';
+            try {
+              const contentType = response.headers.get('content-type');
+              if (contentType?.includes('application/json')) {
+                const error = await response.json();
+                errorMessage = error?.error || error?.message || errorMessage;
+                // Log the full error for debugging
+                console.error('DOCX export API error:', error);
+              } else {
+                const text = await response.text();
+                if (text) {
+                  errorMessage = text.slice(0, 200);
+                }
               }
+            } catch (parseError) {
+              console.error('Failed to parse DOCX export error response:', parseError);
+              // Fallback to default error message
             }
-          } catch {
-            // Fallback to default error message
+            throw new Error(errorMessage);
           }
-          throw new Error(errorMessage);
-        }
 
-        const blob = await response.blob();
-        const safeFileName = fileName?.trim() || 'document';
-        saveAs(blob, safeFileName.endsWith('.docx') ? safeFileName : `${safeFileName}.docx`);
-        toast.success('DOCX exported successfully');
+          // Check if response is actually a DOCX file
+          const contentType = response.headers.get('content-type');
+          if (contentType && !contentType.includes('wordprocessingml') && !contentType.includes('msword') && !contentType.includes('octet-stream')) {
+            // If content type is unexpected, try to read as error
+            try {
+              const errorText = await response.clone().text();
+              console.error('Unexpected content type from DOCX export:', contentType, errorText);
+              // If it looks like JSON error, parse it
+              if (contentType.includes('application/json')) {
+                const error = JSON.parse(errorText);
+                throw new Error(error?.error || error?.message || 'Server returned invalid content type for DOCX export');
+              }
+            } catch {
+              // If we can't parse it, just throw a generic error
+            }
+            throw new Error('Server returned invalid content type for DOCX export');
+          }
+
+          const blob = await response.blob();
+          
+          // Validate blob size
+          if (blob.size === 0) {
+            throw new Error('Received empty DOCX file from server');
+          }
+
+          const safeFileName = fileName?.trim() || 'document';
+          saveAs(blob, safeFileName.endsWith('.docx') ? safeFileName : `${safeFileName}.docx`);
+          toast.success('DOCX exported successfully');
+        } catch (error) {
+          // Re-throw to be caught by outer try-catch
+          throw error;
+        }
         break;
       }
 
