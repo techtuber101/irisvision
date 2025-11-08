@@ -42,6 +42,7 @@ import {
   DocumentViewer
 } from './_utils';
 import { fileQueryKeys } from '@/hooks/react-query/files/use-file-queries';
+import { WaveformAnimation } from '@/components/ui/waveform-animation';
 
 // File type icon mapping
 const FILE_TYPE_ICONS: Record<string, string> = {
@@ -516,18 +517,12 @@ export function DocsToolView({
             {/* PDF Conversion Success Display */}
             {(toolName === 'convert_to_pdf' || toolName === 'convert-to-pdf' || toolName.includes('convert')) && data.pdf_path ? (
               data.success !== false ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-12 space-y-6">
-                  <div className="text-center space-y-4">
-                    <div className="flex items-center justify-center gap-2 mb-4">
-                      <CheckCircle className="h-8 w-8 text-emerald-500" />
-                    </div>
-                    <h2 className="text-2xl font-semibold text-foreground">
-                      PDF Converted Successfully
+                <div className="flex-1 flex flex-col items-center justify-center p-12 space-y-8">
+                  <div className="text-center space-y-6">
+                    <WaveformAnimation className="h-12 mb-4" barCount={5} color="bg-emerald-500 dark:bg-emerald-400" />
+                    <h2 className="text-2xl font-semibold text-foreground bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-400 dark:to-teal-400 bg-clip-text text-transparent">
+                      Successfully Converted Iris Doc to PDF
                     </h2>
-                    <div className="space-y-2 text-muted-foreground">
-                      <p className="text-base">Document: {data.title || data.pdf_filename || 'PDF'}</p>
-                      <p className="text-sm">Filename: {data.pdf_filename || 'document.pdf'}</p>
-                    </div>
                     <Button
                       size="lg"
                       onClick={() => {
@@ -538,7 +533,7 @@ export function DocsToolView({
                           setFileViewerOpen(true);
                         }
                       }}
-                      className="mt-6 bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 text-base"
+                      className="mt-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 text-white px-8 py-6 text-base shadow-lg hover:shadow-xl transition-all duration-200"
                     >
                       <ExternalLink className="h-5 w-5 mr-2" />
                       Open PDF
