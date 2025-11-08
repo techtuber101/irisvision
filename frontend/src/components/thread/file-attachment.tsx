@@ -498,7 +498,9 @@ export function FileAttachment({
             <div
                 className={cn(
                     "group relative w-full",
-                    "rounded-xl border bg-card overflow-hidden pt-10", // Consistent card styling with header space
+                    "rounded-2xl border overflow-hidden pt-10 shadow-[0_20px_60px_rgba(15,23,42,0.08)] dark:shadow-[0_25px_80px_rgba(3,8,20,0.85)]", // Keeps elevated card styling with header space
+                    "bg-white/95 dark:bg-[rgba(8,13,24,0.92)]",
+                    "border-black/5 dark:border-[rgba(34,62,122,0.65)]",
                     isPdf ? "!min-h-[200px] sm:min-h-0 sm:h-[400px] max-h-[500px] sm:!min-w-[300px]" :
                         isHtmlOrMd ? "!min-h-[200px] sm:min-h-0 sm:h-[400px] max-h-[600px] sm:!min-w-[300px]" :
                             (isCsv || isXlsx) ? "min-h-[300px] h-full" : // Let CSV and XLSX take full height
@@ -620,7 +622,7 @@ export function FileAttachment({
                 </div>
 
                 {/* Header with filename */}
-                <div className="absolute top-0 left-0 right-0 bg-[rgba(255,255,255,0.25)] dark:bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border-b border-white/20 dark:border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.05)] dark:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] p-2 h-[40px] z-10 flex items-center justify-between relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 bg-white/80 dark:bg-[rgba(6,11,23,0.9)] backdrop-blur-xl border-b border-black/5 dark:border-[rgba(45,73,138,0.75)] shadow-[0_20px_60px_-10px_rgba(0,0,0,0.08)] dark:shadow-[0_35px_80px_-20px_rgba(3,8,20,0.9),inset_0_1px_0_0_rgba(255,255,255,0.08)] text-black dark:text-white p-2 h-[40px] z-10 flex items-center justify-between relative overflow-hidden">
                     {/* Gradient rim */}
                     <div
                         aria-hidden="true"
@@ -644,7 +646,7 @@ export function FileAttachment({
                         }}
                     />
                     <div className="relative z-10 flex items-center gap-2 min-w-0 flex-1">
-                        <div className="text-sm font-medium truncate text-black dark:text-white drop-shadow-sm" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>{filename}</div>
+                        <div className="text-sm font-semibold tracking-tight truncate text-black dark:text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)] dark:drop-shadow-[0_2px_6px_rgba(0,0,0,0.65)]" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.15)' }}>{filename}</div>
                         {/* XLSX Sheet Selector */}
                         {isXlsx && xlsxSheetNames.length > 1 && (
                             <DropdownMenu>
