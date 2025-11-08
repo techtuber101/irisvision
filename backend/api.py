@@ -29,6 +29,7 @@ from core.admin.billing_admin_api import router as billing_admin_router
 from core.services import transcription as transcription_api
 import sys
 from core.services import email_api
+from core.services.docx_export_api import router as docx_export_router
 from core.triggers import api as triggers_api
 from core.services import api_keys_api
 
@@ -175,6 +176,7 @@ api_router.include_router(template_api.router, prefix="/templates")
 
 api_router.include_router(transcription_api.router)
 api_router.include_router(email_api.router)
+api_router.include_router(docx_export_router)
 
 from core.knowledge_base import api as knowledge_base_api
 api_router.include_router(knowledge_base_api.router)

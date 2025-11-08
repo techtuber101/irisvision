@@ -810,7 +810,10 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 font-weight: 700; 
                 margin: 1.5rem 0 0.75rem; 
                 color: #111827;
-                page-break-after: avoid;
+                page-break-after: auto;
+                page-break-before: avoid;
+                orphans: 2;
+                widows: 2;
             }
             h2 { 
                 font-family: 'LMRoman', 'Times New Roman', Times, serif;
@@ -818,7 +821,10 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 font-weight: 700; 
                 margin: 1.25rem 0 0.625rem; 
                 color: #374151;
-                page-break-after: avoid;
+                page-break-after: auto;
+                page-break-before: avoid;
+                orphans: 2;
+                widows: 2;
             }
             h3 { 
                 font-family: 'LMRoman', 'Times New Roman', Times, serif;
@@ -826,13 +832,19 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 font-weight: 700; 
                 margin: 1rem 0 0.5rem; 
                 color: #4b5563;
-                page-break-after: avoid;
+                page-break-after: auto;
+                page-break-before: avoid;
+                orphans: 2;
+                widows: 2;
             }
             p { 
                 font-size: 14pt;
                 margin-bottom: 1rem; 
                 text-align: left;
                 line-height: 1.8;
+                orphans: 2;
+                widows: 2;
+                page-break-inside: avoid;
             }
             ul, ol { 
                 font-size: 14pt;

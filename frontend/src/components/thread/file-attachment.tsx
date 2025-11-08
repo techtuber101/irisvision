@@ -620,14 +620,14 @@ export function FileAttachment({
                 </div>
 
                 {/* Header with filename */}
-                <div className="absolute top-0 left-0 right-0 bg-accent p-2 h-[40px] z-10 flex items-center justify-between">
+                <div className="absolute top-0 left-0 right-0 bg-blue-600/90 dark:bg-blue-700/90 backdrop-blur-sm border-b border-blue-500/20 p-2 h-[40px] z-10 flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
-                        <div className="text-sm font-medium truncate">{filename}</div>
+                        <div className="text-sm font-medium truncate text-white">{filename}</div>
                         {/* XLSX Sheet Selector */}
                         {isXlsx && xlsxSheetNames.length > 1 && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <button className="flex items-center gap-1 px-2 py-1 rounded-xl hover:bg-background/70 text-xs font-medium transition-colors">
+                                    <button className="flex items-center gap-1 px-2 py-1 rounded-xl hover:bg-white/20 text-xs font-medium transition-colors text-white">
                                         <span className="truncate max-w-[100px]">{xlsxSheetNames[xlsxSheetIndex] || 'Sheet 1'}</span>
                                         <ChevronDown size={12} />
                                     </button>
@@ -660,7 +660,7 @@ export function FileAttachment({
                         {onClick && (
                             <button
                                 onClick={handleClick}
-                                className="cursor-pointer p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/10"
+                                className="cursor-pointer p-1 rounded-full hover:bg-white/20 text-white"
                                 title="Open in viewer"
                             >
                                 <ExternalLink size={14} />

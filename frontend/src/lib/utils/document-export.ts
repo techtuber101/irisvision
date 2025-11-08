@@ -160,13 +160,63 @@ export async function exportDocument({ content, fileName, format }: DocumentExpo
         margin: 0;
         padding: 0;
       }
-      h1 { font-size: 2em; margin: 0.67em 0; }
-      h2 { font-size: 1.5em; margin: 0.83em 0; }
-      h3 { font-size: 1.17em; margin: 1em 0; }
-      h4 { font-size: 1.1em; margin: 1.33em 0; font-weight: 600; }
-      h5 { font-size: 1em; margin: 1.67em 0; font-weight: 600; }
-      h6 { font-size: 0.9em; margin: 2em 0; font-weight: 600; }
-      p { margin: 1em 0; }
+      h1 { 
+        font-size: 2em; 
+        margin: 0.67em 0; 
+        page-break-after: auto;
+        page-break-before: avoid;
+        orphans: 2;
+        widows: 2;
+      }
+      h2 { 
+        font-size: 1.5em; 
+        margin: 0.83em 0; 
+        page-break-after: auto;
+        page-break-before: avoid;
+        orphans: 2;
+        widows: 2;
+      }
+      h3 { 
+        font-size: 1.17em; 
+        margin: 1em 0; 
+        page-break-after: auto;
+        page-break-before: avoid;
+        orphans: 2;
+        widows: 2;
+      }
+      h4 { 
+        font-size: 1.1em; 
+        margin: 1.33em 0; 
+        font-weight: 600; 
+        page-break-after: auto;
+        page-break-before: avoid;
+        orphans: 2;
+        widows: 2;
+      }
+      h5 { 
+        font-size: 1em; 
+        margin: 1.67em 0; 
+        font-weight: 600; 
+        page-break-after: auto;
+        page-break-before: avoid;
+        orphans: 2;
+        widows: 2;
+      }
+      h6 { 
+        font-size: 0.9em; 
+        margin: 2em 0; 
+        font-weight: 600; 
+        page-break-after: auto;
+        page-break-before: avoid;
+        orphans: 2;
+        widows: 2;
+      }
+      p { 
+        margin: 1em 0; 
+        orphans: 2;
+        widows: 2;
+        page-break-inside: avoid;
+      }
       ul, ol { margin: 1em 0; padding-left: 40px; }
       li { margin-bottom: 0.5em; }
       blockquote { 
