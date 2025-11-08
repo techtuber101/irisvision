@@ -522,6 +522,7 @@ Message:
         system_prompt: Optional[Dict[str, Any]] = None,
         return_report: bool = False,
         report: Optional[CompressionReport] = None,
+        pointer_mode: bool = True,
     ) -> Union[List[Dict[str, Any]], Tuple[List[Dict[str, Any]], CompressionReport]]:
         """Compress the messages WITHOUT applying caching during iterations.
 
@@ -531,6 +532,10 @@ Message:
         - Keep recent messages (last 10) unsummarized for fresh context
 
         Caching should be applied ONCE at the end by the caller, not during compression.
+        
+        Args:
+            pointer_mode: If True, preserve memory_refs and do not hydrate them.
+                Only summarize/truncate inline short content, never expand pointers.
         """
         context_window = model_manager.get_context_window(llm_model)
 
@@ -546,7 +551,13 @@ Message:
         else:
             max_tokens = max_tokens or (context_window - 8_000)
 
-        result = self.remove_meta_messages(messages)
+        # In pointer_mode, preserve memory_refs and don't hydrate them
+        if pointer_mode:
+            # Filter out messages that have memory_refs from summarization/truncation
+            # but keep them in the result with their pointers intact
+            result = messages.copy()
+        else:
+            result = self.remove_meta_messages(messages)
 
         if actual_total_tokens is not None:
             uncompressed_total_token_count = actual_total_tokens
@@ -581,6 +592,23 @@ Message:
             regular_messages_indices: List[int] = []
 
             for i, msg in enumerate(result):
+                # In pointer_mode, skip messages with memory_refs from summarization
+                # (they're already offloaded and shouldn't be summarized again)
+                if pointer_mode and isinstance(msg, dict):
+                    content = msg.get('content', '')
+                    if isinstance(content, dict) and content.get('memory_refs'):
+                        # This message already has offloaded content, skip summarization
+                        tool_messages_indices.append(i)
+                        continue
+                    elif isinstance(content, str):
+                        try:
+                            parsed = json.loads(content)
+                            if isinstance(parsed, dict) and parsed.get('memory_refs'):
+                                tool_messages_indices.append(i)
+                                continue
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+                
                 if self.is_tool_related_message(msg):
                     tool_messages_indices.append(i)
                 else:
