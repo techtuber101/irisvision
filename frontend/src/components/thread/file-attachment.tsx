@@ -620,7 +620,7 @@ export function FileAttachment({
                 </div>
 
                 {/* Header with filename */}
-                <div className="absolute top-0 left-0 right-0 bg-[rgba(10,14,22,0.55)] dark:bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border-b border-white/10 dark:border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] p-2 h-[40px] z-10 flex items-center justify-between relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 bg-[rgba(255,255,255,0.25)] dark:bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border-b border-white/20 dark:border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.05)] dark:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] p-2 h-[40px] z-10 flex items-center justify-between relative overflow-hidden">
                     {/* Gradient rim */}
                     <div
                         aria-hidden="true"
@@ -644,12 +644,12 @@ export function FileAttachment({
                         }}
                     />
                     <div className="relative z-10 flex items-center gap-2 min-w-0 flex-1">
-                        <div className="text-sm font-medium truncate text-white">{filename}</div>
+                        <div className="text-sm font-medium truncate text-gray-900 dark:text-white">{filename}</div>
                         {/* XLSX Sheet Selector */}
                         {isXlsx && xlsxSheetNames.length > 1 && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <button className="flex items-center gap-1 px-2 py-1 rounded-xl hover:bg-white/20 text-xs font-medium transition-colors text-white">
+                                    <button className="flex items-center gap-1 px-2 py-1 rounded-xl hover:bg-black/10 dark:hover:bg-white/20 text-xs font-medium transition-colors text-gray-900 dark:text-white">
                                         <span className="truncate max-w-[100px]">{xlsxSheetNames[xlsxSheetIndex] || 'Sheet 1'}</span>
                                         <ChevronDown size={12} />
                                     </button>
@@ -682,7 +682,7 @@ export function FileAttachment({
                         {onClick && (
                             <button
                                 onClick={handleClick}
-                                className="cursor-pointer p-1 rounded-full hover:bg-white/20 text-white"
+                                className="cursor-pointer p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/20 text-gray-900 dark:text-white"
                                 title="Open in viewer"
                             >
                                 <ExternalLink size={14} />

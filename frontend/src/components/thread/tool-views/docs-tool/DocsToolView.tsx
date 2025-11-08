@@ -309,10 +309,11 @@ export function DocsToolView({
     return <CheckCircle className="w-2 h-2 text-emerald-500" />;
   };
   
+  // Ensure we get the correct sandbox ID - prioritize project's sandbox ID
   const resolvedSandboxId =
+    project?.sandbox?.id ||
     data?.sandbox_id ||
     data?._internal?.sandbox_id ||
-    project?.sandbox?.id ||
     project?.id ||
     '';
 
@@ -582,11 +583,20 @@ export function DocsToolView({
                           }
                         }
                         
-                        if (sandboxId && pdfPath) {
+                        // Ensure we use the project's sandbox ID, not from data
+                        const correctSandboxId = project?.sandbox?.id || sandboxId;
+                        
+                        if (correctSandboxId && pdfPath) {
                           setSelectedDocPath(pdfPath);
                           setFileViewerOpen(true);
                         } else {
-                          console.error('Failed to open PDF: missing sandboxId or pdfPath', { sandboxId, pdfPath, data });
+                          console.error('Failed to open PDF: missing sandboxId or pdfPath', { 
+                            correctSandboxId, 
+                            pdfPath, 
+                            projectSandboxId: project?.sandbox?.id,
+                            resolvedSandboxId: sandboxId,
+                            data 
+                          });
                         }
                       }}
                     className="h-12 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm px-8 text-base font-semibold text-white shadow-[0_8px_30px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.15)] transition-all duration-200 hover:border-white/30 hover:bg-white/15 hover:shadow-[0_12px_40px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.2)] active:scale-[0.98] light:border-black/10 light:bg-black/5 light:text-black light:shadow-[0_8px_20px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(0,0,0,0.08)] light:hover:border-black/15 light:hover:bg-black/8 light:hover:shadow-[0_12px_30px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(0,0,0,0.12)]"
@@ -652,11 +662,11 @@ export function DocsToolView({
         )}
       </CardContent>
     </Card>
-    {(resolvedSandboxId && selectedDocPath) && (
+    {((project?.sandbox?.id || resolvedSandboxId) && selectedDocPath) && (
       <FileViewerModal
         open={fileViewerOpen}
         onOpenChange={setFileViewerOpen}
-        sandboxId={resolvedSandboxId}
+        sandboxId={project?.sandbox?.id || resolvedSandboxId}
         initialFilePath={selectedDocPath || undefined}
         project={project}
       />
