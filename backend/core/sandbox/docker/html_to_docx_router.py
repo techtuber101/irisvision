@@ -667,12 +667,14 @@ class HTMLToDocxConverter:
         """Set professional cell borders."""
         tc = cell._tc
         tcPr = tc.get_or_add_tcPr()
+        nsmap = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
         
         # Remove existing borders
         for border_name in ['top', 'left', 'bottom', 'right']:
-            existing_border = tcPr.find(f'.//w:{border_name}', {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+            existing_border = tcPr.find(f'./w:{border_name}', namespaces=nsmap)
             if existing_border is not None:
-                tcPr.remove(existing_border)
+                parent = existing_border.getparent()
+                (parent or tcPr).remove(existing_border)
         
         # Add new borders
         for border_name in ['top', 'left', 'bottom', 'right']:
