@@ -644,12 +644,12 @@ export function FileAttachment({
                         }}
                     />
                     <div className="relative z-10 flex items-center gap-2 min-w-0 flex-1">
-                        <div className="text-sm font-medium truncate text-gray-900 dark:text-white">{filename}</div>
+                        <div className="text-sm font-medium truncate text-black dark:text-white drop-shadow-sm" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>{filename}</div>
                         {/* XLSX Sheet Selector */}
                         {isXlsx && xlsxSheetNames.length > 1 && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <button className="flex items-center gap-1 px-2 py-1 rounded-xl hover:bg-black/10 dark:hover:bg-white/20 text-xs font-medium transition-colors text-gray-900 dark:text-white">
+                                    <button className="flex items-center gap-1 px-2 py-1 rounded-xl hover:bg-black/10 dark:hover:bg-white/20 text-xs font-medium transition-colors text-black dark:text-white">
                                         <span className="truncate max-w-[100px]">{xlsxSheetNames[xlsxSheetIndex] || 'Sheet 1'}</span>
                                         <ChevronDown size={12} />
                                     </button>
@@ -682,7 +682,7 @@ export function FileAttachment({
                         {onClick && (
                             <button
                                 onClick={handleClick}
-                                className="cursor-pointer p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/20 text-gray-900 dark:text-white"
+                                className="cursor-pointer p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/20 text-black dark:text-white"
                                 title="Open in viewer"
                             >
                                 <ExternalLink size={14} />
