@@ -523,6 +523,21 @@ export function DocsToolView({
                     <h2 className="text-2xl font-semibold text-foreground bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-400 dark:to-teal-400 bg-clip-text text-transparent">
                       Successfully Converted Iris Doc to PDF
                     </h2>
+                    <Button
+                      size="lg"
+                      onClick={() => {
+                        const sandboxId = data?.sandbox_id || data?._internal?.sandbox_id || project?.sandbox?.id || project?.id;
+                        const pdfPath = data.pdf_path || data?._internal?.pdf_info?.pdf_path;
+                        if (sandboxId && pdfPath) {
+                          setSelectedDocPath(pdfPath);
+                          setFileViewerOpen(true);
+                        }
+                      }}
+                      className="mt-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 text-white px-8 py-6 text-base shadow-lg hover:shadow-xl transition-all duration-200"
+                    >
+                      <ExternalLink className="h-5 w-5 mr-2" />
+                      Open PDF
+                    </Button>
                   </div>
                 </div>
               ) : (
