@@ -620,8 +620,30 @@ export function FileAttachment({
                 </div>
 
                 {/* Header with filename */}
-                <div className="absolute top-0 left-0 right-0 bg-blue-600/90 dark:bg-blue-700/90 backdrop-blur-sm border-b border-blue-500/20 p-2 h-[40px] z-10 flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
+                <div className="absolute top-0 left-0 right-0 bg-[rgba(10,14,22,0.55)] dark:bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl border-b border-white/10 dark:border-white/10 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] p-2 h-[40px] z-10 flex items-center justify-between relative overflow-hidden">
+                    {/* Gradient rim */}
+                    <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0"
+                        style={{
+                            background: "linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))",
+                            WebkitMask: "linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)",
+                            WebkitMaskComposite: "xor" as any,
+                            maskComposite: "exclude",
+                            padding: 1,
+                        }}
+                    />
+                    {/* Specular streak */}
+                    <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-x-0 top-0 h-12"
+                        style={{
+                            background: "linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)",
+                            filter: "blur(6px)",
+                            mixBlendMode: "screen",
+                        }}
+                    />
+                    <div className="relative z-10 flex items-center gap-2 min-w-0 flex-1">
                         <div className="text-sm font-medium truncate text-white">{filename}</div>
                         {/* XLSX Sheet Selector */}
                         {isXlsx && xlsxSheetNames.length > 1 && (
@@ -649,7 +671,7 @@ export function FileAttachment({
                             </DropdownMenu>
                         )}
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="relative z-10 flex items-center gap-1">
                         {/* <button
                             onClick={handleDownload}
                             className="cursor-pointer p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/10"
