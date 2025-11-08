@@ -701,6 +701,15 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
             "message": "Use this guide to format HTML content for TipTap editor"
         })
     
+    def _remove_first_heading(self, content: str) -> str:
+        """Remove the first h1 heading from HTML content to avoid duplication with the document title."""
+        import re
+        # Match the first h1 tag and its content, including any whitespace
+        # This regex handles h1 tags with or without attributes
+        pattern = r'<h1[^>]*>.*?</h1>\s*'
+        result = re.sub(pattern, '', content, count=1, flags=re.IGNORECASE | re.DOTALL)
+        return result
+    
     def _generate_pdf_html(self, title: str, content: str, metadata: Optional[Dict] = None) -> str:
         regular_font = get_lmroman_data_uri("regular")
         bold_font = get_lmroman_data_uri("bold")
@@ -756,7 +765,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 font-family: 'LMRoman', 'Times New Roman', Times, serif;
                 font-size: 14pt;
                 line-height: 1.8;
-                color: #333;
+                color: #000000;
                 background: white;
                 max-width: 100%;
             }
@@ -911,7 +920,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 color: #2563eb;
                 text-decoration: none;
                 border-bottom: 1px solid transparent;
-                font-size: 14pt;
+                font-size: 11pt;
             }
             a:hover {
                 border-bottom-color: #2563eb;
@@ -951,7 +960,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                         <span>Generated on {current_time}</span>
                     </div>
                     <div class="metadata-item">
-                        <span>Created by <a href="https://irisvision.ai" target="_blank">Iris Intelligence For You</a></span>
+                        <span>Created by <a href="https://irisvision.ai" target="_blank">Iris Intelligence</a> for You</span>
                     </div>
         """
         
@@ -978,7 +987,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 </div>
             </div>
             <div class="content">
-                {content}
+                {self._remove_first_heading(content)}
             </div>
         </body>
         </html>
