@@ -900,21 +900,14 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 color: #374151;
             }
             img {
-                float: right;
-                max-width: 55%;
-                max-height: 450px;
+                display: block;
+                max-width: 65%;
+                max-height: 400px;
                 height: auto;
-                margin: 0.5rem 0 0.5rem 1.5rem;
+                margin: 1.5rem auto;
                 border-radius: 0.25rem;
-                clear: right;
                 page-break-inside: avoid;
                 page-break-after: auto;
-            }
-            /* Clear float after images to prevent text wrapping issues */
-            p:has(img), 
-            div:has(img),
-            figure:has(img) {
-                overflow: auto;
             }
             a {
                 color: #2563eb;
@@ -1227,4 +1220,109 @@ if __name__ == "__main__":
         except Exception as e:
             logger.error(f"Error converting document to PDF: {str(e)}")
             return self.fail_response(f"Error converting document to PDF: {str(e)}")
+    
+    @openapi_schema({
+        "type": "function",
+        "function": {
+            "name": "convert_to_docx",
+            "description": "Convert a document to DOCX (Microsoft Word) format with professional formatting. Images will be embedded when possible.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "doc_id": {
+                        "type": "string",
+                        "description": "ID of the document to convert to DOCX"
+                    },
+                    "download": {
+                        "type": "boolean",
+                        "description": "If true, returns the DOCX file for download. If false, saves it in the workspace",
+                        "default": False
+                    }
+                },
+                "required": ["doc_id"]
+            }
+        }
+    })
+    async def convert_to_docx(self, doc_id: str, download: bool = False) -> ToolResult:
+        try:
+            await self._ensure_sandbox()
+            
+            all_metadata = await self._load_metadata()
+            
+            if doc_id not in all_metadata["documents"]:
+                return self.fail_response(f"Document with ID '{doc_id}' not found")
+            
+            doc_info = all_metadata["documents"][doc_id]
+            
+            # Get the document path
+            doc_path = doc_info["path"]
+            
+            # Make API call to sandbox server to convert to DOCX
+            sandbox_url = getattr(self, '_sandbox_url', None)
+            if not sandbox_url:
+                return self.fail_response("Sandbox URL not available for DOCX conversion")
+            
+            convert_url = f"{sandbox_url}/document/convert-to-docx"
+            
+            import httpx
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    convert_url,
+                    json={
+                        "doc_path": doc_path,
+                        "download": True  # Always get the file content
+                    }
+                )
+                
+                if response.status_code != 200:
+                    error_detail = response.text
+                    logger.error(f"DOCX conversion failed: {error_detail}")
+                    return self.fail_response(f"Failed to convert to DOCX: {error_detail}")
+                
+                docx_content = response.content
+                
+                # Extract filename from Content-Disposition header or create one
+                content_disposition = response.headers.get('Content-Disposition', '')
+                if 'filename=' in content_disposition:
+                    filename_match = re.search(r'filename="(.+?)"', content_disposition)
+                    if filename_match:
+                        docx_filename = filename_match.group(1)
+                    else:
+                        docx_filename = f"{self._sanitize_filename(doc_info['title'])}_{doc_id}.docx"
+                else:
+                    docx_filename = f"{self._sanitize_filename(doc_info['title'])}_{doc_id}.docx"
+                
+                # Save DOCX file to docs directory
+                docx_path = f"/workspace/docs/{docx_filename}"
+                await self.sandbox.fs.upload_file(docx_content, docx_path)
+                
+                # Update metadata
+                all_metadata["documents"][doc_id]["last_docx_export"] = {
+                    "filename": docx_filename,
+                    "path": docx_path,
+                    "exported_at": datetime.now().isoformat()
+                }
+                await self._save_metadata(all_metadata)
+                
+                preview_url = None
+                download_url = None
+                if hasattr(self, '_sandbox_url') and self._sandbox_url:
+                    preview_url = f"{self._sandbox_url}/docs/{docx_filename}"
+                    download_url = preview_url
+                
+                return self.success_response({
+                    "message": f"DOCX Conversion Complete",
+                    "docx_filename": docx_filename,
+                    "docx_path": docx_path,
+                    "title": doc_info["title"],
+                    "_internal": {
+                        "preview_url": preview_url,
+                        "download_url": download_url,
+                        "sandbox_id": self.sandbox_id
+                    }
+                })
+                
+        except Exception as e:
+            logger.error(f"Error converting document to DOCX: {str(e)}")
+            return self.fail_response(f"Error converting document to DOCX: {str(e)}")
     

@@ -6,6 +6,9 @@ from typing import Dict, Optional
 import re
 from io import BytesIO
 import copy
+import base64
+import tempfile
+import os
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
@@ -71,59 +74,66 @@ class HTMLToDocxConverter:
         normal_style = styles['Normal']
         normal_font = normal_style.font
         normal_font.name = 'Calibri'
-        normal_font.size = Pt(11)
-        normal_font.color.rgb = RGBColor(33, 37, 41)  # Professional dark gray
-        normal_style.paragraph_format.space_after = Pt(8)
+        normal_font.size = Pt(12)
+        normal_font.color.rgb = RGBColor(0, 0, 0)  # Pure black for readability
+        normal_style.paragraph_format.space_after = Pt(10)
         normal_style.paragraph_format.space_before = Pt(0)
-        normal_style.paragraph_format.line_spacing = 1.6  # Improved readability
+        normal_style.paragraph_format.line_spacing = 1.8  # Improved readability
 
         # Professional body text style
         if 'IrisBodyText' not in styles:
             body_style = styles.add_style('IrisBodyText', WD_STYLE_TYPE.PARAGRAPH)
             body_style.base_style = normal_style
             body_style.font.name = 'Calibri'
-            body_style.font.size = Pt(11)
-            body_style.font.color.rgb = RGBColor(33, 37, 41)
+            body_style.font.size = Pt(12)
+            body_style.font.color.rgb = RGBColor(0, 0, 0)  # Pure black
+            body_style.font.bold = False  # Ensure not bold
             body_style.paragraph_format.space_after = Pt(10)
             body_style.paragraph_format.space_before = Pt(0)
-            body_style.paragraph_format.line_spacing = 1.6
+            body_style.paragraph_format.line_spacing = 1.8
+            body_style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
         else:
             body_style = styles['IrisBodyText']
+            body_style.font.color.rgb = RGBColor(0, 0, 0)  # Ensure black
+            body_style.font.bold = False
 
         # Enhanced blockquote with professional styling
         if 'IrisBlockQuote' not in styles:
             block_style = styles.add_style('IrisBlockQuote', WD_STYLE_TYPE.PARAGRAPH)
             block_style.base_style = body_style
             block_style.font.italic = True
-            block_style.font.color.rgb = RGBColor(73, 80, 87)  # Professional gray
+            block_style.font.size = Pt(11)
+            block_style.font.color.rgb = RGBColor(50, 50, 50)  # Dark gray for quotes
             block_style.paragraph_format.left_indent = Inches(0.5)
             block_style.paragraph_format.right_indent = Inches(0.3)
             block_style.paragraph_format.space_before = Pt(12)
             block_style.paragraph_format.space_after = Pt(12)
-            block_style.paragraph_format.line_spacing = 1.5
+            block_style.paragraph_format.line_spacing = 1.6
 
         # Professional code block styling
         if 'IrisCodeBlock' not in styles:
             code_style = styles.add_style('IrisCodeBlock', WD_STYLE_TYPE.PARAGRAPH)
             code_style.base_style = body_style
-            code_style.font.name = 'Consolas'
+            code_style.font.name = 'Courier New'
             code_style.font.size = Pt(10)
-            code_style.font.color.rgb = RGBColor(40, 44, 52)  # Dark code color
+            code_style.font.color.rgb = RGBColor(0, 0, 0)  # Black for code
+            code_style.font.bold = False
             code_style.paragraph_format.left_indent = Inches(0.4)
             code_style.paragraph_format.right_indent = Inches(0.4)
-            code_style.paragraph_format.space_before = Pt(8)
-            code_style.paragraph_format.space_after = Pt(8)
-            code_style.paragraph_format.line_spacing = 1.3
+            code_style.paragraph_format.space_before = Pt(10)
+            code_style.paragraph_format.space_after = Pt(10)
+            code_style.paragraph_format.line_spacing = 1.4
 
         # Professional table header styling
         if 'IrisTableHeader' not in styles:
             table_header = styles.add_style('IrisTableHeader', WD_STYLE_TYPE.PARAGRAPH)
             table_header.font.name = 'Calibri'
-            table_header.font.size = Pt(11)
+            table_header.font.size = Pt(12)
             table_header.font.bold = True
-            table_header.font.color.rgb = RGBColor(33, 37, 41)
+            table_header.font.color.rgb = RGBColor(0, 0, 0)  # Pure black
             table_header.paragraph_format.space_after = Pt(6)
             table_header.paragraph_format.space_before = Pt(6)
+            table_header.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
         # Professional subtitle styling
         if 'IrisSubtitle' not in styles:
@@ -138,64 +148,68 @@ class HTMLToDocxConverter:
             list_bullet = styles.add_style('IrisListBullet', WD_STYLE_TYPE.PARAGRAPH)
             list_bullet.base_style = body_style
             list_bullet.font.name = 'Calibri'
-            list_bullet.font.size = Pt(11)
-            list_bullet.font.color.rgb = RGBColor(33, 37, 41)
-            list_bullet.paragraph_format.space_after = Pt(6)
+            list_bullet.font.size = Pt(12)
+            list_bullet.font.color.rgb = RGBColor(0, 0, 0)  # Black text
+            list_bullet.font.bold = False
+            list_bullet.paragraph_format.space_after = Pt(8)
             list_bullet.paragraph_format.space_before = Pt(0)
             list_bullet.paragraph_format.left_indent = Inches(0.3)
+            list_bullet.paragraph_format.line_spacing = 1.6
 
         if 'IrisListNumber' not in styles:
             list_number = styles.add_style('IrisListNumber', WD_STYLE_TYPE.PARAGRAPH)
             list_number.base_style = body_style
             list_number.font.name = 'Calibri'
-            list_number.font.size = Pt(11)
-            list_number.font.color.rgb = RGBColor(33, 37, 41)
-            list_number.paragraph_format.space_after = Pt(6)
+            list_number.font.size = Pt(12)
+            list_number.font.color.rgb = RGBColor(0, 0, 0)  # Black text
+            list_number.font.bold = False
+            list_number.paragraph_format.space_after = Pt(8)
             list_number.paragraph_format.space_before = Pt(0)
             list_number.paragraph_format.left_indent = Inches(0.3)
+            list_number.paragraph_format.line_spacing = 1.6
 
         # Professional heading hierarchy with improved typography
         heading_styles = {
             'Heading 1': {
-                'color': RGBColor(17, 24, 39),  # Very dark gray
-                'size': Pt(24),
+                'color': RGBColor(0, 0, 0),  # Pure black
+                'size': Pt(26),
                 'space_before': Pt(24),
-                'space_after': Pt(12),
+                'space_after': Pt(14),
                 'bold': True
             },
             'Heading 2': {
-                'color': RGBColor(31, 41, 55),  # Dark gray
-                'size': Pt(20),
+                'color': RGBColor(0, 0, 0),  # Pure black
+                'size': Pt(22),
                 'space_before': Pt(20),
-                'space_after': Pt(10),
+                'space_after': Pt(12),
                 'bold': True
             },
             'Heading 3': {
-                'color': RGBColor(55, 65, 81),  # Medium dark gray
-                'size': Pt(16),
+                'color': RGBColor(0, 0, 0),  # Pure black
+                'size': Pt(18),
                 'space_before': Pt(16),
-                'space_after': Pt(8),
+                'space_after': Pt(10),
                 'bold': True
             },
             'Heading 4': {
-                'color': RGBColor(75, 85, 99),  # Medium gray
-                'size': Pt(14),
+                'color': RGBColor(0, 0, 0),  # Pure black
+                'size': Pt(16),
                 'space_before': Pt(14),
-                'space_after': Pt(6),
+                'space_after': Pt(8),
                 'bold': True
             },
             'Heading 5': {
-                'color': RGBColor(107, 114, 128),  # Light gray
-                'size': Pt(12),
+                'color': RGBColor(0, 0, 0),  # Pure black
+                'size': Pt(14),
                 'space_before': Pt(12),
                 'space_after': Pt(6),
                 'bold': True
             },
             'Heading 6': {
-                'color': RGBColor(156, 163, 175),  # Very light gray
-                'size': Pt(11),
+                'color': RGBColor(0, 0, 0),  # Pure black
+                'size': Pt(13),
                 'space_before': Pt(10),
-                'space_after': Pt(4),
+                'space_after': Pt(6),
                 'bold': True
             }
         }
@@ -246,27 +260,20 @@ class HTMLToDocxConverter:
 
     def _get_heading_color(self, level):
         """Get professional heading color based on level."""
-        colors = {
-            1: RGBColor(17, 24, 39),   # Very dark gray
-            2: RGBColor(31, 41, 55),   # Dark gray
-            3: RGBColor(55, 65, 81),  # Medium dark gray
-            4: RGBColor(75, 85, 99), # Medium gray
-            5: RGBColor(107, 114, 128), # Light gray
-            6: RGBColor(156, 163, 175) # Very light gray
-        }
-        return colors.get(level, RGBColor(17, 24, 39))
+        # All headings use pure black for maximum readability
+        return RGBColor(0, 0, 0)
 
     def _get_heading_size(self, level):
         """Get professional heading size based on level."""
         sizes = {
-            1: Pt(24),
-            2: Pt(20),
-            3: Pt(16),
-            4: Pt(14),
-            5: Pt(12),
-            6: Pt(11)
+            1: Pt(26),
+            2: Pt(22),
+            3: Pt(18),
+            4: Pt(16),
+            5: Pt(14),
+            6: Pt(13)
         }
-        return sizes.get(level, Pt(16))
+        return sizes.get(level, Pt(18))
         
     def load_document(self):
         if not self.doc_path.exists():
@@ -343,8 +350,11 @@ class HTMLToDocxConverter:
             else:
                 paragraph = self.document.add_paragraph(style='IrisBodyText')
                 paragraph.paragraph_format.space_after = Pt(10)
-                paragraph.paragraph_format.line_spacing = 1.6
+                paragraph.paragraph_format.line_spacing = 1.8
+                paragraph.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
                 run = paragraph.add_run(text.strip())
+                run.font.bold = False
+                run.font.color.rgb = RGBColor(0, 0, 0)
                 self.apply_run_formatting(run, {})
             return
 
@@ -354,9 +364,10 @@ class HTMLToDocxConverter:
             paragraph = self.document.add_paragraph(style='IrisBodyText')
             paragraph.paragraph_format.space_after = Pt(10)
             paragraph.paragraph_format.space_before = Pt(0)
-            paragraph.paragraph_format.line_spacing = 1.6
+            paragraph.paragraph_format.line_spacing = 1.8
+            paragraph.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
             for child in element.children:
-                self.process_inline_element(child, paragraph, {})
+                self.process_inline_element(child, paragraph, {'bold': False})
 
         elif tag in self.heading_style_map:
             style_name = self.heading_style_map[tag]
@@ -408,11 +419,19 @@ class HTMLToDocxConverter:
             paragraph = self.document.add_paragraph(style='IrisCodeBlock')
             paragraph.paragraph_format.space_before = Pt(12)
             paragraph.paragraph_format.space_after = Pt(12)
+            
+            # Add background shading for code blocks
+            pPr = paragraph._element.get_or_add_pPr()
+            shd = OxmlElement('w:shd')
+            shd.set(qn('w:fill'), 'F5F5F5')  # Light grey background
+            pPr.append(shd)
+            
             code_text = element.get_text()
             run = paragraph.add_run(code_text)
-            run.font.name = 'Consolas'
+            run.font.name = 'Courier New'
             run.font.size = Pt(10)
-            run.font.color.rgb = RGBColor(40, 44, 52)  # Professional dark code color
+            run.font.color.rgb = RGBColor(0, 0, 0)  # Black text
+            run.font.bold = False
 
         elif tag == 'hr':
             paragraph = self.document.add_paragraph()
@@ -437,23 +456,87 @@ class HTMLToDocxConverter:
             alt_text = element.get('alt', 'Image')
             src = element.get('src', '')
             
-            # Professional image placeholder styling
-            paragraph = self.document.add_paragraph(style='IrisBodyText')
-            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            paragraph.paragraph_format.space_before = Pt(12)
-            paragraph.paragraph_format.space_after = Pt(12)
-            
-            # Professional image caption
-            img_run = paragraph.add_run(f'[Image: {alt_text}]')
-            img_run.italic = True
-            img_run.font.color.rgb = RGBColor(107, 114, 128)  # Professional gray
-            img_run.font.size = Pt(11)
-            
+            # Try to embed the actual image
+            image_embedded = False
             if src:
-                ref_run = paragraph.add_run(f'\n({src})')
-                ref_run.font.size = Pt(9)
-                ref_run.font.color.rgb = RGBColor(156, 163, 175)  # Light gray
-                ref_run.font.italic = True
+                try:
+                    image_data = None
+                    
+                    # Handle data URIs (base64 encoded images)
+                    if src.startswith('data:image/'):
+                        # Extract base64 data
+                        match = re.match(r'data:image/[^;]+;base64,(.+)', src)
+                        if match:
+                            image_data = base64.b64decode(match.group(1))
+                    
+                    # Handle file paths
+                    elif not src.startswith(('http://', 'https://', 'blob:')):
+                        # Try to read from file system
+                        file_path = Path(src)
+                        if not file_path.is_absolute():
+                            # Try relative to workspace
+                            file_path = Path('/workspace') / src.lstrip('/')
+                        
+                        if file_path.exists() and file_path.is_file():
+                            with open(file_path, 'rb') as f:
+                                image_data = f.read()
+                    
+                    # If we have image data, embed it
+                    if image_data:
+                        # Create temporary file for the image
+                        with tempfile.NamedTemporaryFile(delete=False, suffix='.tmp') as temp_file:
+                            temp_file.write(image_data)
+                            temp_file_path = temp_file.name
+                        
+                        try:
+                            # Add image to document
+                            paragraph = self.document.add_paragraph()
+                            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            paragraph.paragraph_format.space_before = Pt(12)
+                            paragraph.paragraph_format.space_after = Pt(12)
+                            
+                            # Add the image with appropriate sizing
+                            run = paragraph.add_run()
+                            picture = run.add_picture(temp_file_path, width=Inches(5.5))
+                            image_embedded = True
+                            
+                            # Add caption if alt text exists
+                            if alt_text and alt_text.lower() != 'image':
+                                caption_paragraph = self.document.add_paragraph(style='IrisBodyText')
+                                caption_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                                caption_paragraph.paragraph_format.space_before = Pt(4)
+                                caption_paragraph.paragraph_format.space_after = Pt(12)
+                                caption_run = caption_paragraph.add_run(alt_text)
+                                caption_run.italic = True
+                                caption_run.font.size = Pt(10)
+                                caption_run.font.color.rgb = RGBColor(107, 114, 128)
+                        finally:
+                            # Clean up temporary file
+                            try:
+                                os.unlink(temp_file_path)
+                            except:
+                                pass
+                except Exception as e:
+                    print(f"Failed to embed image: {e}")
+                    pass
+            
+            # If image embedding failed, show placeholder
+            if not image_embedded:
+                paragraph = self.document.add_paragraph(style='IrisBodyText')
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                paragraph.paragraph_format.space_before = Pt(12)
+                paragraph.paragraph_format.space_after = Pt(12)
+                
+                img_run = paragraph.add_run(f'[Image: {alt_text}]')
+                img_run.italic = True
+                img_run.font.color.rgb = RGBColor(107, 114, 128)
+                img_run.font.size = Pt(11)
+                
+                if src and not src.startswith('data:'):
+                    ref_run = paragraph.add_run(f'\n({src})')
+                    ref_run.font.size = Pt(9)
+                    ref_run.font.color.rgb = RGBColor(156, 163, 175)
+                    ref_run.font.italic = True
 
         else:
             for child in element.children:
@@ -479,9 +562,9 @@ class HTMLToDocxConverter:
         elif tag in ['s', 'del', 'strike']:
             new_formatting['strike'] = True
         elif tag == 'code':
-            new_formatting['font_name'] = 'Consolas'
+            new_formatting['font_name'] = 'Courier New'
             new_formatting['font_size'] = Pt(10)
-            new_formatting['color'] = RGBColor(220, 38, 127)  # Professional code color
+            new_formatting['color'] = RGBColor(200, 0, 0)  # Red for inline code
         elif tag == 'span':
             pass
         elif tag == 'br':
