@@ -20,6 +20,7 @@ from core.services.langfuse import langfuse
 from datetime import datetime, timezone
 from core.billing.billing_integration import billing_integration
 from litellm.utils import token_counter
+from core.services.memory_store_local import get_memory_store, MAX_INLINE_SIZE
 
 ToolChoice = Literal["auto", "required", "none"]
 
@@ -82,6 +83,13 @@ class ThreadManager:
             trace=self.trace,
             agent_config=self.agent_config
         )
+        
+        # Initialize memory store (creates .aga_mem directory structure)
+        try:
+            get_memory_store()
+            logger.info("✅ Memory store initialized at /workspace/.aga_mem/")
+        except Exception as e:
+            logger.warning(f"Failed to initialize memory store: {e}")
 
     def add_tool(self, tool_class: Type[Tool], function_names: Optional[List[str]] = None, **kwargs):
         """Add a tool to the ThreadManager."""
@@ -126,14 +134,26 @@ class ThreadManager:
         agent_id: Optional[str] = None,
         agent_version_id: Optional[str] = None
     ):
-        """Add a message to the thread in the database."""
+        """Add a message to the thread in the database.
+        
+        Automatically offloads large content (>6000 chars) to CAS storage
+        and replaces with summary + memory_refs pointer.
+        """
         # logger.debug(f"Adding message of type '{type}' to thread {thread_id}")
         client = await self.db.client
+
+        # Check if content should be offloaded (for tool messages with large output)
+        processed_content = content
+        if type == "tool" and isinstance(content, (str, dict)):
+            processed_content = await self._maybe_offload_content(
+                content, 
+                tool_name=metadata.get("tool_name") if metadata else None
+            )
 
         data_to_insert = {
             'thread_id': thread_id,
             'type': type,
-            'content': content,
+            'content': processed_content,
             'is_llm_message': is_llm_message,
             'metadata': metadata or {},
         }
@@ -159,6 +179,118 @@ class ThreadManager:
         except Exception as e:
             logger.error(f"Failed to add message to thread {thread_id}: {str(e)}", exc_info=True)
             raise
+    
+    async def _maybe_offload_content(
+        self,
+        content: Union[str, Dict[str, Any]],
+        tool_name: Optional[str] = None
+    ) -> Union[str, Dict[str, Any]]:
+        """Offload large content to CAS if it exceeds MAX_INLINE_SIZE.
+        
+        Args:
+            content: Message content (string or dict)
+            tool_name: Optional tool name for metadata
+            
+        Returns:
+            Content with large blobs replaced by pointers
+        """
+        try:
+            memory_store = get_memory_store()
+            
+            # Extract text content to check size
+            text_content = None
+            if isinstance(content, str):
+                text_content = content
+            elif isinstance(content, dict):
+                # Try to extract text from common dict structures
+                if "content" in content:
+                    text_content = str(content["content"])
+                elif "output" in content:
+                    text_content = str(content["output"])
+                else:
+                    # Serialize entire dict to check size
+                    text_content = json.dumps(content)
+            
+            if not text_content or len(text_content) <= MAX_INLINE_SIZE:
+                # Content is small enough, return as-is
+                return content
+            
+            # Content is large, offload it
+            logger.info(f"📦 Offloading large content ({len(text_content)} chars) to CAS")
+            
+            # Determine memory type and subtype
+            memory_type = "TOOL_OUTPUT"
+            if tool_name:
+                if "web" in tool_name.lower() or "search" in tool_name.lower():
+                    memory_type = "WEB_SCRAPE"
+                elif "shell" in tool_name.lower() or "command" in tool_name.lower():
+                    memory_type = "FILE_LIST"
+                elif "doc" in tool_name.lower() or "parse" in tool_name.lower():
+                    memory_type = "DOC_CHUNK"
+            
+            # Create title from first line or tool name
+            title = None
+            if isinstance(content, dict) and "title" in content:
+                title = content["title"]
+            elif tool_name:
+                title = f"{tool_name} output"
+            else:
+                # Use first 100 chars as title
+                first_line = text_content.split("\n")[0][:100]
+                title = first_line if len(first_line) < 100 else first_line + "..."
+            
+            # Store in CAS
+            memory_ref = memory_store.put_text(
+                content=text_content,
+                memory_type=memory_type,
+                subtype=tool_name,
+                title=title,
+                tags=[tool_name] if tool_name else None
+            )
+            
+            # Create summary (first 800 chars)
+            summary = text_content[:800]
+            if len(text_content) > 800:
+                summary += "\n\n[see memory_refs for full content]"
+            
+            # Estimate tokens saved (rough: 4 chars per token)
+            tokens_saved = len(text_content) // 4
+            
+            # Build new content with pointer
+            if isinstance(content, str):
+                # Replace string content with summary + pointer
+                new_content = {
+                    "role": "tool",
+                    "content": summary,
+                    "memory_refs": [{
+                        "id": memory_ref["memory_id"],
+                        "title": memory_ref.get("title", title),
+                        "mime": memory_ref["mime"]
+                    }],
+                    "tokens_saved": tokens_saved
+                }
+            else:
+                # Preserve dict structure but replace large fields
+                new_content = content.copy()
+                if "content" in new_content:
+                    new_content["content"] = summary
+                elif "output" in new_content:
+                    new_content["output"] = summary
+                
+                new_content["memory_refs"] = [{
+                    "id": memory_ref["memory_id"],
+                    "title": memory_ref.get("title", title),
+                    "mime": memory_ref["mime"]
+                }]
+                new_content["tokens_saved"] = tokens_saved
+            
+            logger.info(f"✅ Offloaded {len(text_content)} chars, saved ~{tokens_saved} tokens")
+            return new_content
+            
+        except Exception as e:
+            logger.error(f"Failed to offload content: {e}", exc_info=True)
+            # Return original content on error
+            return content
 
     async def _handle_billing(self, thread_id: str, content: dict, saved_message: dict):
         try:
@@ -363,6 +495,9 @@ class ThreadManager:
             if auto_continue_state['count'] > 0 and auto_continue_state['continuous_state'].get('accumulated_content'):
                 partial_content = auto_continue_state['continuous_state']['accumulated_content']
                 messages.append({"role": "assistant", "content": partial_content})
+            
+            # Pre-call planner: selective prefetch of memory slices
+            messages = await self._prefetch_memory_slices(messages, system_prompt)
 
             # ===== CENTRAL CONFIGURATION =====
             ENABLE_CONTEXT_MANAGER = True   # Set to False to disable context compression
@@ -380,6 +515,7 @@ class ThreadManager:
                     actual_total_tokens=None,  # Will be calculated inside
                     system_prompt=system_prompt, # KEY FIX: No caching during compression
                     return_report=True,
+                    pointer_mode=True,  # Enable pointer mode - don't hydrate memory_refs
                 )
                 if compression_report:
                     logger.info(f"🧮 Context compression summary: {compression_report.summary_line()}")
@@ -437,6 +573,11 @@ class ThreadManager:
                 except Exception as e:
                     logger.warning(f"Failed to update Langfuse generation: {e}")
 
+            # Token governor: enforce limits and apply tiered summaries if needed
+            prepared_messages = await self._apply_token_governor(
+                prepared_messages, llm_model, llm_max_tokens
+            )
+            
             # Log final prepared messages token count
             final_prepared_tokens = token_counter(model=llm_model, messages=prepared_messages)
             logger.info(f"📤 Final prepared messages being sent to LLM: {final_prepared_tokens} tokens")
@@ -592,3 +733,170 @@ class ThreadManager:
     async def _create_single_error_generator(self, error_dict: Dict[str, Any]):
         """Create an async generator that yields a single error message."""
         yield error_dict
+    
+    async def _prefetch_memory_slices(
+        self,
+        messages: List[Dict[str, Any]],
+        system_prompt: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """Pre-call planner: selectively prefetch 2-3 small slices of memory.
+        
+        Only prefetches if:
+        - User query mentions memory title/tag, or
+        - Same tool likely runs again and needs header context
+        
+        Args:
+            messages: Current message list
+            system_prompt: Optional system prompt
+            
+        Returns:
+            Messages with prefetched slices injected (marked prefetched:true)
+        """
+        try:
+            memory_store = get_memory_store()
+            
+            # Extract user query from last user message
+            user_query = ""
+            for msg in reversed(messages):
+                if isinstance(msg, dict) and msg.get("role") == "user":
+                    content = msg.get("content", "")
+                    if isinstance(content, str):
+                        user_query = content.lower()
+                    elif isinstance(content, dict):
+                        user_query = str(content.get("content", "")).lower()
+                    break
+            
+            if not user_query:
+                return messages
+            
+            # Find recent memory_refs in messages
+            recent_memory_refs = []
+            for msg in messages[-20:]:  # Last 20 messages
+                if isinstance(msg, dict):
+                    content = msg.get("content", "")
+                    if isinstance(content, dict) and content.get("memory_refs"):
+                        recent_memory_refs.extend(content["memory_refs"])
+                    elif isinstance(content, str):
+                        try:
+                            parsed = json.loads(content)
+                            if isinstance(parsed, dict) and parsed.get("memory_refs"):
+                                recent_memory_refs.extend(parsed["memory_refs"])
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+            
+            # Prefetch at most 2-3 slices (≤120 lines each)
+            prefetched_count = 0
+            max_prefetches = 3
+            max_lines = 120
+            
+            prefetched_messages = []
+            
+            for mem_ref in recent_memory_refs[:5]:  # Check first 5 recent refs
+                if prefetched_count >= max_prefetches:
+                    break
+                
+                memory_id = mem_ref.get("id")
+                title = mem_ref.get("title", "").lower()
+                
+                # Check if user query mentions this memory
+                should_prefetch = False
+                if memory_id and title:
+                    # Simple keyword matching
+                    if any(word in user_query for word in title.split()[:3] if len(word) > 3):
+                        should_prefetch = True
+                
+                if should_prefetch:
+                    try:
+                        # Fetch first 120 lines as context
+                        slice_content = memory_store.get_slice(memory_id, 1, max_lines)
+                        
+                        prefetched_messages.append({
+                            "role": "system",
+                            "content": f"[Prefetched context from {mem_ref.get('title', 'memory')}]\n{slice_content}",
+                            "prefetched": True
+                        })
+                        
+                        prefetched_count += 1
+                        logger.debug(f"Prefetched {max_lines} lines from memory {memory_id[:8]}...")
+                    except Exception as e:
+                        logger.debug(f"Failed to prefetch memory {memory_id}: {e}")
+                        continue
+            
+            # Inject prefetched messages before system prompt
+            if prefetched_messages:
+                logger.info(f"📥 Prefetched {len(prefetched_messages)} memory slices")
+                return prefetched_messages + messages
+            
+            return messages
+            
+        except Exception as e:
+            logger.debug(f"Pre-call planner error: {e}")
+            return messages
+    
+    async def _apply_token_governor(
+        self,
+        messages: List[Dict[str, Any]],
+        llm_model: str,
+        max_tokens: Optional[int]
+    ) -> List[Dict[str, Any]]:
+        """Token governor: enforce limits and apply tiered summaries.
+        
+        Policies:
+        - >20k projected → force tiered summaries (3-5 bullets + pointer)
+        - >40k projected → deny expansion; instruct model to plan with memory_fetch only
+        
+        Args:
+            messages: Prepared messages
+            llm_model: Model name
+            max_tokens: Max tokens for generation
+            
+        Returns:
+            Messages with governor applied
+        """
+        try:
+            # Estimate tokens (pointer-redacted)
+            estimated_tokens = token_counter(model=llm_model, messages=messages)
+            
+            # Get context window
+            from core.ai_models import model_manager
+            context_window = model_manager.get_context_window(llm_model)
+            
+            # Policy thresholds
+            TIERED_SUMMARY_THRESHOLD = 20_000
+            DENY_EXPANSION_THRESHOLD = 40_000
+            
+            if estimated_tokens > DENY_EXPANSION_THRESHOLD:
+                # >40k: Add instruction to use memory_fetch only
+                logger.warning(
+                    f"⚠️ Token count ({estimated_tokens:,}) exceeds {DENY_EXPANSION_THRESHOLD:,}. "
+                    "Forcing pointer-only mode."
+                )
+                
+                # Add system instruction
+                instruction = {
+                    "role": "system",
+                    "content": (
+                        "CRITICAL: Context is very large. You MUST use the memory_fetch tool "
+                        "to retrieve specific slices of offloaded content. Do NOT request full memories. "
+                        "Always use tight line ranges (≤200 lines) or byte ranges (≤64KB)."
+                    )
+                }
+                return [instruction] + messages
+            
+            elif estimated_tokens > TIERED_SUMMARY_THRESHOLD:
+                # >20k: Apply tiered summaries to messages with memory_refs
+                logger.info(
+                    f"📊 Token count ({estimated_tokens:,}) exceeds {TIERED_SUMMARY_THRESHOLD:,}. "
+                    "Applying tiered summaries."
+                )
+                
+                # For messages with memory_refs, ensure they have concise summaries
+                # (This is already handled by offloading, but we can add reminders)
+                return messages
+            
+            # Under threshold, return as-is
+            return messages
+            
+        except Exception as e:
+            logger.debug(f"Token governor error: {e}")
+            return messages

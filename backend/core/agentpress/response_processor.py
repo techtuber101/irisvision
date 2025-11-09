@@ -1768,6 +1768,11 @@ class ResponseProcessor:
                 logger.debug(f"Linking tool result to assistant message: {assistant_message_id}")
                 self.trace.event(name="linking_tool_result_to_assistant_message", level="DEFAULT", status_message=(f"Linking tool result to assistant message: {assistant_message_id}"))
             
+            # Extract tool name for memory offloading
+            function_name = tool_call.get("function_name") or tool_call.get("name") or ""
+            if function_name:
+                metadata["tool_name"] = function_name
+            
             # --- Add parsing details to metadata if available ---
             if parsing_details:
                 metadata["parsing_details"] = parsing_details
@@ -1778,7 +1783,10 @@ class ResponseProcessor:
             # Check if this is a native function call (has id field)
             if "id" in tool_call:
                 # Format as a proper tool message according to OpenAI spec
-                function_name = tool_call.get("function_name", "")
+                function_name = tool_call.get("function_name", "") or tool_call.get("name", "")
+                # Ensure tool_name is in metadata for memory offloading
+                if function_name and "tool_name" not in metadata:
+                    metadata["tool_name"] = function_name
                 
                 # Format the tool result content - tool role needs string content
                 if isinstance(result, str):
