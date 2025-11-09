@@ -522,6 +522,7 @@ Message:
         system_prompt: Optional[Dict[str, Any]] = None,
         return_report: bool = False,
         report: Optional[CompressionReport] = None,
+        pointer_mode: bool = False,
     ) -> Union[List[Dict[str, Any]], Tuple[List[Dict[str, Any]], CompressionReport]]:
         """Compress the messages WITHOUT applying caching during iterations.
 
@@ -531,6 +532,10 @@ Message:
         - Keep recent messages (last 10) unsummarized for fresh context
 
         Caching should be applied ONCE at the end by the caller, not during compression.
+        
+        Args:
+            pointer_mode: If True, preserve memory_refs without hydration. Only summarize/truncate
+                         the inline short content. Never expand pointers. (default: False)
         """
         context_window = model_manager.get_context_window(llm_model)
 
@@ -547,6 +552,10 @@ Message:
             max_tokens = max_tokens or (context_window - 8_000)
 
         result = self.remove_meta_messages(messages)
+        
+        # In pointer_mode, preserve memory_refs and only work with inline content
+        if pointer_mode:
+            logger.debug("Pointer mode enabled: preserving memory_refs, compressing only inline content")
 
         if actual_total_tokens is not None:
             uncompressed_total_token_count = actual_total_tokens
@@ -581,7 +590,16 @@ Message:
             regular_messages_indices: List[int] = []
 
             for i, msg in enumerate(result):
-                if self.is_tool_related_message(msg):
+                # In pointer_mode, check if message has memory_refs to preserve
+                has_memory_refs = False
+                if pointer_mode and isinstance(msg, dict):
+                    metadata = msg.get('metadata', {})
+                    if isinstance(metadata, dict) and metadata.get('memory_refs'):
+                        has_memory_refs = True
+                        logger.debug(f"Message {i} has memory_refs, preserving as tool-related")
+                
+                # Treat messages with memory_refs as tool-related (preserve them)
+                if self.is_tool_related_message(msg) or has_memory_refs:
                     tool_messages_indices.append(i)
                 else:
                     regular_messages_indices.append(i)
@@ -615,6 +633,14 @@ Message:
 
                 if msg.get('_summarized'):
                     continue
+                
+                # In pointer_mode, skip summarization if message has memory_refs
+                # (content is already offloaded, just keep the short inline summary)
+                if pointer_mode and isinstance(msg, dict):
+                    metadata = msg.get('metadata', {})
+                    if isinstance(metadata, dict) and metadata.get('memory_refs'):
+                        logger.debug(f"Skipping summarization for message {idx} with memory_refs (pointer mode)")
+                        continue
 
                 original_tokens = token_counter(model=llm_model, messages=[msg])
 
