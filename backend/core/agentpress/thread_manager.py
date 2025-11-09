@@ -83,7 +83,8 @@ class ThreadManager:
             tool_registry=self.tool_registry,
             add_message_callback=self.add_message,
             trace=self.trace,
-            agent_config=self.agent_config
+            agent_config=self.agent_config,
+            context_offloader=None  # Will be initialized per-thread with KV store
         )
 
     def add_tool(self, tool_class: Type[Tool], function_names: Optional[List[str]] = None, **kwargs):
@@ -243,29 +244,33 @@ class ThreadManager:
         except Exception as e:
             logger.error(f"Error handling billing: {str(e)}", exc_info=True)
 
-    async def get_llm_messages(self, thread_id: str) -> List[Dict[str, Any]]:
-        """Get all messages for a thread."""
+    async def get_llm_messages(self, thread_id: str, max_messages: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get messages for a thread, with optional limit to prevent loading thousands.
+        
+        Args:
+            thread_id: Thread ID
+            max_messages: Maximum number of messages to load (default: 500). 
+                         If None, loads all messages (not recommended for long threads).
+        """
         logger.debug(f"Getting messages for thread {thread_id}")
         client = await self.db.client
 
         try:
-            all_messages = []
-            batch_size = 1000
-            offset = 0
+            # Default limit to prevent excessive token usage
+            if max_messages is None:
+                max_messages = 500  # Reasonable default - context compression will handle the rest
             
-            while True:
-                result = await client.table('messages').select('message_id, type, content').eq('thread_id', thread_id).eq('is_llm_message', True).order('created_at').range(offset, offset + batch_size - 1).execute()
-                
-                if not result.data:
-                    break
-                    
-                all_messages.extend(result.data)
-                if len(result.data) < batch_size:
-                    break
-                offset += batch_size
-
-            if not all_messages:
+            # Load messages in reverse order (newest first) and limit
+            result = await client.table('messages').select('message_id, type, content').eq('thread_id', thread_id).eq('is_llm_message', True).order('created_at', desc=True).limit(max_messages).execute()
+            
+            if not result.data:
                 return []
+
+            # Reverse to get chronological order (oldest first)
+            all_messages = list(reversed(result.data))
+            
+            if len(all_messages) >= max_messages:
+                logger.warning(f"⚠️ Message history truncated: loaded {max_messages} most recent messages (thread may have more). Context compression will handle summarization.")
 
             messages = []
             for item in all_messages:
@@ -281,6 +286,7 @@ class ThreadManager:
                     content['message_id'] = item['message_id']
                     messages.append(content)
 
+            logger.debug(f"Loaded {len(messages)} messages for thread {thread_id}")
             return messages
 
         except Exception as e:
@@ -376,12 +382,19 @@ class ThreadManager:
             compression_report = None
             if ENABLE_CONTEXT_MANAGER:
                 logger.debug(f"Context manager enabled, compressing {len(messages)} messages")
-                # Pass KV store to ContextManager if available for caching summaries
-                if hasattr(self, 'kv_store') and self.kv_store:
-                    context_manager = ContextManager(kv_store=self.kv_store)
-                    logger.debug("ContextManager initialized with KV cache support")
-                else:
-                    context_manager = ContextManager()
+kv_store_for_context = kv_store
+                
+                # Initialize ContextOffloader for ResponseProcessor
+                from core.agentpress.context_offloader import ContextOffloader
+                context_offloader = ContextOffloader(
+                    kv_store_for_context,
+                    trace=self.response_processor.trace if kv_store_for_context else None,
+                ) if kv_store_for_context else None
+                if context_offloader:
+                    self.response_processor.context_offloader = context_offloader
+                    logger.debug(f"✅ ContextOffloader initialized for thread {thread_id}")
+                
+                context_manager = ContextManager(kv_store=kv_store_for_context)
 
                 compressed_messages, compression_report = await context_manager.compress_messages(
                     messages, llm_model, max_tokens=llm_max_tokens, 
@@ -395,6 +408,18 @@ class ThreadManager:
                 else:
                     logger.debug(f"Context compression completed (no report): {len(messages)} -> {len(compressed_messages)} messages")
                 messages = compressed_messages
+                
+                # Intelligent on-demand expansion: Recent messages expanded automatically
+                # Older messages keep references - LLM can access them instantly via get_artifact() if needed
+                # This gives LLM instant access to recent content while saving tokens on older content
+                if context_offloader:
+                    messages = await context_offloader.expand_cached_references(
+                        messages, 
+                        auto_expand=True,
+                        expand_recent_only=True,  # Only expand references from recent messages
+                        recent_message_count=10   # Last 10 messages automatically expanded
+                    )
+                    logger.debug(f"✅ On-demand expansion: Recent messages expanded, older messages keep references")
             else:
                 logger.debug("Context manager disabled, using raw messages")
 

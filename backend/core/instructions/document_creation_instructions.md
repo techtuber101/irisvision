@@ -102,6 +102,75 @@ When `convert_to_pdf` tool completes successfully, follow this EXACT sequence:
 ❌ convert_to_pdf → complete tool → additional messages
 ❌ convert_to_pdf → complete tool without PDF attachment
 
+## Graph Creation Workflow (MANDATORY for Document Creation Tasks)
+
+### CRITICAL: All document creation tasks MUST include graphs
+
+**For ANY document creation task, you MUST:**
+1. Complete research first using `web_search`
+2. Create 2-3 graphs (preference: 2 or 3 graphs)
+3. Embed graphs properly in the document
+4. Explain each graph thoroughly
+
+### Step-by-Step Graph Creation Process
+
+#### Step 1: Install Matplotlib (After Research)
+**MANDATORY:** After completing research, immediately install matplotlib:
+```
+execute_command: pip install matplotlib
+```
+
+#### Step 2: Create Python Files for Graphs
+- Create 2-3 Python files consecutively (e.g., `graph1.py`, `graph2.py`, `graph3.py`)
+- Each file should create one graph
+- Use descriptive variable names
+- Include proper labels, titles, legends, and formatting
+- Save graphs at high resolution (300 DPI minimum)
+- Use appropriate graph types based on data (line, bar, pie, scatter, etc.)
+
+**After creating all Python files, you MUST say:**
+"I am done making the python files"
+
+#### Step 3: Export All Graphs in One Command
+**CRITICAL:** Run ONLY ONE command that exports all graphs, joining commands strictly with `&&`:
+```
+execute_command: python graph1.py && python graph2.py && python graph3.py
+```
+
+**Requirements:**
+- Use `&&` to join ALL graph export commands
+- Run in a SINGLE command (not multiple separate commands)
+- All graphs must be exported successfully
+
+#### Step 4: Embed Graphs in Document
+- Paste all graphs correctly in the document using proper image paths
+- Place graphs strategically within the narrative flow
+- Ensure graphs are properly sized and formatted
+
+#### Step 5: Explain Each Graph (MANDATORY)
+**For EACH graph, you MUST include:**
+1. **What the graph is:** Clear description of the graph type and data shown
+2. **Why it's there:** Explain the purpose and relevance to the document topic
+3. **What it shows:** Detailed explanation of insights, trends, patterns, or findings
+
+**Example Graph Explanation Format:**
+```html
+<h3>Market Growth Trends</h3>
+<p><img src="graph1.png" alt="Market Growth Trends" /></p>
+<p><strong>What this graph is:</strong> A line chart showing market growth trends over the past 5 years.</p>
+<p><strong>Why it's here:</strong> This graph demonstrates the overall market trajectory and helps readers understand the growth context for our analysis.</p>
+<p><strong>What it shows:</strong> The graph reveals a steady upward trend with a 15% year-over-year growth rate, indicating strong market expansion. The peak in 2023 suggests a significant market opportunity that aligns with our recommendations.</p>
+```
+
+### Graph Creation Checklist
+- [ ] Research completed first
+- [ ] Matplotlib installed after research
+- [ ] 2-3 Python graph files created consecutively
+- [ ] "I am done making the python files" message sent
+- [ ] All graphs exported in ONE command using `&&`
+- [ ] All graphs properly embedded in document
+- [ ] Each graph has explanation covering: what it is, why it's there, what it shows
+
 ## Comprehensive Document Checklist
 - [ ] format="html" specified
 - [ ] All bold text uses `<strong>` tags
@@ -109,5 +178,7 @@ When `convert_to_pdf` tool completes successfully, follow this EXACT sequence:
 - [ ] Proper heading hierarchy (H1 → H2 → H3)
 - [ ] Tables properly formatted
 - [ ] Images integrated (if applicable)
+- [ ] **2-3 graphs created and embedded (MANDATORY)**
+- [ ] **Each graph explained (what it is, why it's there, what it shows)**
 - [ ] Professional structure and layout
 - [ ] PDF conversion follows correct workflow

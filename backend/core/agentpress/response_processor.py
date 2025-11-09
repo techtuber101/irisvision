@@ -27,6 +27,7 @@ from core.utils.json_helpers import (
     to_json_string, format_for_yield
 )
 from litellm import token_counter
+from core.agentpress.context_offloader import ContextOffloader
 
 # Type alias for XML result adding strategy
 XmlAddingStrategy = Literal["user_message", "assistant_message", "inline_edit"]
@@ -87,7 +88,7 @@ class ProcessorConfig:
 class ResponseProcessor:
     """Processes LLM responses, extracting and executing tool calls."""
     
-    def __init__(self, tool_registry: ToolRegistry, add_message_callback: Callable, trace: Optional[StatefulTraceClient] = None, agent_config: Optional[dict] = None):
+    def __init__(self, tool_registry: ToolRegistry, add_message_callback: Callable, trace: Optional[StatefulTraceClient] = None, agent_config: Optional[dict] = None, context_offloader: Optional[ContextOffloader] = None):
         """Initialize the ResponseProcessor.
         
         Args:
@@ -95,6 +96,7 @@ class ResponseProcessor:
             add_message_callback: Callback function to add messages to the thread.
                 MUST return the full saved message object (dict) or None.
             agent_config: Optional agent configuration with version information
+            context_offloader: Optional ContextOffloader for automatic content caching
         """
         self.tool_registry = tool_registry
         self.add_message = add_message_callback
@@ -108,6 +110,7 @@ class ResponseProcessor:
         self.is_agent_builder = False  # Deprecated - keeping for compatibility
         self.target_agent_id = None  # Deprecated - keeping for compatibility
         self.agent_config = agent_config
+        self.context_offloader = context_offloader
 
     async def _yield_message(self, message_obj: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """Helper to yield a message with proper formatting.
@@ -1782,18 +1785,39 @@ class ResponseProcessor:
                 
                 # Format the tool result content - tool role needs string content
                 if isinstance(result, str):
-                    content = result
+                    raw_content = result
                 elif hasattr(result, 'output'):
                     # If it's a ToolResult object
                     if isinstance(result.output, dict) or isinstance(result.output, list):
                         # If output is already a dict or list, convert to JSON string
-                        content = json.dumps(result.output)
+                        raw_content = json.dumps(result.output)
                     else:
                         # Otherwise just use the string representation
-                        content = str(result.output)
+                        raw_content = str(result.output)
                 else:
                     # Fallback to string representation of the whole result
-                    content = str(result)
+                    raw_content = str(result)
+                
+                # Use ContextOffloader to automatically cache large outputs
+                offloader = await self._get_context_offloader(thread_id)
+                if offloader:
+                    function_name = tool_call.get("function_name", "unknown")
+                    tool_call_id = tool_call.get("id")
+                    
+                    reference = await offloader.offload_tool_output(
+                        tool_output=raw_content,
+                        tool_name=function_name,
+                        tool_call_id=tool_call_id,
+                        metadata={"thread_id": thread_id}
+                    )
+                    
+                    if reference:
+                        # Use reference instead of full content
+                        content = json.dumps(offloader.create_reference_message(reference, raw_content))
+                    else:
+                        content = raw_content
+                else:
+                    content = raw_content
                 
                 logger.debug(f"Formatted tool result content: {content[:100]}...")
                 self.trace.event(name="formatted_tool_result_content", level="DEFAULT", status_message=(f"Formatted tool result content: {content[:100]}..."))
@@ -1824,11 +1848,28 @@ class ResponseProcessor:
             # Determine message role based on strategy
             result_role = "user" if strategy == "user_message" else "assistant"
             
+            # Use ContextOffloader to automatically cache large outputs
+            output = result.output if hasattr(result, 'output') else str(result)
+            offloader = await self._get_context_offloader(thread_id)
+            
+            reference = None
+            if offloader:
+                function_name = tool_call.get("function_name", "unknown")
+                tool_call_id = tool_call.get("id")
+                
+                reference = await offloader.offload_tool_output(
+                    tool_output=output,
+                    tool_name=function_name,
+                    tool_call_id=tool_call_id,
+                    metadata={"thread_id": thread_id}
+                )
+            
             # Create two versions of the structured result
-            # 1. Rich version for the frontend
+            # 1. Rich version for the frontend (always full output)
             structured_result_for_frontend = self._create_structured_tool_result(tool_call, result, parsing_details, for_llm=False)
-            # 2. Concise version for the LLM
-            structured_result_for_llm = self._create_structured_tool_result(tool_call, result, parsing_details, for_llm=True)
+            # 2. Concise version for the LLM (with KV cache reference if stored)
+            artifact_key = reference.get("artifact_key") if reference else None
+            structured_result_for_llm = self._create_structured_tool_result(tool_call, result, parsing_details, for_llm=True, artifact_key=artifact_key)
 
             # Add the message with the appropriate role to the conversation history
             # This allows the LLM to see the tool result in subsequent interactions
@@ -1882,7 +1923,57 @@ class ResponseProcessor:
                 self.trace.event(name="failed_even_with_fallback_message", level="ERROR", status_message=(f"Failed even with fallback message: {str(e2)}"), metadata={"tool_call": tool_call, "result": result, "strategy": strategy, "assistant_message_id": assistant_message_id, "parsing_details": parsing_details})
                 return None # Return None on error
 
-    def _create_structured_tool_result(self, tool_call: Dict[str, Any], result: ToolResult, parsing_details: Optional[Dict[str, Any]] = None, for_llm: bool = False):
+    async def _get_context_offloader(self, thread_id: str) -> Optional[ContextOffloader]:
+        """Get or create ContextOffloader for this thread.
+        
+        Args:
+            thread_id: Thread ID to get project_id
+            
+        Returns:
+            ContextOffloader instance or None if unavailable
+        """
+        # Use cached offloader if available
+        if self.context_offloader:
+            return self.context_offloader
+        
+        try:
+            # Get project_id from thread
+            from core.services.supabase import DBConnection
+            from core.sandbox.sandbox import get_or_start_sandbox
+            from core.sandbox.kv_store import SandboxKVStore
+            
+            db = DBConnection()
+            client = await db.client
+            thread_result = await client.table('threads').select('project_id').eq('thread_id', thread_id).execute()
+            
+            if not thread_result.data or len(thread_result.data) == 0:
+                return None
+            
+            project_id = thread_result.data[0].get('project_id')
+            if not project_id:
+                return None
+            
+            # Get sandbox and KV store
+            project_result = await client.table('projects').select('sandbox').eq('project_id', project_id).execute()
+            if not project_result.data or len(project_result.data) == 0:
+                return None
+            
+            sandbox_info = project_result.data[0].get('sandbox', {})
+            if not sandbox_info.get('id'):
+                return None
+            
+            sandbox = await get_or_start_sandbox(sandbox_info['id'])
+            kv_store = SandboxKVStore(sandbox)
+            
+            # Create and cache offloader
+            self.context_offloader = ContextOffloader(kv_store)
+            return self.context_offloader
+            
+        except Exception as e:
+            logger.debug(f"Could not create ContextOffloader: {e}")
+            return None
+    
+    def _create_structured_tool_result(self, tool_call: Dict[str, Any], result: ToolResult, parsing_details: Optional[Dict[str, Any]] = None, for_llm: bool = False, artifact_key: Optional[str] = None):
         """Create a structured tool result format that's tool-agnostic and provides rich information.
         
         Args:
@@ -1890,6 +1981,7 @@ class ResponseProcessor:
             result: The result from the tool execution
             parsing_details: Optional parsing details for XML calls
             for_llm: If True, creates a concise version for the LLM context.
+            artifact_key: Optional KV cache artifact key if output was stored
             
         Returns:
             Structured dictionary containing tool execution information
@@ -1902,6 +1994,8 @@ class ResponseProcessor:
         
         # Process the output - if it's a JSON string, parse it back to an object
         output = result.output if hasattr(result, 'output') else str(result)
+        original_output = output
+        
         if isinstance(output, str):
             try:
                 # Try to parse as JSON to provide structured data to frontend
@@ -1913,6 +2007,27 @@ class ResponseProcessor:
             except Exception:
                 # If parsing fails, keep the original string
                 pass
+
+        # For LLM version: if artifact_key exists, replace output with reference
+        if for_llm and artifact_key:
+            # Create a concise reference instead of full output
+            output_size = len(str(original_output))
+            if isinstance(original_output, str):
+                # Show first 500 chars as preview
+                preview = original_output[:500] + "..." if len(original_output) > 500 else original_output
+            elif isinstance(original_output, (dict, list)):
+                output_str = json.dumps(original_output)
+                preview = output_str[:500] + "..." if len(output_str) > 500 else output_str
+            else:
+                preview = str(original_output)[:500]
+            
+            output = {
+                "_cached": True,
+                "artifact_key": artifact_key,
+                "preview": preview,
+                "size_bytes": output_size,
+                "note": f"Full output stored in KV cache (artifact: {artifact_key}). Use get_artifact(key='{artifact_key}') to retrieve."
+            }
 
         structured_result_v1 = {
             "tool_execution": {

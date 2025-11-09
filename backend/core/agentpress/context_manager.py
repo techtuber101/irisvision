@@ -110,8 +110,8 @@ class CompressionReport:
             f"removed={self.removed_messages}, failures={self.summary_failures}"
         )
 
-DEFAULT_TOKEN_THRESHOLD = 70_000
-SUMMARIZATION_TOKEN_THRESHOLD = 40_000  # Trigger summarization once context crosses ~40k tokens
+DEFAULT_TOKEN_THRESHOLD = 50_000  # Lowered from 70k to trigger compression earlier
+SUMMARIZATION_TOKEN_THRESHOLD = 30_000  # Trigger summarization earlier (~30k tokens)
 
 class ContextManager:
     """Manages thread context including token counting and summarization."""
