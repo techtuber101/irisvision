@@ -67,7 +67,7 @@ token_usage_tracker = RollingTokenUsageTracker()
 class ThreadManager:
     """Manages conversation threads with LLM models and tool execution."""
 
-    def __init__(self, trace: Optional[StatefulTraceClient] = None, agent_config: Optional[dict] = None):
+    def __init__(self, trace: Optional[StatefulTraceClient] = None, agent_config: Optional[dict] = None, project_id: Optional[str] = None):
         self.db = DBConnection()
         self.tool_registry = ToolRegistry()
         
@@ -76,6 +76,9 @@ class ThreadManager:
             self.trace = langfuse.trace(name="anonymous:thread_manager")
             
         self.agent_config = agent_config
+        self.project_id = project_id
+        self.kv_store = None  # Will be initialized async in setup if project_id provided
+        
         self.response_processor = ResponseProcessor(
             tool_registry=self.tool_registry,
             add_message_callback=self.add_message,
@@ -373,7 +376,12 @@ class ThreadManager:
             compression_report = None
             if ENABLE_CONTEXT_MANAGER:
                 logger.debug(f"Context manager enabled, compressing {len(messages)} messages")
-                context_manager = ContextManager()
+                # Pass KV store to ContextManager if available for caching summaries
+                if hasattr(self, 'kv_store') and self.kv_store:
+                    context_manager = ContextManager(kv_store=self.kv_store)
+                    logger.debug("ContextManager initialized with KV cache support")
+                else:
+                    context_manager = ContextManager()
 
                 compressed_messages, compression_report = await context_manager.compress_messages(
                     messages, llm_model, max_tokens=llm_max_tokens, 

@@ -526,7 +526,8 @@ class AgentRunner:
         
         self.thread_manager = ThreadManager(
             trace=self.config.trace, 
-            agent_config=self.config.agent_config
+            agent_config=self.config.agent_config,
+            project_id=self.config.project_id
         )
         
         self.client = await self.thread_manager.db.client
@@ -553,9 +554,16 @@ class AgentRunner:
             # Seed instructions into KV cache (non-blocking, best effort)
             try:
                 from core.sandbox.sandbox import get_or_start_sandbox
+                from core.sandbox.kv_store import SandboxKVStore
                 sandbox = await get_or_start_sandbox(sandbox_info['id'])
+                
+                # Seed instructions
                 await seed_instructions_to_cache(sandbox, force_refresh=False)
                 logger.info(f"Instructions seeded into KV cache for project {self.config.project_id}")
+                
+                # Initialize KV store for ThreadManager to use for conversation caching
+                self.thread_manager.kv_store = SandboxKVStore(sandbox)
+                logger.info(f"✅ KV cache enabled for ThreadManager (conversation summaries will be cached)")
             except Exception as e:
                 logger.warning(f"Failed to seed instructions (non-critical): {e}")
     
