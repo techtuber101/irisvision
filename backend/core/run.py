@@ -39,10 +39,12 @@ from core.tools.task_list_tool import TaskListTool
 from core.agentpress.tool import SchemaType
 from core.tools.sb_upload_file_tool import SandboxUploadFileTool
 from core.tools.sb_docs_tool import SandboxDocsTool
+from core.tools.sb_kv_cache_tool import SandboxKvCacheTool
 from core.tools.people_search_tool import PeopleSearchTool
 from core.tools.company_search_tool import CompanySearchTool
 from core.tools.paper_search_tool import PaperSearchTool
 from core.ai_models.manager import model_manager
+from core.sandbox.instruction_seeder import seed_instructions_to_cache, get_all_instruction_references
 
 load_dotenv()
 
@@ -107,6 +109,7 @@ class ToolManager:
     def _register_sandbox_tools(self, disabled_tools: List[str]):
         """Register sandbox-related tools with granular control."""
         sandbox_tools = [
+            ('sb_kv_cache_tool', SandboxKvCacheTool, {'project_id': self.project_id, 'thread_manager': self.thread_manager}),
             ('sb_shell_tool', SandboxShellTool, {'project_id': self.project_id, 'thread_manager': self.thread_manager}),
             ('sb_files_tool', SandboxFilesTool, {'project_id': self.project_id, 'thread_manager': self.thread_manager}),
             ('sb_expose_tool', SandboxExposeTool, {'project_id': self.project_id, 'thread_manager': self.thread_manager}),
@@ -468,6 +471,14 @@ When using the tools:
         
         system_content += datetime_info
 
+        # Add KV cache instruction references (dramatically reduces baseline prompt)
+        try:
+            instruction_refs = get_all_instruction_references()
+            system_content += f"\n\n{instruction_refs}\n"
+            logger.debug("Added KV cache instruction references to prompt")
+        except Exception as e:
+            logger.warning(f"Failed to add instruction references (non-critical): {e}")
+
         # Add adaptive input handling guidance
         adaptive_input_guidance = """
 
@@ -531,6 +542,15 @@ class AgentRunner:
         sandbox_info = project_data.get('sandbox', {})
         if not sandbox_info.get('id'):
             logger.debug(f"No sandbox found for project {self.config.project_id}; will create lazily when needed")
+        else:
+            # Seed instructions into KV cache (non-blocking, best effort)
+            try:
+                from core.sandbox.sandbox import get_or_start_sandbox
+                sandbox = await get_or_start_sandbox(sandbox_info['id'])
+                await seed_instructions_to_cache(sandbox, force_refresh=False)
+                logger.info(f"Instructions seeded into KV cache for project {self.config.project_id}")
+            except Exception as e:
+                logger.warning(f"Failed to seed instructions (non-critical): {e}")
     
     async def setup_tools(self):
         tool_manager = ToolManager(self.thread_manager, self.config.project_id, self.config.thread_id, self.config.agent_config)
@@ -672,7 +692,7 @@ class AgentRunner:
                 return True
         
         all_tools = [
-            'sb_shell_tool', 'sb_files_tool', 'sb_expose_tool',
+            'sb_kv_cache_tool', 'sb_shell_tool', 'sb_files_tool', 'sb_expose_tool',
             'web_search_tool', 'image_search_tool', 'sb_vision_tool', 'sb_presentation_tool', 'sb_image_edit_tool',
             'sb_kb_tool', 'sb_design_tool', 'sb_upload_file_tool',
             'sb_docs_tool',

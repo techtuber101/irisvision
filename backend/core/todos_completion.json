@@ -1,0 +1,17 @@
+{
+  "todos": [
+    {"id": "1", "content": "Analyze current architecture - read key sandbox, tool, and prompt files", "status": "completed"},
+    {"id": "2", "content": "Design KV cache schema and taxonomy (scopes, TTLs, security model)", "status": "completed"},
+    {"id": "3", "content": "Implement core kv_store.py service layer with async CRUD operations", "status": "completed"},
+    {"id": "4", "content": "Build SandboxKvCacheTool for agent interaction", "status": "completed"},
+    {"id": "5", "content": "Extract current prompt into modular instruction files", "status": "completed"},
+    {"id": "6", "content": "Refactor prompt builder to use file references instead of inline content", "status": "completed"},
+    {"id": "7", "content": "Update ThreadManager/ContextManager for cache-first retrieval", "status": "completed"},
+    {"id": "8", "content": "Integrate KV cache tool into ToolManager registration", "status": "completed"},
+    {"id": "9", "content": "Add instruction seeding mechanism and lifecycle management", "status": "completed"},
+    {"id": "10", "content": "Implement observability (logging, metrics) and security controls", "status": "completed"},
+    {"id": "11", "content": "Write comprehensive tests (unit, integration, regression)", "status": "completed"},
+    {"id": "12", "content": "Update REST API endpoints for cache browsing and management", "status": "completed"}
+  ],
+  "merge": true
+}
