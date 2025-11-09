@@ -2,10 +2,15 @@
 Simplified conversation thread management system for AgentPress.
 """
 
+import base64
+import gzip
 import json
 import time
 from collections import deque
-from typing import List, Dict, Any, Optional, Type, Union, AsyncGenerator, Literal, cast
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+from textwrap import shorten
+from typing import List, Dict, Any, Optional, Type, Union, AsyncGenerator, Literal, Tuple, cast
 from core.services.llm import make_llm_api_call, LLMError
 from core.agentpress.prompt_caching import apply_prompt_caching_strategy, validate_cache_blocks
 from core.agentpress.tool import Tool
@@ -17,9 +22,10 @@ from core.services.supabase import DBConnection
 from core.utils.logger import logger
 from langfuse.client import StatefulGenerationClient, StatefulTraceClient
 from core.services.langfuse import langfuse
-from datetime import datetime, timezone
 from core.billing.billing_integration import billing_integration
 from litellm.utils import token_counter
+from core.services.memory_store_local import get_memory_store
+from core.services import redis as redis_service
 
 ToolChoice = Literal["auto", "required", "none"]
 
@@ -70,6 +76,11 @@ class ThreadManager:
     def __init__(self, trace: Optional[StatefulTraceClient] = None, agent_config: Optional[dict] = None):
         self.db = DBConnection()
         self.tool_registry = ToolRegistry()
+        self.memory_store = get_memory_store()
+        self._memory_reference_counts: Dict[str, int] = {}
+        self._recent_tool_activity: Dict[str, float] = {}
+        self._memory_metadata_cache: Dict[str, Dict[str, Any]] = {}
+        self._run_metrics: Dict[str, Any] = self._init_run_metrics()
         
         self.trace = trace
         if not self.trace:
@@ -83,9 +94,479 @@ class ThreadManager:
             agent_config=self.agent_config
         )
 
+    def _init_run_metrics(self) -> Dict[str, Any]:
+        return {
+            "tokens_pre_pointer": 0,
+            "tokens_post_pointer": 0,
+            "pointer_count_used": 0,
+            "memory_fetch_calls": 0,
+            "semantic_cache_hits": 0,
+        }
+
+    def _reset_run_metrics(self) -> None:
+        self._run_metrics = self._init_run_metrics()
+
+    def _log_run_metrics(self, thread_id: str, extra: Optional[Dict[str, Any]] = None) -> None:
+        payload = {"thread_id": thread_id, **self._run_metrics}
+        if extra:
+            payload.update(extra)
+        try:
+            self.memory_store.log_event("run_metrics", **payload)
+        except Exception as exc:
+            logger.warning(f"Failed to log run metrics: {exc}")
+
+    def _record_pointer_usage(self, memory_id: str, subtype: Optional[str] = None) -> None:
+        current = self._memory_reference_counts.get(memory_id, 0) + 1
+        self._memory_reference_counts[memory_id] = current
+        if subtype:
+            self._recent_tool_activity[subtype] = time.time()
+        self._maybe_promote_summary(memory_id)
+
+    def _append_manifest_entry(self, filename: str, entry: Dict[str, Any]) -> None:
+        manifest_dir = self.memory_store.base_dir / "manifests"
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+        path = manifest_dir / filename
+        with path.open("a", encoding="utf-8") as fp:
+            fp.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    def _pointer_uri(self, memory_id: str, line_start: Optional[int] = None, line_end: Optional[int] = None,
+                     byte_offset: Optional[int] = None, byte_len: Optional[int] = None) -> str:
+        if line_start is not None and line_end is not None:
+            return f"mem://{memory_id}#L{line_start}-{line_end}"
+        if byte_offset is not None and byte_len is not None:
+            return f"mem://{memory_id}?offset={byte_offset}&len={byte_len}"
+        return f"mem://{memory_id}"
+
+    def _create_atomic_note(self, memory_id: str, text: str, meta: Dict[str, Any]) -> None:
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        bullets: List[str] = []
+        for line in lines[:5]:
+            bullets.append(f"- {shorten(line, width=240, placeholder='…')}")
+        if not bullets:
+            bullets = [f"- {shorten(text, width=240, placeholder='…')}"]
+        bullets.append(f"- Pointer: {self._pointer_uri(memory_id, 1, min(len(lines), 120) or 20)}")
+        entry = {
+            "kind": "atomic_note",
+            "memory_id": memory_id,
+            "title": meta.get("title"),
+            "tags": meta.get("tags") or [],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "content": "\n".join(bullets),
+        }
+        self._append_manifest_entry("m__atomic_notes.jsonl", entry)
+        self.memory_store.log_event("atomic_note", memory_id=memory_id, title=meta.get("title"))
+
+    def _create_section_summary(self, memory_id: str, meta: Dict[str, Any], preview: str) -> None:
+        pointer = self._pointer_uri(memory_id, 1, 200)
+        summary_text = shorten(preview, width=1200, placeholder="…")
+        entry = {
+            "kind": "section_summary",
+            "memory_id": memory_id,
+            "title": meta.get("title"),
+            "tags": meta.get("tags") or [],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "content": f"{summary_text}\n\nPointer: {pointer}",
+        }
+        self._append_manifest_entry("m__section_summaries.jsonl", entry)
+        self.memory_store.log_event("section_summary", memory_id=memory_id, title=meta.get("title"))
+
+    def _create_doc_abstract(self, memory_id: str, meta: Dict[str, Any], preview: str) -> None:
+        pointer = self._pointer_uri(memory_id)
+        summary_text = shorten(preview, width=2400, placeholder="…")
+        entry = {
+            "kind": "doc_abstract",
+            "memory_id": memory_id,
+            "title": meta.get("title"),
+            "tags": meta.get("tags") or [],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "content": f"{summary_text}\n\nPointer: {pointer}",
+        }
+        self._append_manifest_entry("m__doc_abstracts.jsonl", entry)
+        self.memory_store.log_event("doc_abstract", memory_id=memory_id, title=meta.get("title"))
+
+    def _maybe_promote_summary(self, memory_id: str) -> None:
+        count = self._memory_reference_counts.get(memory_id, 0)
+        meta = self._memory_metadata_cache.get(memory_id)
+        if not meta:
+            return
+        if count >= 3 and not meta.get("_section_summary"):
+            try:
+                preview = self.memory_store.get_slice(memory_id, 1, 200)
+            except Exception:
+                preview = ""
+            self._create_section_summary(memory_id, meta, preview)
+            meta["_section_summary"] = True
+        if count >= 6 and not meta.get("_doc_abstract"):
+            try:
+                preview = self.memory_store.get_slice(memory_id, 1, 400)
+            except Exception:
+                preview = ""
+            self._create_doc_abstract(memory_id, meta, preview)
+            meta["_doc_abstract"] = True
+
+    def _derive_memory_meta(
+        self,
+        message_type: str,
+        content: Union[Dict[str, Any], List[Any], str],
+        metadata: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        meta = {
+            "type": "SUMMARY",
+            "subtype": None,
+            "title": None,
+            "tags": [],
+        }
+
+        if metadata:
+            custom_meta = metadata.get("memory_meta") or {}
+            meta.update({k: v for k, v in custom_meta.items() if v is not None})
+            if metadata.get("memory_tags"):
+                meta["tags"] = metadata["memory_tags"]
+
+        if isinstance(content, dict):
+            role = content.get("role")
+            if role == "tool":
+                meta.setdefault("type", "TOOL_OUTPUT")
+                meta["type"] = "TOOL_OUTPUT"
+                meta.setdefault("subtype", content.get("name"))
+                meta.setdefault("title", content.get("name") or content.get("tool_call_id"))
+            elif message_type and "web" in message_type.lower():
+                meta["type"] = "WEB_SCRAPE"
+            elif message_type and "shell" in message_type.lower():
+                meta["type"] = "FILE_LIST"
+            elif message_type and "document" in message_type.lower():
+                meta["type"] = "DOC_CHUNK"
+        else:
+            if message_type and "tool" in message_type.lower():
+                meta["type"] = "TOOL_OUTPUT"
+
+        if not meta.get("title"):
+            if isinstance(content, dict):
+                meta["title"] = content.get("title") or content.get("name")
+            if not meta["title"]:
+                meta["title"] = f"{message_type}:{datetime.now(timezone.utc).isoformat()}"
+        return meta
+
+    async def _cache_pointer_metadata(self, memory_info: Dict[str, Any]) -> None:
+        pointer_key = f"mem:ptr:{memory_info['memory_id']}"
+        payload = {
+            "mime": memory_info.get("mime"),
+            "bytes": memory_info.get("bytes"),
+            "rel_path": memory_info.get("path"),
+            "compression": memory_info.get("compression"),
+        }
+        try:
+            await redis_service.set(pointer_key, json.dumps(payload), ex=172800)
+        except Exception as exc:
+            logger.warning(f"Failed to cache pointer metadata for {pointer_key}: {exc}")
+
+    async def _offload_if_large(
+        self,
+        thread_id: str,
+        message_type: str,
+        content: Union[Dict[str, Any], List[Any], str],
+        metadata: Optional[Dict[str, Any]],
+    ) -> Union[Dict[str, Any], List[Any], str]:
+        target_text: Optional[str] = None
+        updated_content = content
+        parsed_from_string: Optional[Dict[str, Any]] = None
+
+        if isinstance(content, dict):
+            possible_text = content.get("content")
+            if isinstance(possible_text, str):
+                target_text = possible_text
+        elif isinstance(content, str):
+            try:
+                parsed = json.loads(content)
+            except json.JSONDecodeError:
+                parsed = None
+            if isinstance(parsed, dict):
+                parsed_from_string = parsed
+                possible_text = parsed.get("content")
+                if isinstance(possible_text, str):
+                    target_text = possible_text
+                updated_content = parsed
+            else:
+                target_text = content
+
+        if target_text is None:
+            return parsed_from_string or updated_content
+
+        if len(target_text) <= 6000:
+            return parsed_from_string or updated_content
+
+        meta = self._derive_memory_meta(message_type, content, metadata)
+
+        memory_info = self.memory_store.put_text(
+            target_text,
+            type=meta.get("type") or "TOOL_OUTPUT",
+            subtype=meta.get("subtype"),
+            mime="text/plain",
+            title=meta.get("title"),
+            tags=meta.get("tags"),
+        )
+
+        memory_id = memory_info["memory_id"]
+        pointer = {
+            "id": memory_id,
+            "title": meta.get("title"),
+            "mime": memory_info.get("mime", "text/plain"),
+        }
+        summary = target_text[:800]
+        summary_with_pointer = summary + "\n\n[see memory_refs]"
+
+        if isinstance(content, dict):
+            updated = dict(content)
+            updated["content"] = summary_with_pointer
+            existing_refs = updated.get("memory_refs") or []
+            updated["memory_refs"] = [*existing_refs, pointer]
+            tokens_saved = len(target_text) // 4
+            updated["tokens_saved"] = updated.get("tokens_saved", 0) + tokens_saved
+            updated_content = updated
+        else:
+            updated_content = {
+                "content": summary_with_pointer,
+                "memory_refs": [pointer],
+                "tokens_saved": len(target_text) // 4,
+            }
+
+        if memory_id not in self._memory_metadata_cache:
+            self._memory_metadata_cache[memory_id] = dict(meta)
+            self._create_atomic_note(memory_id, target_text, meta)
+
+        self._record_pointer_usage(memory_id, meta.get("subtype"))
+
+        self._run_metrics["tokens_pre_pointer"] += len(target_text) // 4
+        self._run_metrics["pointer_count_used"] += 1
+
+        await self._cache_pointer_metadata(memory_info)
+
+        self.memory_store.log_event(
+            "pointerized_message",
+            thread_id=thread_id,
+            memory_id=memory_id,
+            message_type=message_type,
+            bytes=len(target_text.encode("utf-8")),
+        )
+
+        return updated_content
+
+    async def _hydrate_system_prompt(self, system_prompt: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(system_prompt, dict):
+            return system_prompt
+        system_ref = system_prompt.get("system_ref")
+        if not system_ref:
+            return system_prompt
+        cache_key = f"aga:cache:prefix:{system_ref}"
+        content = system_prompt.get("content")
+        if content:
+            try:
+                compressed = gzip.compress(content.encode("utf-8"))
+                encoded = base64.b64encode(compressed).decode("ascii")
+                await redis_service.set(cache_key, encoded, ex=604800)
+            except Exception as exc:
+                logger.warning(f"Failed to cache system prefix {system_ref}: {exc}")
+            return system_prompt
+        try:
+            encoded = await redis_service.get(cache_key)
+        except Exception as exc:
+            logger.warning(f"Failed to fetch cached system prefix {system_ref}: {exc}")
+            return system_prompt
+        if not encoded:
+            logger.warning(f"Missing cached system prefix for {system_ref}")
+            return system_prompt
+        try:
+            raw = base64.b64decode(encoded.encode("ascii"))
+            hydrated_content = gzip.decompress(raw).decode("utf-8")
+            hydrated = dict(system_prompt)
+            hydrated["content"] = hydrated_content
+            return hydrated
+        except Exception as exc:
+            logger.error(f"Failed to hydrate system prefix {system_ref}: {exc}")
+            return system_prompt
+
+    def _extract_memory_refs_from_message(self, message: Dict[str, Any]) -> List[Dict[str, Any]]:
+        refs: List[Dict[str, Any]] = []
+        if not isinstance(message, dict):
+            return refs
+        if isinstance(message.get("content"), dict):
+            content_refs = message["content"].get("memory_refs")
+            if isinstance(content_refs, list):
+                refs.extend(content_refs)
+        if isinstance(message.get("memory_refs"), list):
+            refs.extend(message["memory_refs"])
+        return refs
+
+    async def _plan_prefetch(self, user_text: Optional[str], messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        if not user_text:
+            user_text = ""
+        user_text_lower = user_text.lower()
+        prefetched: List[Dict[str, Any]] = []
+        visited_ids: set[str] = set()
+
+        for message in reversed(messages[-12:]):  # consider recent history
+            refs = self._extract_memory_refs_from_message(message)
+            for ref in refs:
+                memory_id = ref.get("id")
+                if not memory_id or memory_id in visited_ids:
+                    continue
+                meta = self._memory_metadata_cache.get(memory_id)
+                if not meta:
+                    try:
+                        meta = self.memory_store.get_metadata(memory_id)
+                    except Exception as exc:
+                        logger.debug(f"Failed to fetch metadata for prefetch {memory_id}: {exc}")
+                        meta = None
+                    if meta:
+                        self._memory_metadata_cache[memory_id] = dict(meta)
+                if not meta:
+                    continue
+                title = (ref.get("title") or meta.get("title") or "").lower()
+                tags = meta.get("tags") or []
+                subtype = meta.get("subtype")
+                should_prefetch = False
+                if title and title in user_text_lower:
+                    should_prefetch = True
+                elif any(isinstance(tag, str) and tag.lower() in user_text_lower for tag in tags):
+                    should_prefetch = True
+                elif subtype and subtype in self._recent_tool_activity:
+                    if time.time() - self._recent_tool_activity[subtype] <= 600:
+                        should_prefetch = True
+
+                if should_prefetch:
+                    try:
+                        snippet = self.memory_store.get_slice(memory_id, 1, 120)
+                    except Exception as exc:
+                        logger.debug(f"Prefetch slice failed for {memory_id}: {exc}")
+                        continue
+                    prefetched.append(
+                        {
+                            "role": "system",
+                            "content": f"[prefetched:{ref.get('title') or memory_id}]\n{snippet}",
+                            "memory_refs": [ref],
+                            "prefetched": True,
+                        }
+                    )
+                    visited_ids.add(memory_id)
+                if len(prefetched) >= 3:
+                    break
+            if len(prefetched) >= 3:
+                break
+
+        prefetched.reverse()
+        return prefetched
+
+    def _mark_pointer_usage_for_run(self, messages: List[Dict[str, Any]]) -> None:
+        seen: set[str] = set()
+        for message in messages:
+            for ref in self._extract_memory_refs_from_message(message):
+                memory_id = ref.get("id")
+                if not memory_id or memory_id in seen:
+                    continue
+                meta = self._memory_metadata_cache.get(memory_id)
+                subtype = meta.get("subtype") if meta else None
+                self._record_pointer_usage(memory_id, subtype)
+                seen.add(memory_id)
+
+    def _extract_user_text(self, messages: List[Dict[str, Any]]) -> str:
+        for message in reversed(messages):
+            if not isinstance(message, dict):
+                continue
+            if message.get("role") != "user":
+                continue
+            content = message.get("content")
+            if isinstance(content, dict):
+                text = content.get("content")
+                if isinstance(text, str):
+                    return text
+                return json.dumps(content, ensure_ascii=False)
+            if isinstance(content, str):
+                return content
+        return ""
+
+    async def build_messages_for_llm(
+        self,
+        system_prompt: Dict[str, Any],
+        messages: List[Dict[str, Any]],
+        llm_model: str,
+        llm_max_tokens: Optional[int],
+    ) -> Tuple[List[Dict[str, Any]], Optional[Any]]:
+        context_manager = ContextManager()
+        compressed_messages, compression_report = await context_manager.compress_messages(
+            messages,
+            llm_model,
+            max_tokens=llm_max_tokens,
+            system_prompt=system_prompt,
+            return_report=True,
+            pointer_mode=True,
+        )
+
+        user_text = self._extract_user_text(compressed_messages)
+        prefetch_messages = await self._plan_prefetch(user_text, compressed_messages)
+
+        final_messages = list(compressed_messages)
+        if prefetch_messages:
+            insert_idx = len(final_messages)
+            for idx in range(len(final_messages) - 1, -1, -1):
+                if final_messages[idx].get("role") == "user":
+                    insert_idx = idx
+                    break
+            for offset, prefetched in enumerate(prefetch_messages):
+                final_messages.insert(insert_idx + offset, prefetched)
+
+        self._mark_pointer_usage_for_run(final_messages)
+
+        return final_messages, compression_report
+
     def add_tool(self, tool_class: Type[Tool], function_names: Optional[List[str]] = None, **kwargs):
         """Add a tool to the ThreadManager."""
         self.tool_registry.register_tool(tool_class, function_names, **kwargs)
+
+    def _apply_token_governor(
+        self,
+        system_prompt: Dict[str, Any],
+        messages: List[Dict[str, Any]],
+        llm_model: str,
+    ) -> List[Dict[str, Any]]:
+        try:
+            projected_tokens = token_counter(model=llm_model, messages=[system_prompt] + messages)
+        except Exception as exc:
+            logger.debug(f"Token estimation failed in governor: {exc}")
+            projected_tokens = 0
+
+        governor_message: Optional[Dict[str, Any]] = None
+        if projected_tokens > 40000:
+            governor_message = {
+                "role": "system",
+                "content": (
+                    "Context budget critical (>40k tokens). Do not expand memory pointers. "
+                    "Plan actions and rely on memory_fetch with tight byte or line ranges only."
+                ),
+                "token_governor": True,
+            }
+        elif projected_tokens > 20000:
+            governor_message = {
+                "role": "system",
+                "content": (
+                    "Context budget high (>20k tokens). Summarize next steps in 3-5 bullets and "
+                    "reference mem:// pointers instead of expanding them."
+                ),
+                "token_governor": True,
+            }
+
+        result_messages = list(messages)
+        if governor_message:
+            result_messages.append(governor_message)
+            try:
+                projected_tokens = token_counter(model=llm_model, messages=[system_prompt] + result_messages)
+            except Exception as exc:
+                logger.debug(f"Token post-governor estimation failed: {exc}")
+
+        self._run_metrics["tokens_post_pointer"] = projected_tokens
+        return result_messages
+
+    def record_memory_fetch(self, count: int = 1) -> None:
+        self._run_metrics["memory_fetch_calls"] += max(count, 0)
 
     async def create_thread(
         self,
@@ -130,13 +611,24 @@ class ThreadManager:
         # logger.debug(f"Adding message of type '{type}' to thread {thread_id}")
         client = await self.db.client
 
+        processed_content = await self._offload_if_large(thread_id, type, content, metadata)
+
+        memory_refs = []
+        if isinstance(processed_content, dict):
+            memory_refs = processed_content.get("memory_refs") or []
+
         data_to_insert = {
             'thread_id': thread_id,
             'type': type,
-            'content': content,
+            'content': processed_content,
             'is_llm_message': is_llm_message,
             'metadata': metadata or {},
         }
+
+        if memory_refs:
+            merged_metadata = dict(data_to_insert['metadata'])
+            merged_metadata['memory_refs'] = memory_refs
+            data_to_insert['metadata'] = merged_metadata
 
         if agent_id:
             data_to_insert['agent_id'] = agent_id
@@ -357,6 +849,8 @@ class ThreadManager:
             
         try:
             # Get and prepare messages
+            self._reset_run_metrics()
+            system_prompt = await self._hydrate_system_prompt(system_prompt)
             messages = await self.get_llm_messages(thread_id)
             
             # Handle auto-continue context
@@ -369,26 +863,22 @@ class ThreadManager:
             ENABLE_PROMPT_CACHING = True    # Set to False to disable prompt caching
             # ==================================
 
-            # Apply context compression
             compression_report = None
             if ENABLE_CONTEXT_MANAGER:
-                logger.debug(f"Context manager enabled, compressing {len(messages)} messages")
-                context_manager = ContextManager()
-
-                compressed_messages, compression_report = await context_manager.compress_messages(
-                    messages, llm_model, max_tokens=llm_max_tokens, 
-                    actual_total_tokens=None,  # Will be calculated inside
-                    system_prompt=system_prompt, # KEY FIX: No caching during compression
-                    return_report=True,
+                logger.debug(f"Context manager enabled, compressing {len(messages)} messages with pointer mode")
+                messages, compression_report = await self.build_messages_for_llm(
+                    system_prompt, messages, llm_model, llm_max_tokens
                 )
                 if compression_report:
                     logger.info(f"🧮 Context compression summary: {compression_report.summary_line()}")
                     logger.debug(f"Context compression diagnostics: {compression_report.to_dict()}")
                 else:
-                    logger.debug(f"Context compression completed (no report): {len(messages)} -> {len(compressed_messages)} messages")
-                messages = compressed_messages
+                    logger.debug(f"Context compression completed (no report): {len(messages)} messages processed")
             else:
                 logger.debug("Context manager disabled, using raw messages")
+                self._mark_pointer_usage_for_run(messages)
+
+            messages = self._apply_token_governor(system_prompt, messages, llm_model)
 
             # Apply caching
             cache_report = None
@@ -414,6 +904,7 @@ class ThreadManager:
                             f"{cache_report.total_input_tokens:,}",
                             cache_report.notes,
                         )
+                    self._run_metrics["semantic_cache_hits"] = cache_report.cached_blocks
             else:
                 prepared_messages = [system_prompt] + messages
 
@@ -439,6 +930,7 @@ class ThreadManager:
 
             # Log final prepared messages token count
             final_prepared_tokens = token_counter(model=llm_model, messages=prepared_messages)
+            self._run_metrics["tokens_post_pointer"] = final_prepared_tokens
             logger.info(f"📤 Final prepared messages being sent to LLM: {final_prepared_tokens} tokens")
             if cache_report:
                 logger.info(
@@ -486,6 +978,11 @@ class ThreadManager:
             processed_error = ErrorProcessor.process_system_error(e, context={"thread_id": thread_id})
             ErrorProcessor.log_error(processed_error)
             return processed_error.to_stream_dict()
+        finally:
+            try:
+                self._log_run_metrics(thread_id, {"llm_model": llm_model})
+            except Exception as exc:
+                logger.debug(f"Run metrics logging failed: {exc}")
 
     async def _auto_continue_generator(
         self, thread_id: str, system_prompt: Dict[str, Any], llm_model: str,

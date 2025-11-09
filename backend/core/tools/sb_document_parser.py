@@ -1,16 +1,20 @@
+import json
 from chunkr_ai import Chunkr
 from typing import Dict, Any
+from textwrap import shorten
 
 from core.agentpress.tool import ToolResult, openapi_schema
 from core.agentpress.thread_manager import ThreadManager
 from core.sandbox.tool_base import SandboxToolsBase
 from core.utils.logger import logger
+from core.services.memory_store_local import get_memory_store
 
 
 class SandboxDocumentParserTool(SandboxToolsBase):
     def __init__(self, project_id: str, thread_manager: ThreadManager):
         super().__init__(project_id, thread_manager)
         self.chunkr = Chunkr()
+        self.memory_store = get_memory_store()
 
     @openapi_schema({
         "type": "function",
@@ -67,11 +71,9 @@ class SandboxDocumentParserTool(SandboxToolsBase):
             
             # Extract meaningful content from the Chunkr response
             parsed_content = self._extract_meaningful_content(task, extract_tables, extract_structured_data)
+            payload = self._store_parsed_document(url, parsed_content)
             
-            return self.success_response({
-                "message": f"Successfully parsed document from URL: {url}",
-                "content": parsed_content
-            })
+            return self.success_response(payload)
             
         except Exception as e:
             logger.error(f"Error parsing document from URL {url}: {e}", exc_info=True)
@@ -178,3 +180,43 @@ class SandboxDocumentParserTool(SandboxToolsBase):
             "tables_count": len(content["tables"]),
             "main_headings": [item["content"] for item in content["structure"][:5]]  # First 5 headings
         }
+
+    def _store_parsed_document(self, url: str, parsed_content: Dict[str, Any]) -> Dict[str, Any]:
+        raw_json = json.dumps(parsed_content, ensure_ascii=False, indent=2)
+        title = f"doc:{shorten(url, width=60, placeholder='…')}"
+        memory_info = self.memory_store.put_text(
+            raw_json,
+            type="DOC_CHUNK",
+            subtype="chunkr",
+            title=title,
+            tags=["document", "parser"],
+        )
+        pointer = f"mem://{memory_info['memory_id']}"
+        summary = parsed_content.get("summary") or {}
+        summary_lines = [
+            f"Pages: {summary.get('total_pages')}",
+            f"Headings: {summary.get('headings_count')}",
+            f"Text sections: {summary.get('text_sections')}",
+            f"Tables: {summary.get('tables_count')}",
+        ]
+        main_headings = summary.get("main_headings") or []
+        for heading in main_headings[:3]:
+            summary_lines.append(f"- {heading}")
+        content = "\n".join(summary_lines)
+        output = {
+            "role": "tool",
+            "name": "parse_document",
+            "url": url,
+            "content": content,
+            "memory_refs": [
+                {"id": memory_info["memory_id"], "title": title, "mime": "application/json"}
+            ],
+            "pointer": pointer,
+        }
+        self.memory_store.log_event(
+            "document_parse_store",
+            memory_id=memory_info["memory_id"],
+            url=url,
+            pages=summary.get("total_pages"),
+        )
+        return output

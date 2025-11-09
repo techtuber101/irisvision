@@ -36,6 +36,7 @@ from langfuse.client import StatefulTraceClient
 
 from core.tools.mcp_tool_wrapper import MCPToolWrapper
 from core.tools.task_list_tool import TaskListTool
+from core.tools.memory_fetch_tool import MemoryFetchTool
 from core.agentpress.tool import SchemaType
 from core.tools.sb_upload_file_tool import SandboxUploadFileTool
 from core.tools.sb_docs_tool import SandboxDocsTool
@@ -103,6 +104,7 @@ class ToolManager:
         self.thread_manager.add_tool(ExpandMessageTool, thread_id=self.thread_id, thread_manager=self.thread_manager)
         self.thread_manager.add_tool(MessageTool)
         self.thread_manager.add_tool(TaskListTool, project_id=self.project_id, thread_manager=self.thread_manager, thread_id=self.thread_id)
+        self.thread_manager.add_tool(MemoryFetchTool, thread_manager=self.thread_manager)
     
     def _register_sandbox_tools(self, disabled_tools: List[str]):
         """Register sandbox-related tools with granular control."""
