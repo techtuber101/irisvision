@@ -1265,6 +1265,7 @@ export function FileViewerModal({
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
+        showClose={false}
         className="sm:max-w-[90vw] md:max-w-[1200px] w-[95vw] h-[90vh] max-h-[900px] flex flex-col p-0 gap-0 overflow-hidden rounded-3xl border border-blue-500/10 bg-[rgba(15,23,42,0.12)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.1),inset_0_1px_0_0_rgba(59,130,246,0.05)] !top-[50%] !left-[50%] !translate-x-[-50%] !translate-y-[-50%] light:border-white/20 light:bg-[rgba(255,255,255,0.22)] light:backdrop-blur-2xl light:shadow-[0_24px_70px_-18px_rgba(15,23,42,0.2),inset_0_1px_0_rgba(255,255,255,0.35),0_0_0_1px_rgba(255,255,255,0.08)]"
       >
         {/* Custom close button with high z-index */}
@@ -1272,10 +1273,10 @@ export function FileViewerModal({
           variant="ghost"
           size="icon"
           onClick={() => handleOpenChange(false)}
-          className="absolute top-4 right-4 z-50 h-8 w-8 rounded-sm opacity-70 hover:opacity-100 hover:bg-white/10 text-white/90 hover:text-white border-0 focus:ring-2 focus:ring-offset-2 focus:ring-white/20"
+          className="absolute top-4 right-4 z-50 h-8 w-8 opacity-70 hover:opacity-100 text-white/90 hover:text-white border-0 focus:outline-none"
           aria-label="Close"
         >
-          <X className="h-4 w-4" />
+          <X className="h-5 w-5" />
         </Button>
         
         {/* Gradient rim */}
