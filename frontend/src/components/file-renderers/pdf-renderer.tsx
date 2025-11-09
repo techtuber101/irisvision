@@ -29,10 +29,12 @@ const MIN_ZOOM = 0.6;
 const MAX_ZOOM = 2.2;
 const ZOOM_STEP = 0.2;
 const DEFAULT_ASPECT_RATIO = 1.294; // Close to US Letter
+const DARK_BUTTON =
+  'px-2 py-1 rounded bg-[rgba(15,23,42,0.85)] text-white hover:bg-[rgba(15,23,42,0.95)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
 
 const PageSkeleton = ({ height, width, pageNumber }: { height: number; width: number; pageNumber: number }) => (
   <div
-    className="border border-gray-200 dark:border-white/10 rounded-lg bg-gray-100 dark:bg-[rgba(15,23,42,0.4)] w-full flex flex-col items-center justify-center text-xs text-gray-500 dark:text-white/60"
+    className="border border-white/10 rounded-lg bg-[rgba(15,23,42,0.4)] w-full flex flex-col items-center justify-center text-xs text-white/60"
     style={{ height, maxWidth: width }}
   >
     Loading page {pageNumber}...
@@ -241,7 +243,7 @@ export function PdfRenderer({ url, className }: PdfRendererProps) {
     <div className={cn('flex flex-col w-full h-full', className)}>
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-auto rounded-md bg-[rgba(15,23,42,0.12)] backdrop-blur-2xl border border-blue-500/10 relative"
+        className="flex-1 overflow-auto rounded-md bg-[rgba(15,23,42,0.25)] border border-white/5"
       >
         <div ref={pagesWrapperRef} className="w-full max-w-5xl mx-auto py-6 px-4">
           <Document
@@ -275,7 +277,7 @@ export function PdfRenderer({ url, className }: PdfRendererProps) {
                         width={pageWidth}
                         renderTextLayer
                         renderAnnotationLayer
-                        className="border border-gray-200 dark:border-white/10 rounded-lg bg-white shadow-lg"
+                        className="border border-white/10 rounded-lg bg-white shadow-lg"
                         loading={<PageSkeleton height={placeholderHeight} width={pageWidth} pageNumber={pageNumber} />}
                         onLoadSuccess={page => handlePageLoad(pageNumber, page)}
                       />
@@ -294,11 +296,11 @@ export function PdfRenderer({ url, className }: PdfRendererProps) {
       </div>
 
       {numPages > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 p-3 border-t border-white/10 bg-[rgba(15,23,42,0.12)] backdrop-blur-2xl relative z-10">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3 border-t border-white/10 bg-[rgba(15,23,42,0.6)]">
           <div className="flex items-center space-x-2">
             <button
               onClick={zoomOut}
-              className="h-8 w-8 p-0 rounded border border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm flex items-center justify-center"
+              className={DARK_BUTTON}
               disabled={zoom <= MIN_ZOOM}
               aria-label="Zoom out"
             >
@@ -309,7 +311,7 @@ export function PdfRenderer({ url, className }: PdfRendererProps) {
             </span>
             <button
               onClick={zoomIn}
-              className="h-8 w-8 p-0 rounded border border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm flex items-center justify-center"
+              className={DARK_BUTTON}
               disabled={zoom >= MAX_ZOOM}
               aria-label="Zoom in"
             >
@@ -320,7 +322,7 @@ export function PdfRenderer({ url, className }: PdfRendererProps) {
           <div className="flex items-center space-x-2 text-white/80 text-sm">
             <button
               onClick={goToPreviousPage}
-              className="h-8 px-2 rounded border border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+              className={DARK_BUTTON}
               disabled={currentPage <= 1}
             >
               Previous
@@ -330,7 +332,7 @@ export function PdfRenderer({ url, className }: PdfRendererProps) {
             </span>
             <button
               onClick={goToNextPage}
-              className="h-8 px-2 rounded border border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+              className={DARK_BUTTON}
               disabled={currentPage >= numPages}
             >
               Next

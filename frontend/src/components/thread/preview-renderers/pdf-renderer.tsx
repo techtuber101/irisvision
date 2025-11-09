@@ -26,7 +26,12 @@ interface PdfRendererProps {
 
 type PageMetrics = Record<number, { aspectRatio: number }>;
 
+const MIN_ZOOM = 0.6;
+const MAX_ZOOM = 2.2;
+const ZOOM_STEP = 0.2;
 const DEFAULT_ASPECT_RATIO = 1.294;
+const DARK_BUTTON =
+    'px-1.5 py-0.5 rounded bg-[rgba(15,23,42,0.85)] text-white hover:bg-[rgba(15,23,42,0.95)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs';
 
 const PageSkeleton = ({ height, width, pageNumber }: { height: number; width: number; pageNumber: number }) => (
     <div
@@ -186,6 +191,14 @@ export function PdfRenderer({ url, className }: PdfRendererProps) {
         changePage(currentPage + 1);
     }, [changePage, currentPage]);
 
+    const zoomIn = useCallback(() => {
+        setZoom(prev => Math.min(prev + ZOOM_STEP, MAX_ZOOM));
+    }, []);
+
+    const zoomOut = useCallback(() => {
+        setZoom(prev => Math.max(prev - ZOOM_STEP, MIN_ZOOM));
+    }, []);
+
     const renderedPages = useMemo(() => {
         if (!numPages) return new Set<number>([1]);
         const toRender = new Set<number>();
@@ -286,6 +299,51 @@ export function PdfRenderer({ url, className }: PdfRendererProps) {
                 </div>
             </div>
 
+            {numPages > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-2 p-2 border-t border-white/10 bg-[rgba(15,23,42,0.6)]">
+                    <div className="flex items-center space-x-1.5">
+                        <button
+                            onClick={zoomOut}
+                            className={DARK_BUTTON}
+                            disabled={zoom <= MIN_ZOOM}
+                            aria-label="Zoom out"
+                        >
+                            -
+                        </button>
+                        <span className="text-white/80 text-[11px] min-w-[2.5rem] text-center">
+                            {Math.round(zoom * 100)}%
+                        </span>
+                        <button
+                            onClick={zoomIn}
+                            className={DARK_BUTTON}
+                            disabled={zoom >= MAX_ZOOM}
+                            aria-label="Zoom in"
+                        >
+                            +
+                        </button>
+                    </div>
+
+                    <div className="flex items-center space-x-1.5 text-white/80 text-[11px]">
+                        <button
+                            onClick={goToPreviousPage}
+                            className={DARK_BUTTON}
+                            disabled={currentPage <= 1}
+                        >
+                            Previous
+                        </button>
+                        <span>
+                            Page {currentPage} / {numPages}
+                        </span>
+                        <button
+                            onClick={goToNextPage}
+                            className={DARK_BUTTON}
+                            disabled={currentPage >= numPages}
+                        >
+                            Next
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

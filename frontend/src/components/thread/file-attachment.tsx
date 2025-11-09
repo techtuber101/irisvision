@@ -498,9 +498,7 @@ export function FileAttachment({
             <div
                 className={cn(
                     "group relative w-full",
-                    "rounded-2xl border overflow-hidden pt-10 shadow-[0_20px_60px_rgba(15,23,42,0.08)] dark:shadow-[0_25px_80px_rgba(3,8,20,0.85)]", // Keeps elevated card styling with header space
-                    "bg-white/95 dark:bg-[rgba(8,13,24,0.92)]",
-                    "border-black/5 dark:border-[rgba(34,62,122,0.65)]",
+                    "rounded-xl border bg-card overflow-hidden pt-10", // Consistent card styling with header space
                     isPdf ? "!min-h-[200px] sm:min-h-0 sm:h-[400px] max-h-[500px] sm:!min-w-[300px]" :
                         isHtmlOrMd ? "!min-h-[200px] sm:min-h-0 sm:h-[400px] max-h-[600px] sm:!min-w-[300px]" :
                             (isCsv || isXlsx) ? "min-h-[300px] h-full" : // Let CSV and XLSX take full height
@@ -622,36 +620,14 @@ export function FileAttachment({
                 </div>
 
                 {/* Header with filename */}
-                <div className="absolute top-0 left-0 right-0 bg-white/80 dark:bg-[rgba(6,11,23,0.9)] backdrop-blur-xl border-b border-black/5 dark:border-[rgba(45,73,138,0.75)] shadow-[0_20px_60px_-10px_rgba(0,0,0,0.08)] dark:shadow-[0_35px_80px_-20px_rgba(3,8,20,0.9),inset_0_1px_0_0_rgba(255,255,255,0.08)] text-black dark:text-white p-2 h-[40px] z-10 flex items-center justify-between relative overflow-hidden">
-                    {/* Gradient rim */}
-                    <div
-                        aria-hidden="true"
-                        className="pointer-events-none absolute inset-0"
-                        style={{
-                            background: "linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))",
-                            WebkitMask: "linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)",
-                            WebkitMaskComposite: "xor" as any,
-                            maskComposite: "exclude",
-                            padding: 1,
-                        }}
-                    />
-                    {/* Specular streak */}
-                    <div
-                        aria-hidden="true"
-                        className="pointer-events-none absolute inset-x-0 top-0 h-12"
-                        style={{
-                            background: "linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)",
-                            filter: "blur(6px)",
-                            mixBlendMode: "screen",
-                        }}
-                    />
-                    <div className="relative z-10 flex items-center gap-2 min-w-0 flex-1">
-                        <div className="text-sm font-semibold tracking-tight truncate text-black dark:text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)] dark:drop-shadow-[0_2px_6px_rgba(0,0,0,0.65)]" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.15)' }}>{filename}</div>
+                <div className="absolute top-0 left-0 right-0 bg-accent p-2 h-[40px] z-10 flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <div className="text-sm font-medium truncate">{filename}</div>
                         {/* XLSX Sheet Selector */}
                         {isXlsx && xlsxSheetNames.length > 1 && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <button className="flex items-center gap-1 px-2 py-1 rounded-xl hover:bg-black/10 dark:hover:bg-white/20 text-xs font-medium transition-colors text-black dark:text-white">
+                                    <button className="flex items-center gap-1 px-2 py-1 rounded-xl hover:bg-background/70 text-xs font-medium transition-colors">
                                         <span className="truncate max-w-[100px]">{xlsxSheetNames[xlsxSheetIndex] || 'Sheet 1'}</span>
                                         <ChevronDown size={12} />
                                     </button>
@@ -673,7 +649,7 @@ export function FileAttachment({
                             </DropdownMenu>
                         )}
                     </div>
-                    <div className="relative z-10 flex items-center gap-1">
+                    <div className="flex items-center gap-1">
                         {/* <button
                             onClick={handleDownload}
                             className="cursor-pointer p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/10"
@@ -684,7 +660,7 @@ export function FileAttachment({
                         {onClick && (
                             <button
                                 onClick={handleClick}
-                                className="cursor-pointer p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/20 text-black dark:text-white"
+                                className="cursor-pointer p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/10"
                                 title="Open in viewer"
                             >
                                 <ExternalLink size={14} />

@@ -989,48 +989,11 @@ export function FileViewerModal({
               margin: 0 auto;
               background: white;
             }
-            h1 { 
-              font-size: 24pt; 
-              margin-top: 20pt; 
-              margin-bottom: 12pt; 
-              page-break-after: auto;
-              page-break-before: avoid;
-              orphans: 2;
-              widows: 2;
-            }
-            h2 { 
-              font-size: 20pt; 
-              margin-top: 18pt; 
-              margin-bottom: 10pt; 
-              page-break-after: auto;
-              page-break-before: avoid;
-              orphans: 2;
-              widows: 2;
-            }
-            h3 { 
-              font-size: 16pt; 
-              margin-top: 16pt; 
-              margin-bottom: 8pt; 
-              page-break-after: auto;
-              page-break-before: avoid;
-              orphans: 2;
-              widows: 2;
-            }
-            h4, h5, h6 { 
-              font-weight: bold; 
-              margin-top: 12pt; 
-              margin-bottom: 6pt; 
-              page-break-after: auto;
-              page-break-before: avoid;
-              orphans: 2;
-              widows: 2;
-            }
-            p { 
-              margin: 8pt 0; 
-              orphans: 2;
-              widows: 2;
-              page-break-inside: avoid;
-            }
+            h1 { font-size: 24pt; margin-top: 20pt; margin-bottom: 12pt; }
+            h2 { font-size: 20pt; margin-top: 18pt; margin-bottom: 10pt; }
+            h3 { font-size: 16pt; margin-top: 16pt; margin-bottom: 8pt; }
+            h4, h5, h6 { font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
+            p { margin: 8pt 0; }
             pre, code {
               font-family: 'Geist Mono', 'Courier New', monospace;
               background-color: #f5f5f5;
