@@ -20,7 +20,8 @@ from core.tools.sb_files_tool import SandboxFilesTool
 from core.tools.sb_kb_tool import SandboxKbTool
 from core.tools.data_providers_tool import DataProvidersTool
 from core.tools.expand_msg_tool import ExpandMessageTool
-from core.prompts.prompt import get_system_prompt
+from core.prompts.prompt import get_system_prompt as get_system_prompt_original
+from core.prompts.prompt_kv_cache import get_system_prompt_kv_cache
 
 from core.utils.logger import logger
 
@@ -316,7 +317,13 @@ class PromptManager:
                                   tool_registry=None,
                                   xml_tool_calling: bool = True) -> dict:
         
-        default_system_content = get_system_prompt()
+        # Use KV cache prompt if feature flag is enabled, otherwise use original
+        if config.USE_KV_CACHE_PROMPT:
+            default_system_content = get_system_prompt_kv_cache()
+            logger.info("🔥 Using streamlined KV cache prompt (~10k tokens)")
+        else:
+            default_system_content = get_system_prompt_original()
+            logger.info("Using original prompt (~40k tokens)")
         
         # if "anthropic" not in model_name.lower():
         #     sample_response_path = os.path.join(os.path.dirname(__file__), 'prompts/samples/1.txt')

@@ -41,6 +41,8 @@ class Configuration:
     # Environment mode
     ENV_MODE: EnvMode = EnvMode.LOCAL
     
+    # Feature Flags
+    USE_KV_CACHE_PROMPT: bool = False  # Enable streamlined 10k prompt with KV cache instructions
     
     # Subscription tier IDs - Production
     STRIPE_FREE_TIER_ID_PROD: str = 'price_1RILb4G6l1KZGqIrK4QLrx9i'
