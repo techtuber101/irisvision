@@ -10,6 +10,8 @@ import datetime
 import asyncio
 import logging
 from typing import Optional
+from textwrap import shorten
+from core.services.memory_store_local import get_memory_store
 
 # TODO: add subpages, etc... in filters as sometimes its necessary 
 
@@ -60,6 +62,7 @@ class SandboxWebSearchTool(SandboxToolsBase):
         # API usage tracking
         self._usage_count = 0
         self._last_reset_time = datetime.datetime.now()
+        self.memory_store = get_memory_store()
 
     def _track_api_usage(self):
         """Track API usage and log warnings if approaching limits"""
@@ -78,6 +81,94 @@ class SandboxWebSearchTool(SandboxToolsBase):
         # Warning at 50 requests (assuming free tier limit is around 100/hour)
         if self._usage_count == 50:
             logging.warning(f"Tavily API usage approaching limit: {self._usage_count} requests in the last hour")
+
+    def _offload_search_payload(self, query: str, search_response: dict, success: bool = True) -> dict:
+        raw_json = json.dumps(search_response, ensure_ascii=False, indent=2)
+        title = f"web_search:{shorten(query, width=60, placeholder='…')}"
+        memory_info = self.memory_store.put_text(
+            raw_json,
+            type="WEB_SCRAPE",
+            subtype="serp",
+            title=title,
+            tags=["web", "search"],
+        )
+        pointer = f"mem://{memory_info['memory_id']}"
+        results = search_response.get("results", []) or []
+        summary_lines = []
+        answer = search_response.get("answer")
+        if isinstance(answer, str) and answer.strip():
+            summary_lines.append(shorten(f"Answer: {answer.strip()}", width=240, placeholder="…"))
+        for idx, item in enumerate(results[:5], start=1):
+            title_line = item.get("title") or item.get("url") or "untitled result"
+            url = item.get("url") or ""
+            snippet = item.get("content") or ""
+            summary_lines.append(
+                shorten(f"{idx}. {title_line} ({url}) — {snippet}", width=240, placeholder="…")
+            )
+        if not summary_lines:
+            summary_lines.append("No direct SERP hits; see memory_refs for full payload.")
+
+        content = "\n".join(summary_lines)
+        output = {
+            "role": "tool",
+            "name": "web_search",
+            "query": query,
+            "content": content,
+            "memory_refs": [
+                {"id": memory_info["memory_id"], "title": title, "mime": "application/json"}
+            ],
+            "pointer": pointer,
+            "result_count": len(results),
+            "has_answer": bool(answer),
+            "success": success,
+        }
+        self.memory_store.log_event(
+            "web_search_store",
+            memory_id=memory_info["memory_id"],
+            query=query,
+            result_count=len(results),
+            success=success,
+        )
+        return output
+    
+    def _offload_scrape_results(
+        self,
+        urls: list[str],
+        results: list[dict],
+        message: str,
+        success_count: int,
+        failure_count: int,
+    ) -> dict:
+        raw_json = json.dumps({"urls": urls, "results": results}, ensure_ascii=False, indent=2)
+        joined_urls = ", ".join(urls)
+        title = f"scrape:{shorten(joined_urls, width=60, placeholder='…')}"
+        memory_info = self.memory_store.put_text(
+            raw_json,
+            type="WEB_SCRAPE",
+            subtype="html",
+            title=title,
+            tags=["web", "scrape"],
+        )
+        pointer = f"mem://{memory_info['memory_id']}"
+        output = {
+            "role": "tool",
+            "name": "scrape_webpage",
+            "urls": urls,
+            "content": message,
+            "memory_refs": [
+                {"id": memory_info["memory_id"], "title": title, "mime": "application/json"}
+            ],
+            "pointer": pointer,
+            "summary": {"successful": success_count, "failed": failure_count},
+        }
+        self.memory_store.log_event(
+            "web_scrape_store",
+            memory_id=memory_info["memory_id"],
+            url_count=len(urls),
+            success_count=success_count,
+            failure_count=failure_count,
+        )
+        return output
 
     async def _tavily_search_with_retry(self, query: str, max_results: int) -> dict:
         """
@@ -228,17 +319,13 @@ class SandboxWebSearchTool(SandboxToolsBase):
             
             # Consider search successful if we have either results OR an answer
             if len(results) > 0 or (answer and answer.strip()):
-                return ToolResult(
-                    success=True,
-                    output=json.dumps(search_response, ensure_ascii=False)
-                )
+                payload = self._offload_search_payload(query, search_response)
+                return ToolResult(success=True, output=json.dumps(payload, ensure_ascii=False))
             else:
                 # No results or answer found
                 logging.warning(f"No search results or answer found for query: '{query}'")
-                return ToolResult(
-                    success=False,
-                    output=json.dumps(search_response, ensure_ascii=False)
-                )
+                payload = self._offload_search_payload(query, search_response, success=False)
+                return ToolResult(success=False, output=json.dumps(payload, ensure_ascii=False))
         
         except TavilyRateLimitError as e:
             error_message = str(e)
@@ -375,10 +462,8 @@ class SandboxWebSearchTool(SandboxToolsBase):
                 error_details = "; ".join([f"{r.get('url')}: {r.get('error', 'Unknown error')}" for r in results])
                 return self.fail_response(f"Failed to scrape all {len(results)} URLs. Errors: {error_details}")
             
-            return ToolResult(
-                success=True,
-                output=message
-            )
+            payload = self._offload_scrape_results(url_list, results, message, successful, failed)
+            return ToolResult(success=True, output=json.dumps(payload, ensure_ascii=False))
         
         except Exception as e:
             error_message = str(e)

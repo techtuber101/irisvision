@@ -203,6 +203,19 @@ class ContextManager:
     def is_tool_related_message(self, msg: Dict[str, Any]) -> bool:
         """Check if message contains any tool-related data (calls or results) that must be preserved."""
         return self.has_tool_calls(msg) or self.is_tool_result_message(msg)
+
+    def message_has_pointer(self, msg: Dict[str, Any]) -> bool:
+        if not isinstance(msg, dict):
+            return False
+        content = msg.get("content")
+        if isinstance(content, dict):
+            refs = content.get("memory_refs")
+            if isinstance(refs, list) and refs:
+                return True
+        refs_top = msg.get("memory_refs")
+        if isinstance(refs_top, list) and refs_top:
+            return True
+        return False
     
     async def summarize_message(
         self, 
@@ -349,6 +362,7 @@ Message:
         max_tokens: Optional[int],
         token_threshold: int = 768,
         uncompressed_total_token_count: Optional[int] = None,
+        pointer_mode: bool = False,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """Compress the tool result messages except the most recent one.
         
@@ -365,6 +379,8 @@ Message:
             for msg in reversed(messages):  # Start from the end and work backwards
                 if not isinstance(msg, dict):
                     continue  # Skip non-dict messages
+                if pointer_mode and self.message_has_pointer(msg):
+                    continue
                 if self.is_tool_result_message(msg):  # Only compress ToolResult messages
                     _i += 1  # Count the number of ToolResult messages
                     msg_token_count = token_counter(model=llm_model, messages=[msg])  # Count the number of tokens in the message
@@ -396,6 +412,7 @@ Message:
         max_tokens: Optional[int],
         token_threshold: int = 768,
         uncompressed_total_token_count: Optional[int] = None,
+        pointer_mode: bool = False,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """Compress the user messages except the most recent one.
         
@@ -412,6 +429,8 @@ Message:
             for msg in reversed(messages):  # Start from the end and work backwards
                 if not isinstance(msg, dict):
                     continue  # Skip non-dict messages
+                if pointer_mode and self.message_has_pointer(msg):
+                    continue
                 if msg.get('role') == 'user':  # Only compress User messages
                     _i += 1  # Count the number of User messages
                     msg_token_count = token_counter(model=llm_model, messages=[msg])  # Count the number of tokens in the message
@@ -443,6 +462,7 @@ Message:
         max_tokens: Optional[int],
         token_threshold: int = 768,
         uncompressed_total_token_count: Optional[int] = None,
+        pointer_mode: bool = False,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """Compress the assistant messages except the most recent one.
         
@@ -459,6 +479,8 @@ Message:
             for msg in reversed(messages):  # Start from the end and work backwards
                 if not isinstance(msg, dict):
                     continue  # Skip non-dict messages
+                if pointer_mode and self.message_has_pointer(msg):
+                    continue
                 if msg.get('role') == 'assistant':  # Only compress Assistant messages
                     _i += 1  # Count the number of Assistant messages
                     msg_token_count = token_counter(model=llm_model, messages=[msg])  # Count the number of tokens in the message
@@ -484,10 +506,13 @@ Message:
                             
         return messages, truncated_count
 
-    def remove_meta_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def remove_meta_messages(self, messages: List[Dict[str, Any]], pointer_mode: bool = False) -> List[Dict[str, Any]]:
         """Remove meta messages from the messages."""
         result: List[Dict[str, Any]] = []
         for msg in messages:
+            if pointer_mode and self.message_has_pointer(msg):
+                result.append(msg)
+                continue
             msg_content = msg.get('content')
             # Try to parse msg_content as JSON if it's a string
             if isinstance(msg_content, str):
@@ -520,6 +545,7 @@ Message:
         max_iterations: int = 5,
         actual_total_tokens: Optional[int] = None,
         system_prompt: Optional[Dict[str, Any]] = None,
+        pointer_mode: bool = False,
         return_report: bool = False,
         report: Optional[CompressionReport] = None,
     ) -> Union[List[Dict[str, Any]], Tuple[List[Dict[str, Any]], CompressionReport]]:
@@ -546,7 +572,7 @@ Message:
         else:
             max_tokens = max_tokens or (context_window - 8_000)
 
-        result = self.remove_meta_messages(messages)
+        result = self.remove_meta_messages(messages, pointer_mode=pointer_mode)
 
         if actual_total_tokens is not None:
             uncompressed_total_token_count = actual_total_tokens
@@ -612,6 +638,9 @@ Message:
             for idx in messages_to_summarize:
                 msg = result[idx]
                 original_role = msg.get('role', 'user')
+
+                if pointer_mode and self.message_has_pointer(msg):
+                    continue
 
                 if msg.get('_summarized'):
                     continue
@@ -714,6 +743,7 @@ Message:
             max_tokens,
             token_threshold,
             uncompressed_total_token_count,
+            pointer_mode=pointer_mode,
         )
         result, user_truncated = self.compress_user_messages(
             result,
@@ -721,6 +751,7 @@ Message:
             max_tokens,
             token_threshold,
             uncompressed_total_token_count,
+            pointer_mode=pointer_mode,
         )
         result, assistant_truncated = self.compress_assistant_messages(
             result,
@@ -728,6 +759,7 @@ Message:
             max_tokens,
             token_threshold,
             uncompressed_total_token_count,
+            pointer_mode=pointer_mode,
         )
 
         truncated_now = tool_truncated + user_truncated + assistant_truncated
@@ -770,6 +802,7 @@ Message:
                 llm_model,
                 max_tokens,
                 system_prompt=system_prompt,
+                pointer_mode=pointer_mode,
             )
             report.removed_messages += removed
             report.add_phase(
@@ -798,6 +831,7 @@ Message:
                 max_iterations - 1,
                 uncompressed_total_token_count,
                 system_prompt,
+                pointer_mode=pointer_mode,
                 return_report=True,
                 report=report,
             )
@@ -851,7 +885,8 @@ Message:
         max_tokens: Optional[int] = 41000,
         removal_batch_size: int = 10,
         min_messages_to_keep: int = 10,
-        system_prompt: Optional[Dict[str, Any]] = None
+        system_prompt: Optional[Dict[str, Any]] = None,
+        pointer_mode: bool = False,
     ) -> Tuple[List[Dict[str, Any]], int, int]:
         """Compress the messages by omitting messages from the middle.
         
@@ -866,7 +901,7 @@ Message:
             return messages, 0, 0
             
         result = messages
-        result = self.remove_meta_messages(result)
+        result = self.remove_meta_messages(result, pointer_mode=pointer_mode)
 
         # Early exit if no compression needed
         if system_prompt:

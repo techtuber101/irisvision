@@ -6,6 +6,8 @@ from uuid import uuid4
 from core.agentpress.tool import ToolResult, openapi_schema, tool_metadata
 from core.sandbox.tool_base import SandboxToolsBase
 from core.agentpress.thread_manager import ThreadManager
+from core.services.memory_store_local import get_memory_store
+from textwrap import shorten
 
 @tool_metadata(
     display_name="Terminal & Commands",
@@ -23,6 +25,57 @@ class SandboxShellTool(SandboxToolsBase):
     def __init__(self, project_id: str, thread_manager: ThreadManager):
         super().__init__(project_id, thread_manager)
         self._sessions: Dict[str, str] = {}  # Maps session names to session IDs
+        self.memory_store = get_memory_store()
+
+    def _prepare_shell_response(
+        self,
+        *,
+        command: str,
+        output: str,
+        cwd: str,
+        session_name: str,
+        completed: bool,
+        status: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "role": "tool",
+            "name": "shell_command",
+            "command": command,
+            "cwd": cwd,
+            "session_name": session_name,
+            "completed": completed,
+        }
+        if status:
+            payload["status"] = status
+
+        output = output or ""
+        if output and len(output) > 1500:
+            title = f"shell:{shorten(command, width=60, placeholder='…')}"
+            memory_info = self.memory_store.put_text(
+                output,
+                type="TOOL_OUTPUT",
+                subtype="shell",
+                title=title,
+                tags=["shell", "command"],
+            )
+            pointer = f"mem://{memory_info['memory_id']}"
+            payload["content"] = shorten(output, width=800, placeholder="…")
+            payload["memory_refs"] = [
+                {"id": memory_info["memory_id"], "title": title, "mime": "text/plain"}
+            ]
+            payload["pointer"] = pointer
+            self.memory_store.log_event(
+                "shell_output_store",
+                memory_id=memory_info["memory_id"],
+                command=command,
+                cwd=cwd,
+                session=session_name,
+                completed=completed,
+            )
+        else:
+            payload["content"] = output
+
+        return payload
 
     async def _ensure_session(self, session_name: str = "default") -> str:
         """Ensure a session exists and return its ID."""
@@ -152,12 +205,15 @@ class SandboxShellTool(SandboxToolsBase):
                 # Kill the session after capture
                 await self._execute_raw_command(f"tmux kill-session -t {session_name}")
                 
-                return self.success_response({
-                    "output": final_output,
-                    "session_name": session_name,
-                    "cwd": cwd,
-                    "completed": True
-                })
+                payload = self._prepare_shell_response(
+                    command=command,
+                    output=final_output,
+                    cwd=cwd,
+                    session_name=session_name,
+                    completed=True,
+                    status="Session terminated after completion.",
+                )
+                return self.success_response(payload)
             else:
                 # Send command to tmux session for non-blocking execution
                 await self._execute_raw_command(f'tmux send-keys -t {session_name} "{wrapped_command}" Enter')
@@ -255,11 +311,15 @@ class SandboxShellTool(SandboxToolsBase):
             else:
                 termination_status = "Session still running."
             
-            return self.success_response({
-                "output": output,
-                "session_name": session_name,
-                "status": termination_status
-            })
+            payload = self._prepare_shell_response(
+                command=f"[check] {session_name}",
+                output=output,
+                cwd=self.workspace_path,
+                session_name=session_name,
+                completed=kill_session,
+                status=termination_status,
+            )
+            return self.success_response(payload)
                 
         except Exception as e:
             return self.fail_response(f"Error checking command output: {str(e)}")
