@@ -379,7 +379,7 @@ class PromptManager:
             user_message: User's message content
             
         Returns:
-            Instruction tag (presentation, document_creation, research, web_development) or None
+            Instruction tag (presentation, document_creation, research, web_development, visualization) or None
         """
         if not user_message:
             return None
@@ -400,6 +400,11 @@ class PromptManager:
         research_keywords = ['research', 'analyze', 'analysis', 'study', 'investigate', 'data visualization', 'comprehensive report', 'find information']
         if any(keyword in message_lower for keyword in research_keywords):
             return 'research'
+        
+        # Visualization detection (charts, graphs, matplotlib)
+        visualization_keywords = ['chart', 'charts', 'graph', 'graphs', 'visualization', 'visualize', 'matplotlib', 'plot', 'plots', 'infographic', 'infographics', 'create chart', 'create graph', 'generate chart', 'generate graph']
+        if any(keyword in message_lower for keyword in visualization_keywords):
+            return 'visualization'
         
         # Web development detection
         webdev_keywords = ['website', 'web app', 'web application', 'html', 'css', 'javascript', 'react', 'vue', 'frontend', 'backend', 'deploy website', 'create website']
@@ -456,6 +461,31 @@ class PromptManager:
         return None
     
     @staticmethod
+    async def _load_multiple_instructions(
+        task_types: List[str],
+        thread_id: str,
+        client
+    ) -> str:
+        """Load multiple instruction types and combine them.
+        
+        Args:
+            task_types: List of instruction tags to load
+            thread_id: Thread ID to get project_id
+            client: Database client
+            
+        Returns:
+            Combined instruction content
+        """
+        combined_instructions = []
+        
+        for task_type in task_types:
+            instruction_content = await PromptManager._load_instructions_for_task(task_type, thread_id, client)
+            if instruction_content:
+                combined_instructions.append(instruction_content)
+        
+        return "\n\n".join(combined_instructions) if combined_instructions else ""
+    
+    @staticmethod
     async def build_system_prompt(model_name: str, agent_config: Optional[dict], 
                                   thread_id: str, 
                                   mcp_wrapper_instance: Optional[MCPToolWrapper],
@@ -476,16 +506,30 @@ class PromptManager:
                 if task_type:
                     # Only load if message is substantial (not just a mention)
                     message_lower = user_message.lower()
-                    task_keywords_present = sum(1 for kw in ['presentation', 'slide', 'document', 'report', 'research', 'analyze', 'website', 'web app'] if kw in message_lower)
+                    task_keywords_present = sum(1 for kw in ['presentation', 'slide', 'document', 'report', 'research', 'analyze', 'website', 'web app', 'chart', 'graph', 'visualization', 'matplotlib'] if kw in message_lower)
                     
                     if task_keywords_present >= 1:  # At least one clear keyword
                         logger.debug(f"Detected task type: {task_type}, auto-loading instructions...")
-                        instruction_content = await PromptManager._load_instructions_for_task(task_type, thread_id, client)
+                        
+                        # For document_creation and research tasks, also load visualization instructions
+                        # (since charts are mandatory for all documents and research reports)
+                        instruction_types_to_load = [task_type]
+                        if task_type in ['document_creation', 'research']:
+                            instruction_types_to_load.append('visualization')
+                            logger.debug(f"{task_type} detected - also loading visualization instructions")
+                        
+                        # Load instructions (single or multiple)
+                        if len(instruction_types_to_load) == 1:
+                            instruction_content = await PromptManager._load_instructions_for_task(task_type, thread_id, client)
+                        else:
+                            instruction_content = await PromptManager._load_multiple_instructions(instruction_types_to_load, thread_id, client)
+                        
                         if instruction_content:
                             # Inject instructions into system prompt
                             instruction_section = f"\n\n# TASK-SPECIFIC INSTRUCTIONS (Auto-loaded)\n\n{instruction_content}\n"
                             default_system_content = default_system_content + instruction_section
-                            logger.info(f"✅ Injected {task_type} instructions into system prompt ({len(instruction_content)} chars)")
+                            loaded_types = ", ".join(instruction_types_to_load)
+                            logger.info(f"✅ Injected {loaded_types} instructions into system prompt ({len(instruction_content)} chars)")
                         else:
                             logger.debug(f"Could not load {task_type} instructions from KV cache")
                     else:

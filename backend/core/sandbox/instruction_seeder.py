@@ -44,6 +44,11 @@ INSTRUCTION_FILES = {
         "file": "web_development_instructions.md",
         "tag": "web_development",
         "description": "Web development, deployment, and UI design standards"
+    },
+    "visualization": {
+        "file": "visualization_instructions.md",
+        "tag": "visualization",
+        "description": "Matplotlib charts, graphs, and data visualization creation guidelines"
     }
 }
 

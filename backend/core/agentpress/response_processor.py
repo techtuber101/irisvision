@@ -605,38 +605,33 @@ class ResponseProcessor:
                                 })
                             except json.JSONDecodeError: continue
 
-                # ULTRA-AGGRESSIVE: Cache long assistant messages to reduce token usage
-                cached_assistant_content = None
-                offloader = await self._get_context_offloader(thread_id)
-                if offloader and accumulated_content:
-                    # Check if assistant message is long enough to cache
-                    from litellm.utils import token_counter
+                # NON-BLOCKING: Cache assistant messages in background, use full content immediately
+                # This prevents caching from blocking message streaming
+                assistant_content_for_storage = accumulated_content  # Use full content immediately
+                
+                # Get offloader and cache in background (fire-and-forget) for next time
+                async def get_offloader_and_cache_assistant():
                     try:
-                        assistant_tokens = token_counter(model="gpt-4", text=accumulated_content)
-                        if assistant_tokens > 500:  # Cache if >500 tokens (aggressive)
-                            reference = await offloader.offload_content(
-                                content=accumulated_content,
-                                content_type="assistant_message",
-                                source_id=f"assistant_{thread_id}",
-                                metadata={"thread_run_id": thread_run_id, "has_tool_calls": bool(complete_native_tool_calls)}
-                            )
-                            if reference:
-                                cached_assistant_content = reference
-                                logger.info(f"💾 Cached long assistant message: {assistant_tokens:,} tokens -> {reference.get('artifact_key')}")
+                        offloader = await self._get_context_offloader(thread_id)
+                        if offloader and accumulated_content:
+                            from litellm.utils import token_counter
+                            assistant_tokens = token_counter(model="gpt-4", text=accumulated_content)
+                            if assistant_tokens > 500:  # Cache if >500 tokens
+                                reference = await offloader.offload_content(
+                                    content=accumulated_content,
+                                    content_type="assistant_message",
+                                    source_id=f"assistant_{thread_id}",
+                                    metadata={"thread_run_id": thread_run_id, "has_tool_calls": bool(complete_native_tool_calls)}
+                                )
+                                if reference:
+                                    logger.debug(f"✅ Background cached assistant message: {assistant_tokens:,} tokens -> {reference.get('artifact_key')}")
                     except Exception as e:
-                        logger.debug(f"Could not cache assistant message: {e}")
-
-                # Use cached reference if available, otherwise use full content
-                if cached_assistant_content:
-                    assistant_content_for_storage = {
-                        "_cached": True,
-                        "artifact_key": cached_assistant_content["artifact_key"],
-                        "preview": cached_assistant_content["preview"],
-                        "retrieval_hint": cached_assistant_content.get("retrieval_hint", ""),
-                        "scope": cached_assistant_content.get("scope", "artifacts")
-                    }
-                else:
-                    assistant_content_for_storage = accumulated_content
+                        logger.debug(f"Background assistant caching failed (non-critical): {e}")
+                
+                # Fire-and-forget: get offloader and cache in background without blocking
+                # Task is scheduled but not awaited - execution continues immediately
+                # Errors are handled inside the function, so no need to await
+                asyncio.create_task(get_offloader_and_cache_assistant())
 
                 message_data = { # Dict to be saved in 'content'
                     "role": "assistant", "content": assistant_content_for_storage,
@@ -1831,26 +1826,34 @@ class ResponseProcessor:
                     # Fallback to string representation of the whole result
                     raw_content = str(result)
                 
-                # Use ContextOffloader to automatically cache large outputs
-                offloader = await self._get_context_offloader(thread_id)
-                if offloader:
-                    function_name = tool_call.get("function_name", "unknown")
-                    tool_call_id = tool_call.get("id")
-                    
-                    reference = await offloader.offload_tool_output(
-                        tool_output=raw_content,
-                        tool_name=function_name,
-                        tool_call_id=tool_call_id,
-                        metadata={"thread_id": thread_id}
-                    )
-                    
-                    if reference:
-                        # Use reference instead of full content
-                        content = json.dumps(offloader.create_reference_message(reference, raw_content))
-                    else:
-                        content = raw_content
-                else:
-                    content = raw_content
+                # NON-BLOCKING: Cache in background, yield result immediately for speed
+                # This prevents caching from blocking tool result streaming
+                content = raw_content  # Use full content immediately (no blocking)
+                
+                # Get offloader in background (non-blocking) - don't await if it's slow
+                # Cache in background (fire-and-forget) - doesn't block streaming
+                async def get_offloader_and_cache():
+                    try:
+                        offloader = await self._get_context_offloader(thread_id)
+                        if offloader:
+                            function_name = tool_call.get("function_name", "unknown")
+                            tool_call_id = tool_call.get("id")
+                            
+                            reference = await offloader.offload_tool_output(
+                                tool_output=raw_content,
+                                tool_name=function_name,
+                                tool_call_id=tool_call_id,
+                                metadata={"thread_id": thread_id}
+                            )
+                            if reference:
+                                logger.debug(f"✅ Background cached: {function_name} -> {reference.get('artifact_key')}")
+                    except Exception as e:
+                        logger.debug(f"Background caching failed (non-critical): {e}")
+                
+                # Fire-and-forget: get offloader and cache in background without blocking
+                # Task is scheduled but not awaited - execution continues immediately
+                # Errors are handled inside the function, so no need to await
+                asyncio.create_task(get_offloader_and_cache())
                 
                 logger.debug(f"Formatted tool result content: {content[:100]}...")
                 self.trace.event(name="formatted_tool_result_content", level="DEFAULT", status_message=(f"Formatted tool result content: {content[:100]}..."))
@@ -1881,38 +1884,40 @@ class ResponseProcessor:
             # Determine message role based on strategy
             result_role = "user" if strategy == "user_message" else "assistant"
             
-            # Use ContextOffloader to automatically cache large outputs
+            # NON-BLOCKING: Cache in background, use full output immediately for speed
+            # This prevents caching from blocking tool result streaming
             output = result.output if hasattr(result, 'output') else str(result)
             output_size = len(str(output))
-            offloader = await self._get_context_offloader(thread_id)
             
-            reference = None
-            if offloader:
-                function_name = tool_call.get("function_name", "unknown")
-                tool_call_id = tool_call.get("id")
-                
-                logger.debug(f"🔍 Checking if tool output should be cached: {function_name} (size: {output_size} chars)")
-                
-                reference = await offloader.offload_tool_output(
-                    tool_output=output,
-                    tool_name=function_name,
-                    tool_call_id=tool_call_id,
-                    metadata={"thread_id": thread_id}
-                )
-                
-                if reference:
-                    logger.info(f"✅ Tool output cached: {function_name} -> {reference.get('artifact_key')} in artifacts scope")
-                else:
-                    logger.debug(f"⏭️  Tool output not cached: {function_name} (below threshold)")
-            else:
-                logger.warning(f"⚠️  ContextOffloader not available for thread {thread_id} - tool outputs won't be cached!")
+            # Get offloader and cache in background (fire-and-forget) - doesn't block streaming
+            async def get_offloader_and_cache():
+                try:
+                    offloader = await self._get_context_offloader(thread_id)
+                    if offloader:
+                        function_name = tool_call.get("function_name", "unknown")
+                        tool_call_id = tool_call.get("id")
+                        
+                        reference = await offloader.offload_tool_output(
+                            tool_output=output,
+                            tool_name=function_name,
+                            tool_call_id=tool_call_id,
+                            metadata={"thread_id": thread_id}
+                        )
+                        if reference:
+                            logger.debug(f"✅ Background cached: {function_name} -> {reference.get('artifact_key')}")
+                except Exception as e:
+                    logger.debug(f"Background caching failed (non-critical): {e}")
+            
+            # Fire-and-forget: get offloader and cache in background without blocking
+            # Task is scheduled but not awaited - execution continues immediately
+            # Errors are handled inside the function, so no need to await
+            asyncio.create_task(get_offloader_and_cache())
             
             # Create two versions of the structured result
             # 1. Rich version for the frontend (always full output)
             structured_result_for_frontend = self._create_structured_tool_result(tool_call, result, parsing_details, for_llm=False)
-            # 2. Concise version for the LLM (with KV cache reference if stored)
-            artifact_key = reference.get("artifact_key") if reference else None
-            structured_result_for_llm = self._create_structured_tool_result(tool_call, result, parsing_details, for_llm=True, artifact_key=artifact_key)
+            # 2. Use full output for LLM (caching happens in background, will be used next time)
+            structured_result_for_llm = self._create_structured_tool_result(tool_call, result, parsing_details, for_llm=True, artifact_key=None)
 
             # Add the message with the appropriate role to the conversation history
             # This allows the LLM to see the tool result in subsequent interactions
@@ -2015,9 +2020,10 @@ class ResponseProcessor:
                     sandbox_obj = await create_sandbox(sandbox_pass, project_id)
                     sandbox_id = sandbox_obj.id
                     
-                    # Wait 5 seconds for services to start up
-                    logger.info(f"Waiting 5 seconds for sandbox {sandbox_id} services to initialize...")
-                    await asyncio.sleep(5)
+                    # PERFORMANCE: Reduced wait time for faster startup (was 5s, now 2s)
+                    # Services will be ready enough for KV cache operations
+                    logger.info(f"Waiting 2 seconds for sandbox {sandbox_id} services to initialize...")
+                    await asyncio.sleep(2)
                     
                     # Gather preview links and token (best-effort)
                     try:

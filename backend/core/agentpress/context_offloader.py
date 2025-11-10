@@ -24,6 +24,7 @@ Key Features:
 
 import json
 import uuid
+import asyncio
 from typing import Any, Dict, Optional, Union, Tuple, List
 from datetime import datetime
 from litellm.utils import token_counter
@@ -561,6 +562,8 @@ class ContextOffloader:
         - Automatically expand references in recent/active messages (LLM needs them now)
         - This gives LLM instant access without tool calls, while saving tokens
         
+        PERFORMANCE: Fast-path check - skip if no cached references found
+        
         Args:
             messages: List of messages that may contain cached references
             auto_expand: If True, automatically retrieve and expand cached content
@@ -573,27 +576,55 @@ class ContextOffloader:
         if not self.enabled or not auto_expand:
             return messages
         
+        # FAST PATH: Quick check if any messages have cached references (avoid unnecessary work)
+        has_cached_refs = False
+        for msg in messages[-recent_message_count:] if expand_recent_only and len(messages) > recent_message_count else messages:
+            content = msg.get("content", "")
+            if isinstance(content, str):
+                if "_cached" in content and "artifact_key" in content:
+                    has_cached_refs = True
+                    break
+            elif isinstance(content, dict):
+                if content.get("_cached") is True:
+                    has_cached_refs = True
+                    break
+        
+        if not has_cached_refs:
+            # No cached references found, return messages as-is (fast path)
+            logger.debug("⚡ Fast path: No cached references found, skipping expansion")
+            return messages
+        
         # Strategy: Expand recent messages (LLM needs them now), keep older as references
+        # PERFORMANCE: Expand in parallel for speed
         if expand_recent_only and len(messages) > recent_message_count:
             # Older messages: Keep as references (saves tokens, LLM can retrieve if needed)
             older_messages = messages[:-recent_message_count]
             
-            # Recent messages: Expand automatically (LLM needs them immediately)
+            # Recent messages: Expand automatically in PARALLEL (LLM needs them immediately)
             recent_messages = messages[-recent_message_count:]
-            expanded_recent = []
-            for msg in recent_messages:
-                expanded_msg = await self._expand_message_cached_content(msg)
-                expanded_recent.append(expanded_msg)
+            # Expand in parallel for speed (non-blocking)
+            expansion_tasks = [self._expand_message_cached_content(msg) for msg in recent_messages]
+            expanded_recent = await asyncio.gather(*expansion_tasks, return_exceptions=True)
+            
+            # Filter out exceptions (keep original message if expansion fails)
+            expanded_recent = [
+                msg if not isinstance(msg, Exception) else recent_messages[i]
+                for i, msg in enumerate(expanded_recent)
+            ]
             
             # Combine: older messages keep references, recent messages expanded
-            logger.debug(f"📦 Smart expansion: {len(older_messages)} messages with references, {len(expanded_recent)} recent messages expanded")
+            logger.debug(f"📦 Smart expansion: {len(older_messages)} messages with references, {len(expanded_recent)} recent messages expanded (parallel)")
             return older_messages + expanded_recent
         else:
-            # Expand all messages (for short conversations)
-            expanded_messages = []
-            for msg in messages:
-                expanded_msg = await self._expand_message_cached_content(msg)
-                expanded_messages.append(expanded_msg)
+            # Expand all messages in parallel (for short conversations)
+            expansion_tasks = [self._expand_message_cached_content(msg) for msg in messages]
+            expanded_messages = await asyncio.gather(*expansion_tasks, return_exceptions=True)
+            
+            # Filter out exceptions
+            expanded_messages = [
+                msg if not isinstance(msg, Exception) else messages[i]
+                for i, msg in enumerate(expanded_messages)
+            ]
             
             return expanded_messages
     

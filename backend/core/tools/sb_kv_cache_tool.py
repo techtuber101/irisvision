@@ -120,7 +120,7 @@ Use this to offload large instruction blocks from the prompt so they can be retr
             "name": "get_instruction",
             "description": """Retrieve an instruction file by tag. 
 
-**IMPORTANT:** Instructions are automatically loaded in the background based on task detection. You typically don't need to call this tool - the system automatically injects relevant instructions into your context when it detects your task type (presentation, document creation, research, web development).
+**IMPORTANT:** Instructions are automatically loaded in the background based on task detection. You typically don't need to call this tool - the system automatically injects relevant instructions into your context when it detects your task type (presentation, document creation, research, web development, visualization).
 
 Only use this tool if:
 - You need instructions for a task type that wasn't auto-detected
@@ -133,7 +133,7 @@ For normal usage, instructions are already in your context automatically.""",
                 "properties": {
                     "tag": {
                         "type": "string",
-                        "description": "Instruction tag to retrieve (e.g., 'presentation', 'research', 'document_creation', 'web_development')"
+                        "description": "Instruction tag to retrieve (e.g., 'presentation', 'research', 'document_creation', 'web_development', 'visualization')"
                     }
                 },
                 "required": ["tag"]
