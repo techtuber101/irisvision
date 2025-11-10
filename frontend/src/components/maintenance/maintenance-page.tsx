@@ -1,16 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Loader2, Server, RefreshCw, AlertCircle, Clock, Wrench } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Loader2, RefreshCw, AlertCircle, Clock } from 'lucide-react';
 import { useApiHealth } from '@/hooks/react-query';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { isLocalMode } from '@/lib/config';
+import { useScroll } from 'motion/react';
+import { FlickeringGrid } from '@/components/home/ui/flickering-grid';
+import { useMediaQuery } from '@/hooks/use-media-query';
 
 export function MaintenancePage() {
+  const tablet = useMediaQuery('(max-width: 1024px)');
+  const [mounted, setMounted] = useState(false);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+  const { scrollY } = useScroll();
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   
   const { data: healthData, isLoading: isCheckingHealth, refetch } = useApiHealth();
@@ -29,90 +33,151 @@ export function MaintenancePage() {
   };
 
   useEffect(() => {
+    setMounted(true);
     setLastChecked(new Date());
   }, []);
 
+  // Detect when scrolling is active to reduce animation complexity
+  useEffect(() => {
+    const unsubscribe = scrollY.on('change', () => {
+      setIsScrolling(true);
+
+      // Clear any existing timeout
+      if (scrollTimeout.current) {
+        clearTimeout(scrollTimeout.current);
+      }
+
+      // Set a new timeout
+      scrollTimeout.current = setTimeout(() => {
+        setIsScrolling(false);
+      }, 300); // Wait 300ms after scroll stops
+    });
+
+    return () => {
+      unsubscribe();
+      if (scrollTimeout.current) {
+        clearTimeout(scrollTimeout.current);
+      }
+    };
+  }, [scrollY]);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl">
-        <Card className="border-none shadow-none backdrop-blur-sm bg-transparent">
-          <CardContent className="p-8">
-            <div className="text-center space-y-6">
-              <div className="flex justify-center mb-4">
-                <div className="relative">
-                  <div className="relative p-4 rounded-full border-2 bg-primary/10">
-                    <Wrench className="h-10 w-10" />
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-center">
-                <Badge variant="outline" className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700 text-blue-800 dark:text-blue-200 font-medium">
-                  <AlertCircle className="h-4 w-4" />
-                  System Under Maintenance
-                </Badge>
-              </div>
-              <div className="space-y-4">
-                <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                  We'll Be Right Back
-                </h1>
-                <p className="text-base text-muted-foreground max-w-lg mx-auto leading-relaxed">
-                  {isLocalMode() ? (
-                    "The backend server appears to be offline. Please ensure your backend server is running and try again."
-                  ) : (
-                    "We're performing scheduled maintenance to improve your experience. Our team is working diligently to restore all services."
-                  )}
-                </p>
-              </div>
-              <div className="grid grid-cols-1 gap-3 mt-6 md:px-4">
-                <Card className="bg-muted-foreground/10 border-none shadow-none">
-                  <CardContent className="text-center">
-                    <div className="flex items-center justify-center mb-1">
-                      <div className="h-3 w-3 bg-red-500 dark:bg-red-400 rounded-full mr-2 animate-pulse"></div>
-                      <span className="font-medium text-red-700 dark:text-red-300">Services Offline</span>
-                    </div>
-                    <p className="text-sm text-red-600 dark:text-red-400">All agent executions are currently paused.</p>
-                  </CardContent>
-                </Card>
-              </div>
-              <div className="space-y-4 pt-4">
-                <Button
-                  onClick={checkHealth}
-                  disabled={isCheckingHealth}
-                  size="lg"
-                  className="w-full md:w-auto px-6 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium transition-all duration-200"
-                >
-                  {isCheckingHealth ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Checking Status...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="h-4 w-4" />
-                      Check System Status
-                    </>
-                  )}
-                </Button>
-                {lastChecked && (
-                  <div className="flex items-center justify-center text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4 mr-2" />
-                    Last checked: {lastChecked.toLocaleTimeString()}
-                  </div>
-                )}
-              </div>
-              <div className="pt-4 border-t border-border/50">
-                <p className="text-sm text-muted-foreground">
-                  {isLocalMode() ? (
-                    "Need help? Check the documentation for setup instructions."
-                  ) : (
-                    "For urgent matters, please contact our support team."
-                  )}
-                </p>
-              </div>
+    <section className="w-full relative overflow-hidden min-h-screen flex items-center justify-center">
+      <div className="relative flex flex-col items-center w-full px-6">
+        {/* Left side flickering grid with gradient fades */}
+        <div className="absolute left-0 top-0 h-full w-1/3 -z-10 overflow-hidden">
+          {/* Horizontal fade from left to right */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-background z-10" />
+
+          {/* Vertical fade from top */}
+          <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-background via-background/90 to-transparent z-10" />
+
+          {/* Vertical fade to bottom */}
+          <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-background via-background/90 to-transparent z-10" />
+
+          <FlickeringGrid
+            className="h-full w-full"
+            squareSize={mounted && tablet ? 2 : 2.5}
+            gridGap={mounted && tablet ? 2 : 2.5}
+            color="var(--secondary)"
+            maxOpacity={0.4}
+            flickerChance={isScrolling ? 0.01 : 0.03}
+          />
+        </div>
+
+        {/* Right side flickering grid with gradient fades */}
+        <div className="absolute right-0 top-0 h-full w-1/3 -z-10 overflow-hidden">
+          {/* Horizontal fade from right to left */}
+          <div className="absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-background z-10" />
+
+          {/* Vertical fade from top */}
+          <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-background via-background/90 to-transparent z-10" />
+
+          {/* Vertical fade to bottom */}
+          <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-background via-background/90 to-transparent z-10" />
+
+          <FlickeringGrid
+            className="h-full w-full"
+            squareSize={mounted && tablet ? 2 : 2.5}
+            gridGap={mounted && tablet ? 2 : 2.5}
+            color="var(--secondary)"
+            maxOpacity={0.4}
+            flickerChance={isScrolling ? 0.01 : 0.03}
+          />
+        </div>
+
+        {/* Center content background with rounded bottom */}
+        <div className="absolute inset-x-1/4 top-0 h-full -z-20 bg-background rounded-b-xl"></div>
+
+        <div className="relative z-10 max-w-3xl mx-auto h-full w-full flex flex-col gap-10 items-center justify-center py-12">
+          <div className="inline-flex h-10 w-fit items-center justify-center gap-2 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 px-4">
+            <AlertCircle className="size-4" />
+            <span className="text-sm font-medium">System Maintenance</span>
+          </div>
+
+          <div className="flex flex-col items-center justify-center gap-5">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-medium tracking-tighter text-balance text-center text-primary">
+              We'll be right back
+            </h1>
+            <p className="text-base md:text-lg text-center text-muted-foreground font-medium text-balance leading-relaxed tracking-tight max-w-2xl">
+              {isLocalMode() ? (
+                "The backend server appears to be offline. Please ensure your backend server is running and try again."
+              ) : (
+                "We're currently performing scheduled maintenance to improve your experience. Our team is working diligently to restore all services."
+              )}
+            </p>
+          </div>
+
+          {/* Status indicator */}
+          <div className="flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-red-500/10 border border-red-500/20">
+            <div className="h-3 w-3 bg-red-500 dark:bg-red-400 rounded-full animate-pulse"></div>
+            <div className="flex flex-col items-start gap-0.5">
+              <span className="text-sm font-semibold text-red-700 dark:text-red-300">Services Offline</span>
+              <span className="text-xs text-red-600 dark:text-red-400">All agent executions are currently paused</span>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+
+          <div className="flex flex-col items-center w-full max-w-xl gap-4">
+            <Button
+              onClick={checkHealth}
+              disabled={isCheckingHealth}
+              className="inline-flex h-12 md:h-14 items-center justify-center gap-2 rounded-full bg-primary text-white px-8 shadow-md hover:bg-primary/90 transition-all duration-200 disabled:opacity-50"
+            >
+              {isCheckingHealth ? (
+                <>
+                  <Loader2 className="size-4 md:size-5 animate-spin dark:text-black" />
+                  <span className="font-medium dark:text-black">Checking Status...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="size-4 md:size-5 dark:text-black" />
+                  <span className="font-medium dark:text-black">Check Status Now</span>
+                </>
+              )}
+            </Button>
+            
+            {lastChecked && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="size-4" />
+                <span>Last checked: {lastChecked.toLocaleTimeString()}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-4 border-t border-border/50 w-full max-w-xl text-center">
+            <p className="text-sm text-muted-foreground">
+              {isLocalMode() ? (
+                "Need help? Check the documentation for setup instructions."
+              ) : (
+                "For urgent matters, please contact our support team."
+              )}
+            </p>
+          </div>
+
+          {/* Subtle glow effect */}
+          <div className="absolute -bottom-4 inset-x-0 h-6 bg-secondary/20 blur-xl rounded-full -z-10 opacity-70"></div>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }
