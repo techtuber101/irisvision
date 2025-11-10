@@ -19,6 +19,9 @@ from daytona_sdk import AsyncSandbox
 from core.sandbox.kv_store import SandboxKVStore
 from core.utils.logger import logger
 
+# Module-level flag to prevent recursive seeding
+_seeding_in_progress = False
+
 
 # Define instruction file mappings
 INSTRUCTION_FILES = {
@@ -48,15 +51,16 @@ INSTRUCTION_FILES = {
 class InstructionSeeder:
     """Manages seeding of instruction files into KV cache."""
     
-    def __init__(self, sandbox: AsyncSandbox):
+    def __init__(self, sandbox: AsyncSandbox, kv_store: Optional[SandboxKVStore] = None):
         """
         Initialize instruction seeder.
         
         Args:
             sandbox: AsyncSandbox instance
+            kv_store: Optional existing KV store instance to reuse (prevents recursion)
         """
         self.sandbox = sandbox
-        self.kv_store = SandboxKVStore(sandbox)
+        self.kv_store = kv_store or SandboxKVStore(sandbox)
         self.instructions_dir = Path(__file__).parent.parent / "instructions"
     
     async def seed_all_instructions(self, force_refresh: bool = False) -> Dict[str, bool]:
@@ -69,28 +73,40 @@ class InstructionSeeder:
         Returns:
             Dict mapping instruction tags to success status
         """
-        results = {}
+        global _seeding_in_progress
         
-        for key, config in INSTRUCTION_FILES.items():
-            try:
-                success = await self.seed_instruction(
-                    tag=config["tag"],
-                    filename=config["file"],
-                    description=config["description"],
-                    force_refresh=force_refresh
-                )
-                results[config["tag"]] = success
-            except Exception as e:
-                logger.error(f"Failed to seed instruction '{config['tag']}': {e}")
-                results[config["tag"]] = False
+        # Prevent recursive seeding
+        if _seeding_in_progress:
+            logger.warning("Seeding already in progress, skipping recursive call")
+            return {}
         
-        seeded_count = sum(1 for v in results.values() if v)
-        logger.info(
-            f"Instruction seeding complete: {seeded_count}/{len(INSTRUCTION_FILES)} "
-            f"instructions seeded successfully"
-        )
+        _seeding_in_progress = True
         
-        return results
+        try:
+            results = {}
+            
+            for key, config in INSTRUCTION_FILES.items():
+                try:
+                    success = await self.seed_instruction(
+                        tag=config["tag"],
+                        filename=config["file"],
+                        description=config["description"],
+                        force_refresh=force_refresh
+                    )
+                    results[config["tag"]] = success
+                except Exception as e:
+                    logger.error(f"Failed to seed instruction '{config['tag']}': {e}")
+                    results[config["tag"]] = False
+            
+            seeded_count = sum(1 for v in results.values() if v)
+            logger.info(
+                f"Instruction seeding complete: {seeded_count}/{len(INSTRUCTION_FILES)} "
+                f"instructions seeded successfully"
+            )
+            
+            return results
+        finally:
+            _seeding_in_progress = False
     
     async def seed_instruction(
         self,

@@ -414,10 +414,10 @@ kv_store_for_context = kv_store
                 # This gives LLM instant access to recent content while saving tokens on older content
                 if context_offloader:
                     messages = await context_offloader.expand_cached_references(
-                        messages, 
+                        messages,
                         auto_expand=True,
                         expand_recent_only=True,  # Only expand references from recent messages
-                        recent_message_count=10   # Last 10 messages automatically expanded
+                        recent_message_count=3   # ULTRA-AGGRESSIVE: Only last 3 messages expanded (was 10)
                     )
                     logger.debug(f"✅ On-demand expansion: Recent messages expanded, older messages keep references")
             else:

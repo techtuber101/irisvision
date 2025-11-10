@@ -32,7 +32,7 @@ class EnvMode(Enum):
 
 class Configuration:
     """
-    Centralized configuration for AgentPress backend.
+    Centralized configuration for Iris backend.
     
     This class loads environment variables and provides type checking and validation.
     Default values can be specified for optional configuration items.

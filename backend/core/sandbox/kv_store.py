@@ -153,6 +153,8 @@ class SandboxKVStore:
         self.sandbox = sandbox
         self.root_path = KV_CACHE_ROOT
         self._locks: Dict[str, asyncio.Lock] = {}
+        self._initialized = False
+        self._initializing = False  # Prevent recursive initialization
     
     def _get_lock(self, key: str) -> asyncio.Lock:
         """Get or create a lock for a specific key."""
@@ -173,11 +175,67 @@ class SandboxKVStore:
         """Get the path to the scope's index file."""
         return f"{self._scope_path(scope)}/{INDEX_FILENAME}"
     
+    async def _ensure_initialized(self) -> None:
+        """
+        Ensure KV cache is initialized: create .iris folder and seed instructions.
+        
+        This runs automatically on first use and ensures the .iris folder
+        is visible immediately and instructions are seeded.
+        """
+        if self._initialized or self._initializing:
+            return
+        
+        self._initializing = True
+        
+        try:
+            # Create root .iris/kv-cache directory
+            try:
+                await self.sandbox.fs.create_folder(self.root_path, "755")
+                logger.info(f"✅ Created KV cache root directory: {self.root_path}")
+            except Exception as e:
+                # Directory might already exist
+                logger.debug(f"KV cache root directory check: {e}")
+            
+            # Create all scope directories immediately (including artifacts!)
+            for scope in SCOPE_CONFIG.keys():
+                await self._ensure_scope_directory(scope)
+                logger.debug(f"✅ Created/verified scope directory: {scope}")
+            
+            # Verify artifacts scope exists (critical for tool output caching)
+            artifacts_path = self._scope_path("artifacts")
+            try:
+                # Try to list files to verify it exists
+                await self.sandbox.fs.list_files(artifacts_path)
+                logger.info(f"✅ Artifacts scope verified: {artifacts_path}")
+            except Exception as e:
+                logger.warning(f"⚠️  Artifacts scope verification failed: {e} - will be created on first use")
+            
+            # Seed instructions automatically
+            # Pass self to prevent creating a new SandboxKVStore instance (which would cause recursion)
+            try:
+                from core.sandbox.instruction_seeder import InstructionSeeder
+                seeder = InstructionSeeder(self.sandbox, kv_store=self)
+                results = await seeder.seed_all_instructions(force_refresh=False)
+                seeded_count = sum(1 for v in results.values() if v)
+                logger.info(f"✅ Auto-seeded {seeded_count}/{len(results)} instructions into KV cache")
+            except Exception as e:
+                logger.warning(f"Failed to auto-seed instructions (non-critical): {e}")
+            
+            self._initialized = True
+            logger.info(f"✅ KV cache initialized: {self.root_path} ready")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize KV cache: {e}")
+            # Don't block if initialization fails, but mark as attempted
+            self._initialized = True
+        finally:
+            self._initializing = False
+    
     async def _ensure_scope_directory(self, scope: str) -> None:
         """Ensure scope directory exists."""
         scope_path = self._scope_path(scope)
         try:
-            await self.sandbox.fs.make_dir(scope_path)
+            await self.sandbox.fs.create_folder(scope_path, "755")
             logger.debug(f"Created KV cache scope directory: {scope_path}")
         except Exception as e:
             # Directory might already exist
@@ -277,6 +335,9 @@ class SandboxKVStore:
                 f"maximum allowed ({MAX_VALUE_SIZE_MB}MB)"
             )
         
+        # Ensure KV cache is initialized (creates .iris folder and seeds instructions)
+        await self._ensure_initialized()
+        
         # Ensure scope directory exists
         await self._ensure_scope_directory(scope)
         
@@ -336,6 +397,9 @@ class SandboxKVStore:
             KVKeyError: If key not found
             KVValueError: If deserialization fails
         """
+        # Ensure KV cache is initialized (creates .iris folder and seeds instructions)
+        await self._ensure_initialized()
+        
         scope = validate_scope(scope)
         sanitized_key = sanitize_key(key)
         
@@ -404,6 +468,9 @@ class SandboxKVStore:
         Raises:
             KVKeyError: If key not found
         """
+        # Ensure KV cache is initialized
+        await self._ensure_initialized()
+        
         scope = validate_scope(scope)
         sanitized_key = sanitize_key(key)
         
@@ -467,6 +534,9 @@ class SandboxKVStore:
         Returns:
             List of dicts with key metadata
         """
+        # Ensure KV cache is initialized
+        await self._ensure_initialized()
+        
         scope = validate_scope(scope)
         index = await self._load_index(scope)
         

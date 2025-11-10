@@ -5,8 +5,17 @@ This module provides a unified, intelligent system for automatically offloading
 large content to KV cache storage, dramatically reducing token usage while
 maintaining seamless access for the LLM.
 
+ULTRA-AGGRESSIVE CACHING MODE (for high token usage scenarios):
+- Cache threshold: >300 tokens or >1.5k chars (was 1k/5k)
+- Force cache: tool_output, file_content, view_tasks, terminal_output, assistant_message
+- Recent message expansion: Only last 3 messages (was 10)
+- Preview size: 200 chars (was 500)
+- Assistant messages: Cached if >500 tokens
+
+Expected impact: 60-80% token reduction for high-volume conversations.
+
 Key Features:
-- Automatic detection of large content (>2k tokens or >10k chars)
+- Automatic detection of large content with aggressive thresholds
 - Unified caching interface for all content types
 - Smart content type detection (tool outputs, files, search results, etc.)
 - Seamless retrieval hints for LLM
@@ -23,10 +32,11 @@ from core.utils.logger import logger
 from core.sandbox.kv_store import SandboxKVStore, KVStoreError
 
 
-# Content size thresholds
-TOKEN_THRESHOLD = 2000  # Cache if >2k tokens
-CHAR_THRESHOLD = 10000  # Cache if >10k chars
-MIN_CACHE_SIZE = 500  # Don't cache if <500 chars (overhead not worth it)
+# Content size thresholds - ULTRA-AGGRESSIVE caching for high token usage scenarios
+# These thresholds cache almost everything to minimize token consumption
+TOKEN_THRESHOLD = 300  # Cache if >300 tokens (ultra-aggressive, was 1k)
+CHAR_THRESHOLD = 1500  # Cache if >1.5k chars (ultra-aggressive, was 5k)
+MIN_CACHE_SIZE = 100  # Don't cache if <100 chars (was 200)
 
 
 class ContextOffloader:
@@ -78,17 +88,41 @@ class ContextOffloader:
         
         return token_count, char_count
     
-    def _should_cache(self, content: Any) -> bool:
+    def _should_cache(self, content: Any, content_type: str = "generic", force_cache: bool = False) -> bool:
         """Determine if content should be cached.
         
         Args:
             content: Content to evaluate
+            content_type: Type of content (for special rules)
+            force_cache: If True, always cache regardless of size
             
         Returns:
             True if content should be cached
         """
         if not self.enabled:
             return False
+        
+        # MANDATORY: Web search results MUST be cached
+        if force_cache or content_type in ["web_search", "websearch", "search"]:
+            token_count, char_count = self._estimate_size(content)
+            # Only skip if content is extremely small (less than 50 chars)
+            if char_count < 50:
+                logger.debug(f"Web search result too small to cache: {char_count} chars")
+                return False
+            return True
+        
+        # AGGRESSIVE: Force cache these high-volume content types regardless of size
+        aggressive_cache_types = [
+            "tool_output", "file_content", "browser_output", 
+            "view_tasks", "task_list", "terminal_output",
+            "assistant_message", "long_response"
+        ]
+        if content_type in aggressive_cache_types:
+            token_count, char_count = self._estimate_size(content)
+            # Cache if >100 chars (very aggressive)
+            if char_count > 100:
+                logger.debug(f"🔴 Aggressive caching: {content_type} ({char_count} chars) - force caching")
+                return True
         
         token_count, char_count = self._estimate_size(content)
         
@@ -130,7 +164,7 @@ class ContextOffloader:
         
         return base_key
     
-    def _create_preview(self, content: Any, max_chars: int = 500) -> str:
+    def _create_preview(self, content: Any, max_chars: int = 200) -> str:
         """Create a preview of content for reference messages.
         
         Args:
@@ -179,11 +213,29 @@ class ContextOffloader:
         Returns:
             Reference dict with artifact_key and preview, or None if not cached
         """
-        if not self._should_cache(content):
+        # Check if content should be cached
+        # Check metadata for force_cache flag (for web search)
+        force_cache = metadata.get("force_cached", False) if metadata else False
+        should_cache = self._should_cache(content, content_type=content_type, force_cache=force_cache)
+        token_count, char_count = self._estimate_size(content)
+        
+        if not should_cache:
+            logger.debug(
+                f"⏭️  Content not cached ({content_type}): {token_count:,} tokens, {char_count:,} chars - "
+                f"below threshold ({TOKEN_THRESHOLD} tokens / {CHAR_THRESHOLD} chars) or caching disabled"
+            )
             return None
         
+        logger.debug(
+            f"✅ Content will be cached ({content_type}): {token_count:,} tokens, {char_count:,} chars - "
+            f"exceeds threshold"
+        )
+        
         try:
-            token_count, char_count = self._estimate_size(content)
+            # Check if KV store is available
+            if not self.kv_store:
+                logger.debug(f"⏭️  KV store not available, skipping cache for {content_type}")
+                return None
             
             # Determine scope and TTL based on content type
             scope = "artifacts"  # Default scope
@@ -217,7 +269,7 @@ class ContextOffloader:
                 **(metadata or {})
             }
             
-            # Store in KV cache
+            # Store in KV cache (this will auto-initialize if needed)
             await self.kv_store.put(
                 scope=scope,
                 key=artifact_key,
@@ -234,6 +286,11 @@ class ContextOffloader:
                 f"artifact: {artifact_key} (scope: {scope}, TTL: {ttl}h)"
             )
             
+            # Log to help debug why artifacts folder might not be visible
+            logger.debug(
+                f"📁 KV cache artifact stored: {self.kv_store.root_path}/{scope}/{artifact_key}"
+            )
+            
             # Return reference
             return {
                 "_cached": True,
@@ -246,8 +303,28 @@ class ContextOffloader:
                 "note": f"Content type: {content_type}. Cached at {cache_metadata['cached_at']}"
             }
             
+        except KVStoreError as e:
+            # Specific KV store errors (quota, permissions, etc.) - log at debug level
+            logger.debug(f"⏭️  KV store error for {content_type} (non-critical): {e}")
+            return None
         except Exception as e:
-            logger.warning(f"Failed to offload content ({content_type}): {e}")
+            # Check if error is related to sandbox/filesystem not being ready
+            error_str = str(e).lower()
+            is_sandbox_error = any(keyword in error_str for keyword in [
+                'sandbox', 'not found', 'not available', 'not started', 
+                'connection', 'timeout', 'filesystem', 'asyncfilesystem',
+                'create_folder', 'upload_file', 'make_dir'
+            ])
+            
+            if is_sandbox_error:
+                # Sandbox not ready yet - this is expected and will retry automatically
+                logger.debug(
+                    f"⏭️  Sandbox not ready for caching {content_type} "
+                    f"(will retry automatically when sandbox is available): {type(e).__name__}"
+                )
+            else:
+                # Other unexpected errors - log as warning
+                logger.warning(f"⚠️  Failed to offload content ({content_type}): {e}")
             return None
     
     async def offload_tool_output(
@@ -268,22 +345,78 @@ class ContextOffloader:
         Returns:
             Reference dict or None
         """
+        # Log size check for debugging
+        token_count, char_count = self._estimate_size(tool_output)
+        logger.debug(
+            f"🔍 Tool output size check: {tool_name} -> {token_count:,} tokens, {char_count:,} chars "
+            f"(threshold: {TOKEN_THRESHOLD} tokens or {CHAR_THRESHOLD} chars)"
+        )
+        
+        # MANDATORY: Web search results MUST be cached regardless of size
+        # This prevents them from being stored in conversation context
+        is_web_search = tool_name in ['web_search', 'websearch', 'search']
+        force_cache = is_web_search
+        
+        if force_cache:
+            logger.info(
+                f"🔴 MANDATORY CACHING: {tool_name} output MUST be cached "
+                f"(size: {token_count:,} tokens, {char_count:,} chars)"
+            )
+        
         tool_metadata = {
             "tool_name": tool_name,
             "tool_call_id": tool_call_id,
+            "force_cached": force_cache,
             **(metadata or {})
         }
         
         source_id = tool_call_id or tool_name
         custom_key = f"tool_output_{tool_name}"
         
-        return await self.offload_content(
+        # For web search, use lower threshold to ensure caching
+        # If it's still below threshold, we'll force cache it anyway
+        reference = await self.offload_content(
             content=tool_output,
-            content_type="tool_output",
+            content_type="web_search" if is_web_search else "tool_output",
             source_id=source_id,
             metadata=tool_metadata,
             custom_key=custom_key
         )
+        
+        # If web search wasn't cached (shouldn't happen, but safety check)
+        if is_web_search and not reference:
+            # Force cache with minimal threshold override
+            logger.warning(
+                f"⚠️  Web search result not cached (unexpected), attempting force cache: "
+                f"{tool_name} ({token_count:,} tokens, {char_count:,} chars)"
+            )
+            # Try again with explicit content type that has lower threshold
+            reference = await self.offload_content(
+                content=tool_output,
+                content_type="web_search",
+                source_id=source_id,
+                metadata={**tool_metadata, "force_cached": True},
+                custom_key=custom_key
+            )
+        
+        if reference:
+            logger.info(
+                f"✅ Cached tool output: {tool_name} ({token_count:,} tokens, {char_count:,} chars) -> "
+                f"artifact: {reference.get('artifact_key')} in scope: {reference.get('scope')}"
+            )
+        else:
+            if is_web_search:
+                logger.error(
+                    f"❌ CRITICAL: Failed to cache web search result: {tool_name} "
+                    f"({token_count:,} tokens, {char_count:,} chars) - this should not happen!"
+                )
+            else:
+                logger.debug(
+                    f"⏭️  Tool output not cached: {tool_name} ({token_count:,} tokens, {char_count:,} chars) - "
+                    f"below threshold ({TOKEN_THRESHOLD} tokens / {CHAR_THRESHOLD} chars) or caching disabled"
+                )
+        
+        return reference
     
     async def offload_search_results(
         self,

@@ -605,8 +605,41 @@ class ResponseProcessor:
                                 })
                             except json.JSONDecodeError: continue
 
+                # ULTRA-AGGRESSIVE: Cache long assistant messages to reduce token usage
+                cached_assistant_content = None
+                offloader = await self._get_context_offloader(thread_id)
+                if offloader and accumulated_content:
+                    # Check if assistant message is long enough to cache
+                    from litellm.utils import token_counter
+                    try:
+                        assistant_tokens = token_counter(model="gpt-4", text=accumulated_content)
+                        if assistant_tokens > 500:  # Cache if >500 tokens (aggressive)
+                            reference = await offloader.offload_content(
+                                content=accumulated_content,
+                                content_type="assistant_message",
+                                source_id=f"assistant_{thread_id}",
+                                metadata={"thread_run_id": thread_run_id, "has_tool_calls": bool(complete_native_tool_calls)}
+                            )
+                            if reference:
+                                cached_assistant_content = reference
+                                logger.info(f"💾 Cached long assistant message: {assistant_tokens:,} tokens -> {reference.get('artifact_key')}")
+                    except Exception as e:
+                        logger.debug(f"Could not cache assistant message: {e}")
+
+                # Use cached reference if available, otherwise use full content
+                if cached_assistant_content:
+                    assistant_content_for_storage = {
+                        "_cached": True,
+                        "artifact_key": cached_assistant_content["artifact_key"],
+                        "preview": cached_assistant_content["preview"],
+                        "retrieval_hint": cached_assistant_content.get("retrieval_hint", ""),
+                        "scope": cached_assistant_content.get("scope", "artifacts")
+                    }
+                else:
+                    assistant_content_for_storage = accumulated_content
+
                 message_data = { # Dict to be saved in 'content'
-                    "role": "assistant", "content": accumulated_content,
+                    "role": "assistant", "content": assistant_content_for_storage,
                     "tool_calls": complete_native_tool_calls or None
                 }
 
@@ -1850,6 +1883,7 @@ class ResponseProcessor:
             
             # Use ContextOffloader to automatically cache large outputs
             output = result.output if hasattr(result, 'output') else str(result)
+            output_size = len(str(output))
             offloader = await self._get_context_offloader(thread_id)
             
             reference = None
@@ -1857,12 +1891,21 @@ class ResponseProcessor:
                 function_name = tool_call.get("function_name", "unknown")
                 tool_call_id = tool_call.get("id")
                 
+                logger.debug(f"🔍 Checking if tool output should be cached: {function_name} (size: {output_size} chars)")
+                
                 reference = await offloader.offload_tool_output(
                     tool_output=output,
                     tool_name=function_name,
                     tool_call_id=tool_call_id,
                     metadata={"thread_id": thread_id}
                 )
+                
+                if reference:
+                    logger.info(f"✅ Tool output cached: {function_name} -> {reference.get('artifact_key')} in artifacts scope")
+                else:
+                    logger.debug(f"⏭️  Tool output not cached: {function_name} (below threshold)")
+            else:
+                logger.warning(f"⚠️  ContextOffloader not available for thread {thread_id} - tool outputs won't be cached!")
             
             # Create two versions of the structured result
             # 1. Rich version for the frontend (always full output)
@@ -1959,10 +2002,65 @@ class ResponseProcessor:
                 return None
             
             sandbox_info = project_result.data[0].get('sandbox', {})
-            if not sandbox_info.get('id'):
-                return None
             
-            sandbox = await get_or_start_sandbox(sandbox_info['id'])
+            # If sandbox doesn't exist, create it lazily (for context offloading)
+            if not sandbox_info.get('id'):
+                logger.debug(f"No sandbox found for project {project_id}; creating lazily for context offloading")
+                try:
+                    from core.sandbox.sandbox import create_sandbox, get_preview_link_info
+                    import uuid
+                    import asyncio
+                    
+                    sandbox_pass = str(uuid.uuid4())
+                    sandbox_obj = await create_sandbox(sandbox_pass, project_id)
+                    sandbox_id = sandbox_obj.id
+                    
+                    # Wait 5 seconds for services to start up
+                    logger.info(f"Waiting 5 seconds for sandbox {sandbox_id} services to initialize...")
+                    await asyncio.sleep(5)
+                    
+                    # Gather preview links and token (best-effort)
+                    try:
+                        vnc_info = await get_preview_link_info(sandbox_obj, 6080)
+                        website_info = await get_preview_link_info(sandbox_obj, 8080)
+                        vnc_url = vnc_info.url
+                        website_url = website_info.url
+                        token = vnc_info.token
+                    except Exception:
+                        logger.warning(f"Failed to extract preview links for sandbox {sandbox_id}")
+                        vnc_url = None
+                        website_url = None
+                        token = None
+                    
+                    # Persist sandbox metadata to project record
+                    update_result = await client.table('projects').update({
+                        'sandbox': {
+                            'id': sandbox_id,
+                            'pass': sandbox_pass,
+                            'vnc_preview': vnc_url,
+                            'sandbox_url': website_url,
+                            'token': token
+                        }
+                    }).eq('project_id', project_id).execute()
+                    
+                    if not update_result.data:
+                        # Cleanup created sandbox if DB update failed
+                        try:
+                            from core.sandbox.sandbox import delete_sandbox
+                            await delete_sandbox(sandbox_id)
+                        except Exception:
+                            logger.error(f"Failed to delete sandbox {sandbox_id} after DB update failure")
+                        raise Exception("Database update failed when storing sandbox metadata")
+                    
+                    logger.info(f"✅ Created sandbox {sandbox_id} lazily for context offloading")
+                    sandbox = await get_or_start_sandbox(sandbox_id)
+                except Exception as e:
+                    logger.warning(f"Failed to create sandbox lazily for context offloading: {e}")
+                    return None
+            else:
+                # Use existing sandbox
+                sandbox = await get_or_start_sandbox(sandbox_info['id'])
+            
             kv_store = SandboxKVStore(sandbox)
             
             # Create and cache offloader
