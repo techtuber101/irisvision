@@ -45,7 +45,14 @@ from core.tools.people_search_tool import PeopleSearchTool
 from core.tools.company_search_tool import CompanySearchTool
 from core.tools.paper_search_tool import PaperSearchTool
 from core.ai_models.manager import model_manager
-from core.sandbox.instruction_seeder import seed_instructions_to_cache, get_all_instruction_references
+from core.agentpress.context_planner import get_project_context
+from core.sandbox.instruction_seeder import (
+    INSTRUCTION_FILES,
+    get_all_instruction_references,
+    seed_instructions_to_cache,
+)
+from core.sandbox.kv_store import SandboxKVStore
+from core.sandbox.sandbox import get_or_start_sandbox
 
 load_dotenv()
 
@@ -412,12 +419,14 @@ class PromptManager:
             return 'web_development'
         
         return None
+
     
     @staticmethod
     async def _load_instructions_for_task(
         task_type: str,
         thread_id: str,
-        client
+        client,
+        kv_store: Optional[SandboxKVStore] = None,
     ) -> Optional[str]:
         """Load instructions from KV cache for detected task type.
         
@@ -425,36 +434,28 @@ class PromptManager:
             task_type: Instruction tag (presentation, document_creation, etc.)
             thread_id: Thread ID to get project_id
             client: Database client
+            kv_store: Optional pre-initialized KV store
             
         Returns:
             Instruction content or None if not found
         """
         try:
-            # Get project_id from thread
-            thread_result = await client.table('threads').select('project_id').eq('thread_id', thread_id).execute()
-            if not thread_result.data or len(thread_result.data) == 0:
+            if not kv_store:
+                context = await get_project_context(thread_id, client)
+                kv_store = context.get("kv_store")
+            if not kv_store:
                 return None
-            
-            project_id = thread_result.data[0].get('project_id')
-            if project_id:
-                # Get project to find sandbox
-                project_result = await client.table('projects').select('sandbox').eq('project_id', project_id).execute()
-                if project_result.data and len(project_result.data) > 0:
-                    sandbox_info = project_result.data[0].get('sandbox', {})
-                    if sandbox_info.get('id'):
-                        from core.sandbox.sandbox import get_or_start_sandbox
-                        from core.sandbox.kv_store import SandboxKVStore
-                        
-                        sandbox = await get_or_start_sandbox(sandbox_info['id'])
-                        kv_store = SandboxKVStore(sandbox)
-                        
-                        # Fetch instruction from KV cache
-                        key = f"instruction_{task_type}"
-                        instruction_content = await kv_store.get(scope="instructions", key=key, as_type="str")
-                        
-                        if instruction_content:
-                            logger.info(f"✅ Auto-loaded {task_type} instructions from KV cache ({len(instruction_content)} chars)")
-                            return instruction_content
+
+            key = f"instruction_{task_type}"
+            instruction_content = await kv_store.get(
+                scope="instructions", key=key, as_type="str"
+            )
+
+            if instruction_content:
+                logger.info(
+                    f"✅ Auto-loaded {task_type} instructions from KV cache ({len(instruction_content)} chars)"
+                )
+                return instruction_content
         except Exception as e:
             logger.debug(f"Could not auto-load instructions for {task_type}: {e}")
         
@@ -464,7 +465,8 @@ class PromptManager:
     async def _load_multiple_instructions(
         task_types: List[str],
         thread_id: str,
-        client
+        client,
+        kv_store: Optional[SandboxKVStore] = None,
     ) -> str:
         """Load multiple instruction types and combine them.
         
@@ -479,7 +481,9 @@ class PromptManager:
         combined_instructions = []
         
         for task_type in task_types:
-            instruction_content = await PromptManager._load_instructions_for_task(task_type, thread_id, client)
+            instruction_content = await PromptManager._load_instructions_for_task(
+                task_type, thread_id, client, kv_store=kv_store
+            )
             if instruction_content:
                 combined_instructions.append(instruction_content)
         
@@ -494,46 +498,9 @@ class PromptManager:
                                   xml_tool_calling: bool = True,
                                   user_message: Optional[str] = None) -> dict:
         
-        # Use KV cache prompt if feature flag is enabled, otherwise use original
         if config.USE_KV_CACHE_PROMPT:
             default_system_content = get_system_prompt_kv_cache()
             logger.info("🔥 Using streamlined KV cache prompt (~10k tokens)")
-            
-            # Auto-detect task type and load instructions in background
-            # Only load if task is clearly detected (not ambiguous) to avoid unnecessary token usage
-            if user_message and client:
-                task_type = PromptManager._detect_task_type(user_message)
-                if task_type:
-                    # Only load if message is substantial (not just a mention)
-                    message_lower = user_message.lower()
-                    task_keywords_present = sum(1 for kw in ['presentation', 'slide', 'document', 'report', 'research', 'analyze', 'website', 'web app', 'chart', 'graph', 'visualization', 'matplotlib'] if kw in message_lower)
-                    
-                    if task_keywords_present >= 1:  # At least one clear keyword
-                        logger.debug(f"Detected task type: {task_type}, auto-loading instructions...")
-                        
-                        # For document_creation and research tasks, also load visualization instructions
-                        # (since charts are mandatory for all documents and research reports)
-                        instruction_types_to_load = [task_type]
-                        if task_type in ['document_creation', 'research']:
-                            instruction_types_to_load.append('visualization')
-                            logger.debug(f"{task_type} detected - also loading visualization instructions")
-                        
-                        # Load instructions (single or multiple)
-                        if len(instruction_types_to_load) == 1:
-                            instruction_content = await PromptManager._load_instructions_for_task(task_type, thread_id, client)
-                        else:
-                            instruction_content = await PromptManager._load_multiple_instructions(instruction_types_to_load, thread_id, client)
-                        
-                        if instruction_content:
-                            # Inject instructions into system prompt
-                            instruction_section = f"\n\n# TASK-SPECIFIC INSTRUCTIONS (Auto-loaded)\n\n{instruction_content}\n"
-                            default_system_content = default_system_content + instruction_section
-                            loaded_types = ", ".join(instruction_types_to_load)
-                            logger.info(f"✅ Injected {loaded_types} instructions into system prompt ({len(instruction_content)} chars)")
-                        else:
-                            logger.debug(f"Could not load {task_type} instructions from KV cache")
-                    else:
-                        logger.debug(f"Task type {task_type} detected but message too ambiguous, skipping instruction load")
         else:
             default_system_content = get_system_prompt_original()
             logger.info("Using original prompt (~40k tokens)")
@@ -732,9 +699,7 @@ class AgentRunner:
                 from core.sandbox.sandbox import get_or_start_sandbox
                 from core.sandbox.kv_store import SandboxKVStore
                 sandbox = await get_or_start_sandbox(sandbox_info['id'])
-                
-                # Seed instructions
-                await seed_instructions_to_cache(sandbox, force_refresh=False)
+                await seed_instructions_to_cache(sandbox, force_refresh=True)
                 logger.info(f"Instructions seeded into KV cache for project {self.config.project_id}")
                 
                 # Initialize KV store for ThreadManager to use for conversation caching

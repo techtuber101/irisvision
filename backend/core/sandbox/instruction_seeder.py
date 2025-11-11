@@ -12,9 +12,11 @@ Usage:
     await seed_instructions_to_cache(sandbox, force_refresh=False)
 """
 
+import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from daytona_sdk import AsyncSandbox
 from core.sandbox.kv_store import SandboxKVStore
 from core.utils.logger import logger
@@ -22,6 +24,9 @@ from core.utils.logger import logger
 # Module-level flag to prevent recursive seeding
 _seeding_in_progress = False
 
+# Persistent flag configuration
+SEED_FLAG_FILENAME = ".instructions_seeded.json"
+SEED_FLAG_VERSION = 1
 
 # Define instruction file mappings
 INSTRUCTION_FILES = {
@@ -67,6 +72,31 @@ class InstructionSeeder:
         self.sandbox = sandbox
         self.kv_store = kv_store or SandboxKVStore(sandbox)
         self.instructions_dir = Path(__file__).parent.parent / "instructions"
+        self.seed_flag_path = f"{self.kv_store.root_path}/{SEED_FLAG_FILENAME}"
+    
+    async def _load_seed_flag(self) -> Optional[Dict[str, Any]]:
+        try:
+            data = await self.sandbox.fs.download_file(self.seed_flag_path)
+            return json.loads(data.decode("utf-8"))
+        except FileNotFoundError:
+            return None
+        except Exception as exc:
+            logger.debug(f"Could not read instruction seed flag: {exc}")
+            return None
+    
+    async def _write_seed_flag(self, results: Dict[str, bool]) -> None:
+        payload = {
+            "version": SEED_FLAG_VERSION,
+            "seeded_at": datetime.now(timezone.utc).isoformat(),
+            "results": results,
+        }
+        try:
+            await self.sandbox.fs.upload_file(
+                json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8"),
+                self.seed_flag_path
+            )
+        except Exception as exc:
+            logger.warning(f"Failed to write instruction seed flag: {exc}")
     
     async def seed_all_instructions(self, force_refresh: bool = False) -> Dict[str, bool]:
         """
@@ -90,6 +120,17 @@ class InstructionSeeder:
         try:
             results = {}
             
+            if not force_refresh:
+                existing_flag = await self._load_seed_flag()
+                if existing_flag and existing_flag.get("version") == SEED_FLAG_VERSION:
+                    logger.info(
+                        "Instruction seeding skipped - already seeded on %s",
+                        existing_flag.get("seeded_at", "unknown time")
+                    )
+                    return existing_flag.get("results", {
+                        config["tag"]: True for config in INSTRUCTION_FILES.values()
+                    })
+            
             for key, config in INSTRUCTION_FILES.items():
                 try:
                     success = await self.seed_instruction(
@@ -108,6 +149,9 @@ class InstructionSeeder:
                 f"Instruction seeding complete: {seeded_count}/{len(INSTRUCTION_FILES)} "
                 f"instructions seeded successfully"
             )
+            
+            if seeded_count == len(INSTRUCTION_FILES):
+                await self._write_seed_flag(results)
             
             return results
         finally:

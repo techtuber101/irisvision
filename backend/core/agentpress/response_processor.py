@@ -1883,41 +1883,70 @@ class ResponseProcessor:
             # For XML and other non-native tools, use the new structured format
             # Determine message role based on strategy
             result_role = "user" if strategy == "user_message" else "assistant"
+            function_name = tool_call.get("function_name", "unknown")
             
             # NON-BLOCKING: Cache in background, use full output immediately for speed
             # This prevents caching from blocking tool result streaming
             output = result.output if hasattr(result, 'output') else str(result)
             output_size = len(str(output))
+            artifact_reference_for_llm = None
             
-            # Get offloader and cache in background (fire-and-forget) - doesn't block streaming
-            async def get_offloader_and_cache():
+            if function_name == "create_document":
                 try:
                     offloader = await self._get_context_offloader(thread_id)
                     if offloader:
-                        function_name = tool_call.get("function_name", "unknown")
                         tool_call_id = tool_call.get("id")
-                        
-                        reference = await offloader.offload_tool_output(
+                        artifact_reference_for_llm = await offloader.offload_tool_output(
                             tool_output=output,
                             tool_name=function_name,
                             tool_call_id=tool_call_id,
-                            metadata={"thread_id": thread_id}
+                            metadata={
+                                "thread_id": thread_id,
+                                "forced_for_tool": function_name,
+                            },
                         )
-                        if reference:
-                            logger.debug(f"✅ Background cached: {function_name} -> {reference.get('artifact_key')}")
+                        if artifact_reference_for_llm:
+                            logger.debug(
+                                f"✅ Cached create_document output -> {artifact_reference_for_llm.get('artifact_key')}"
+                            )
                 except Exception as e:
-                    logger.debug(f"Background caching failed (non-critical): {e}")
-            
-            # Fire-and-forget: get offloader and cache in background without blocking
-            # Task is scheduled but not awaited - execution continues immediately
-            # Errors are handled inside the function, so no need to await
-            asyncio.create_task(get_offloader_and_cache())
+                    logger.debug(f"Immediate caching failed for create_document: {e}")
+            else:
+                async def get_offloader_and_cache():
+                    try:
+                        offloader = await self._get_context_offloader(thread_id)
+                        if offloader:
+                            tool_call_id = tool_call.get("id")
+                            reference = await offloader.offload_tool_output(
+                                tool_output=output,
+                                tool_name=function_name,
+                                tool_call_id=tool_call_id,
+                                metadata={"thread_id": thread_id}
+                            )
+                            if reference:
+                                logger.debug(f"✅ Background cached: {function_name} -> {reference.get('artifact_key')}")
+                    except Exception as e:
+                        logger.debug(f"Background caching failed (non-critical): {e}")
+                
+                asyncio.create_task(get_offloader_and_cache())
             
             # Create two versions of the structured result
             # 1. Rich version for the frontend (always full output)
             structured_result_for_frontend = self._create_structured_tool_result(tool_call, result, parsing_details, for_llm=False)
             # 2. Use full output for LLM (caching happens in background, will be used next time)
-            structured_result_for_llm = self._create_structured_tool_result(tool_call, result, parsing_details, for_llm=True, artifact_key=None)
+            artifact_key_for_llm = artifact_reference_for_llm.get("artifact_key") if artifact_reference_for_llm else None
+            structured_result_for_llm = self._create_structured_tool_result(
+                tool_call,
+                result,
+                parsing_details,
+                for_llm=True,
+                artifact_key=artifact_key_for_llm,
+            )
+            if function_name == "create_document" and not artifact_key_for_llm:
+                structured_result_for_llm["tool_execution"]["result"]["output"] = {
+                    "_cached": False,
+                    "note": "Document HTML omitted to protect context window. Use the create_document output from metadata.frontend_content or call get_artifact() if needed."
+                }
 
             # Add the message with the appropriate role to the conversation history
             # This allows the LLM to see the tool result in subsequent interactions

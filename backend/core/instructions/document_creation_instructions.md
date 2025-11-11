@@ -2,6 +2,18 @@
 
 ## Document Generation Workflow
 
+### Task Planning Structure (MANDATORY)
+- When creating tasks for a document project, always break them into **three distinct sections**:
+  1. **Research Phase** – information gathering, outlining, sourcing data
+  2. **Visualization Phase** – chart planning, Matplotlib notebook/script creation, exporting graphs
+  3. **Document Creation & Delivery Phase** – HTML drafting, embedding visuals, final QA and delivery prep
+- Ensure the `create_tasks` call explicitly names these sections so progress is easy to track and update.
+
+### Visualization Requirements (NON-NEGOTIABLE)
+- Install matplotlib (pip install) for every document creation project immediately after research concludes
+- Generate **2-3 meaningful charts/diagrams** that genuinely support the narrative
+- Embed each chart in the document with proper HTML `<img>` tags and rich explanations
+
 ### CRITICAL Format Requirements
 - **ALWAYS use format="html" (DEFAULT)**
 - **NEVER use format="markdown"**
@@ -77,6 +89,8 @@
 
 ## PDF Conversion Workflow (CRITICAL)
 
+> **Only run `convert_to_pdf` if the user explicitly asks for a PDF.** Never assume they want a PDF or trigger the conversion automatically.
+
 ### MANDATORY Workflow After Successful PDF Conversion
 
 When `convert_to_pdf` tool completes successfully, follow this EXACT sequence:
@@ -109,7 +123,7 @@ When `convert_to_pdf` tool completes successfully, follow this EXACT sequence:
 **For ANY document creation task, you MUST:**
 1. Complete research first using `web_search`
 2. Create 2-3 graphs (preference: 2 or 3 graphs)
-3. Embed graphs properly in the document
+3. Embed every generated graph/diagram in the final document using proper HTML `<img>` tags (embedding is not optional—if a chart exists, it must appear in the deliverable)
 4. Explain each graph thoroughly
 
 ### Step-by-Step Graph Creation Process
@@ -182,3 +196,13 @@ execute_command: python graph1.py && python graph2.py && python graph3.py
 - [ ] **Each graph explained (what it is, why it's there, what it shows)**
 - [ ] Professional structure and layout
 - [ ] PDF conversion follows correct workflow
+- [ ] All tasks updated to `completed` before the final `create_document` call
+- [ ] `create_document` is the final tool action for delivery
+
+## Final Delivery Workflow (STRICT)
+1. Once research and visualization tasks are complete, update every remaining task to `completed` **before** calling `create_document`.
+2. Run the `create_document` tool—this must be the **final** tool call for document delivery. **Never** invoke `complete`, `ask`, `convert_to_pdf`, or any other tool afterward; the conversation should end with the document viewer open.
+3. After the tool succeeds, send the completion message in the required format:
+   - `### Mission Accomplished ✓ ###`
+   - Executive summary (2–3 sentences)
+   - Separator line + “What would you like to do next?” followed by 2–3 suggestions (first suggestion: offer PDF/DOCX conversion; only convert if the user explicitly asks).

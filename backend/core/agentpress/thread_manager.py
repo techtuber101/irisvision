@@ -5,7 +5,7 @@ Simplified conversation thread management system for AgentPress.
 import json
 import time
 from collections import deque
-from typing import List, Dict, Any, Optional, Type, Union, AsyncGenerator, Literal, cast
+from typing import List, Dict, Any, Optional, Type, Union, AsyncGenerator, Literal, cast, Tuple
 from core.services.llm import make_llm_api_call, LLMError
 from core.agentpress.prompt_caching import apply_prompt_caching_strategy, validate_cache_blocks
 from core.agentpress.tool import Tool
@@ -15,13 +15,21 @@ from core.agentpress.response_processor import ResponseProcessor, ProcessorConfi
 from core.agentpress.error_processor import ErrorProcessor
 from core.services.supabase import DBConnection
 from core.utils.logger import logger
+from core.utils.config import config as app_config
 from langfuse.client import StatefulGenerationClient, StatefulTraceClient
 from core.services.langfuse import langfuse
 from datetime import datetime, timezone
 from core.billing.billing_integration import billing_integration
 from litellm.utils import token_counter
+from core.agentpress.context_planner import (
+    build_auto_context_section,
+    get_project_context,
+    load_project_summary,
+)
 
 ToolChoice = Literal["auto", "required", "none"]
+
+AGGRESSIVE_CONTEXT_TOKEN_TARGET = 100_000
 
 
 class RollingTokenUsageTracker:
@@ -67,7 +75,9 @@ token_usage_tracker = RollingTokenUsageTracker()
 class ThreadManager:
     """Manages conversation threads with LLM models and tool execution."""
 
-    def __init__(self, trace: Optional[StatefulTraceClient] = None, agent_config: Optional[dict] = None, project_id: Optional[str] = None):
+    PLANNER_CACHE_TURNS = 2
+
+    def __init__(self, trace: Optional[StatefulTraceClient] = None, agent_config: Optional[dict] = None):
         self.db = DBConnection()
         self.tool_registry = ToolRegistry()
         
@@ -76,9 +86,6 @@ class ThreadManager:
             self.trace = langfuse.trace(name="anonymous:thread_manager")
             
         self.agent_config = agent_config
-        self.project_id = project_id
-        self.kv_store = None  # Will be initialized async in setup if project_id provided
-        
         self.response_processor = ResponseProcessor(
             tool_registry=self.tool_registry,
             add_message_callback=self.add_message,
@@ -86,6 +93,7 @@ class ThreadManager:
             agent_config=self.agent_config,
             context_offloader=None  # Will be initialized per-thread with KV store
         )
+        self._planner_cache: Dict[str, Dict[str, Any]] = {}
 
     def add_tool(self, tool_class: Type[Tool], function_names: Optional[List[str]] = None, **kwargs):
         """Add a tool to the ThreadManager."""
@@ -367,11 +375,18 @@ class ThreadManager:
         try:
             # Get and prepare messages
             messages = await self.get_llm_messages(thread_id)
+            aggressive_context_mode = False
             
             # Handle auto-continue context
             if auto_continue_state['count'] > 0 and auto_continue_state['continuous_state'].get('accumulated_content'):
                 partial_content = auto_continue_state['continuous_state']['accumulated_content']
                 messages.append({"role": "assistant", "content": partial_content})
+
+            raw_messages = list(messages)
+            client = await self.db.client
+            project_context = await get_project_context(thread_id, client)
+            kv_store = project_context.get("kv_store")
+            project_summary_data = await load_project_summary(kv_store)
 
             # ===== CENTRAL CONFIGURATION =====
             ENABLE_CONTEXT_MANAGER = True   # Set to False to disable context compression
@@ -382,14 +397,12 @@ class ThreadManager:
             compression_report = None
             if ENABLE_CONTEXT_MANAGER:
                 logger.debug(f"Context manager enabled, compressing {len(messages)} messages")
-kv_store_for_context = kv_store
+                
+                kv_store_for_context = kv_store
                 
                 # Initialize ContextOffloader for ResponseProcessor
                 from core.agentpress.context_offloader import ContextOffloader
-                context_offloader = ContextOffloader(
-                    kv_store_for_context,
-                    trace=self.response_processor.trace if kv_store_for_context else None,
-                ) if kv_store_for_context else None
+                context_offloader = ContextOffloader(kv_store_for_context) if kv_store_for_context else None
                 if context_offloader:
                     self.response_processor.context_offloader = context_offloader
                     logger.debug(f"✅ ContextOffloader initialized for thread {thread_id}")
@@ -408,26 +421,98 @@ kv_store_for_context = kv_store
                 else:
                     logger.debug(f"Context compression completed (no report): {len(messages)} -> {len(compressed_messages)} messages")
                 messages = compressed_messages
+
+                if compression_report:
+                    final_estimate = compression_report.final_tokens or 0
+                    if final_estimate <= 0:
+                        final_estimate = compression_report.initial_tokens
+                    aggressive_context_mode = final_estimate >= AGGRESSIVE_CONTEXT_TOKEN_TARGET
+                    if aggressive_context_mode:
+                        logger.info(
+                            "⚠️ Aggressive context mode enabled (%s tokens after compression)",
+                            f"{final_estimate:,}",
+                        )
+                        try:
+                            self.response_processor.trace.event(
+                                name="context_manager.aggressive_mode",
+                                level="DEFAULT",
+                                status_message="Aggressive context safeguards activated after compression",
+                                metadata={
+                                    "initial_tokens": compression_report.initial_tokens,
+                                    "final_tokens": final_estimate,
+                                    "compression_ratio": compression_report.compression_ratio(),
+                                    "summarized_messages": compression_report.summarized_messages,
+                                    "removed_messages": compression_report.removed_messages,
+                                },
+                            )
+                        except Exception as exc:
+                            logger.debug(f"Failed to emit aggressive mode telemetry: {exc}")
                 
                 # Intelligent on-demand expansion: Recent messages expanded automatically
                 # Older messages keep references - LLM can access them instantly via get_artifact() if needed
                 # This gives LLM instant access to recent content while saving tokens on older content
-                if context_offloader:
+                AUTO_EXPAND_CACHED_REFERENCES = False
+                if context_offloader and AUTO_EXPAND_CACHED_REFERENCES:
                     messages = await context_offloader.expand_cached_references(
                         messages,
                         auto_expand=True,
-                        expand_recent_only=True,  # Only expand references from recent messages
-                        recent_message_count=3   # ULTRA-AGGRESSIVE: Only last 3 messages expanded (was 10)
+                        expand_recent_only=True,
+                        recent_message_count=3
                     )
-                    logger.debug(f"✅ On-demand expansion: Recent messages expanded, older messages keep references")
+                    logger.debug("✅ On-demand expansion: Recent messages expanded, older messages keep references")
+                elif context_offloader:
+                    logger.debug("Caching: auto expansion disabled (planner handles hydration)")
             else:
                 logger.debug("Context manager disabled, using raw messages")
+                try:
+                    approx_tokens = token_counter(model=llm_model, messages=[system_prompt] + messages)
+                    aggressive_context_mode = approx_tokens >= AGGRESSIVE_CONTEXT_TOKEN_TARGET
+                    if aggressive_context_mode:
+                        logger.info(
+                            "⚠️ Aggressive context mode enabled (raw token estimate ~%s)",
+                            f"{approx_tokens:,}",
+                        )
+                        try:
+                            self.response_processor.trace.event(
+                                name="context_manager.aggressive_mode",
+                                level="DEFAULT",
+                                status_message="Aggressive context safeguards activated (raw estimate)",
+                                metadata={
+                                    "estimated_tokens": approx_tokens,
+                                    "compressor_enabled": False,
+                                },
+                            )
+                        except Exception as exc:
+                            logger.debug(f"Failed to emit aggressive mode telemetry: {exc}")
+                except Exception as exc:
+                    logger.debug(f"Token estimation failed for aggressive mode check: {exc}")
+
+            system_prompt_for_turn = {
+                "role": system_prompt.get("role", "system"),
+                "content": system_prompt.get("content", ""),
+            }
+
+            planner_section = ""
+            if app_config.USE_KV_CACHE_PROMPT:
+                latest_user_message_text, latest_user_message_id = self._get_latest_user_message_info(raw_messages)
+                latest_trigger_id = latest_user_message_id or self._get_latest_trigger_id(raw_messages) or f"{thread_id}:{auto_continue_state['count']}"
+                planner_section = await self._get_planner_section(
+                    thread_id=thread_id,
+                    trigger_id=latest_trigger_id,
+                    user_message=latest_user_message_text,
+                    kv_store=kv_store,
+                    project_summary=project_summary_data.get("summary"),
+                    turn_label=f"turn_{auto_continue_state['count']}",
+                    aggressive_mode=aggressive_context_mode,
+                )
+            if planner_section:
+                system_prompt_for_turn["content"] += planner_section
 
             # Apply caching
             cache_report = None
             if ENABLE_PROMPT_CACHING:
                 prepared_messages, cache_report = apply_prompt_caching_strategy(
-                    system_prompt,
+                    system_prompt_for_turn,
                     messages,
                     llm_model,
                     return_report=True,
@@ -448,7 +533,7 @@ kv_store_for_context = kv_store
                             cache_report.notes,
                         )
             else:
-                prepared_messages = [system_prompt] + messages
+                prepared_messages = [system_prompt_for_turn] + messages
 
             # Get tool schemas if needed
             openapi_tool_schemas = self.tool_registry.get_openapi_schemas() if config.native_tool_calling else None
@@ -592,6 +677,112 @@ kv_store_for_context = kv_store
                 "type": "content",
                 "content": f"\n[Agent reached maximum auto-continue limit of {native_max_auto_continues}]"
             }
+
+    def _stringify_message_content(self, content: Any) -> str:
+        if isinstance(content, str):
+            return content
+        if isinstance(content, dict):
+            nested = content.get("content")
+            if isinstance(nested, str):
+                return nested
+            try:
+                return json.dumps(content, ensure_ascii=False)
+            except Exception:
+                return str(content)
+        if isinstance(content, list):
+            parts = [self._stringify_message_content(item) for item in content]
+            return "\n".join(part for part in parts if part)
+        return str(content)
+
+    def _get_latest_user_message_info(self, messages: List[Dict[str, Any]]) -> Tuple[Optional[str], Optional[str]]:
+        for msg in reversed(messages):
+            if msg.get("role") != "user":
+                continue
+            content = msg.get("content")
+            text = self._stringify_message_content(content)
+            if text:
+                return text, msg.get("message_id")
+        return None, None
+
+    def _get_latest_trigger_id(self, messages: List[Dict[str, Any]]) -> Optional[str]:
+        for msg in reversed(messages):
+            message_id = msg.get("message_id")
+            if message_id:
+                return message_id
+        return None
+
+    async def _get_planner_section(
+        self,
+        thread_id: str,
+        trigger_id: Optional[str],
+        user_message: Optional[str],
+        kv_store,
+        project_summary: Optional[str],
+        turn_label: str,
+        aggressive_mode: bool = False,
+    ) -> str:
+        if not app_config.USE_KV_CACHE_PROMPT:
+            return ""
+
+        cache_entry = self._planner_cache.get(thread_id)
+        if not user_message and not cache_entry:
+            return ""
+
+        if not user_message:
+            if cache_entry:
+                if cache_entry.get("aggressive_mode", False) != aggressive_mode:
+                    return ""
+                cache_entry["ttl"] = self.PLANNER_CACHE_TURNS
+                return cache_entry.get("section", "")
+            return ""
+
+        normalized_trigger = trigger_id or f"{thread_id}:{turn_label}"
+        should_replan = False
+
+        if not cache_entry:
+            should_replan = True
+        elif cache_entry.get("trigger_id") != normalized_trigger:
+            should_replan = True
+        elif cache_entry.get("ttl", 0) <= 0:
+            should_replan = True
+        elif cache_entry.get("aggressive_mode", False) != aggressive_mode:
+            should_replan = True
+
+        if should_replan:
+            planner_result = await build_auto_context_section(
+                user_message=user_message,
+                thread_id=thread_id,
+                kv_store=kv_store,
+                project_summary=project_summary,
+                turn_label=turn_label,
+                aggressive_mode=aggressive_mode,
+            )
+            section = planner_result.section
+            telemetry = planner_result.telemetry
+            self._planner_cache[thread_id] = {
+                "section": section,
+                "trigger_id": normalized_trigger,
+                "ttl": self.PLANNER_CACHE_TURNS,
+                "aggressive_mode": aggressive_mode,
+                "telemetry": telemetry,
+            }
+            if section and telemetry:
+                try:
+                    self.trace.event(
+                        name="planner_context_section",
+                        level="INFO",
+                        metadata={
+                            "thread_id": thread_id,
+                            "turn_label": turn_label,
+                            **telemetry,
+                        },
+                    )
+                except Exception as exc:
+                    logger.debug(f"Failed to record planner telemetry: {exc}")
+            return section
+
+        cache_entry["ttl"] -= 1
+        return cache_entry.get("section", "")
 
     def _check_auto_continue_trigger(
         self, chunk: Dict[str, Any], auto_continue_state: Dict[str, Any], 

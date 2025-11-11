@@ -76,12 +76,19 @@ The base prompt is then extended with:
 - **Location:** Lines 621-644
 - **Format:** Embedded string with guidance on handling mid-conversation user input
 
+#### 2.10 Auto-loaded Context (Planner, Conditional)
+- **Source:** `backend/core/agentpress/context_planner.py`
+- **Injector:** `ThreadManager._execute_run()` via `build_auto_context_section()`
+- **Contents:** Planner-selected instructions, cached artifacts, and optional project summary
+- **Trigger:** Runs whenever `USE_KV_CACHE_PROMPT` is enabled, the latest user request is available, and a KV cache exists for the project
+- **Purpose:** Gives the LLM exactly the context it asked for (and nothing more) before each LLM call
+
 ## Final Assembly
 
 All sections are concatenated in order:
 ```
 base_prompt
-+ task_specific_instructions (if detected)
++ (per turn) auto_loaded_context (planner selection, if any)
 + agent_custom_prompt (if exists, else base)
 + builder_prompt (if enabled)
 + knowledge_base (if exists)
@@ -98,7 +105,7 @@ base_prompt
 |---------|----------|------|
 | Base prompt | `prompt_kv_cache.py` | Static |
 | Task tool instructions | `prompt_kv_cache.py` (section 5.1) | Static |
-| Task-specific instructions | KV cache → `run.py` | Dynamic |
+| Task-specific instructions | Context planner → KV cache (`run.py`) | Dynamic |
 | Agent builder prompt | `agent_builder_prompt.py` | Static |
 | Tool schemas | `run.py` (`_format_tools_for_xml()`) | Dynamic |
 | Knowledge base | Database → `run.py` | Dynamic |
@@ -112,13 +119,13 @@ base_prompt
 - `get_system_prompt_kv_cache()` - Returns base prompt
 - `PromptManager.build_system_prompt()` - Assembles full prompt
 - `PromptManager._format_tools_for_xml()` - Formats tool schemas
-- `PromptManager._detect_task_type()` - Detects task from user message
-- `PromptManager._load_instructions_for_task()` - Loads from KV cache
+- `build_auto_context_section()` - Injects planner-selected instructions/artifacts/project summary before every turn
+- `ContextPlanner.plan_context()` - Scores available context objects and outputs a JSON plan
+- `PromptManager._load_instructions_for_task()` - Loads instruction blobs from KV cache (used by the planner)
 
 ## Notes
 
 - The base prompt in `prompt_kv_cache.py` contains the task tool instructions (section 5.1)
 - Tool schemas are dynamically generated from the tool registry
-- Task-specific instructions are only loaded when a task type is detected
+- Task-specific instructions are selected by the context planner (LLM) rather than static keyword heuristics, and the decision is re-evaluated on every LLM turn
 - Most additions are conditional based on agent configuration
-
