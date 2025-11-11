@@ -20,7 +20,8 @@ from core.tools.sb_files_tool import SandboxFilesTool
 from core.tools.sb_kb_tool import SandboxKbTool
 from core.tools.data_providers_tool import DataProvidersTool
 from core.tools.expand_msg_tool import ExpandMessageTool
-from core.prompts.prompt import get_system_prompt
+from core.prompts.prompt import get_system_prompt as get_system_prompt_original
+from core.prompts.prompt_kv_cache import get_system_prompt_kv_cache
 
 from core.utils.logger import logger
 
@@ -39,10 +40,19 @@ from core.tools.task_list_tool import TaskListTool
 from core.agentpress.tool import SchemaType
 from core.tools.sb_upload_file_tool import SandboxUploadFileTool
 from core.tools.sb_docs_tool import SandboxDocsTool
+from core.tools.sb_kv_cache_tool import SandboxKvCacheTool
 from core.tools.people_search_tool import PeopleSearchTool
 from core.tools.company_search_tool import CompanySearchTool
 from core.tools.paper_search_tool import PaperSearchTool
 from core.ai_models.manager import model_manager
+from core.agentpress.context_planner import get_project_context
+from core.sandbox.instruction_seeder import (
+    INSTRUCTION_FILES,
+    get_all_instruction_references,
+    seed_instructions_to_cache,
+)
+from core.sandbox.kv_store import SandboxKVStore
+from core.sandbox.sandbox import get_or_start_sandbox
 
 load_dotenv()
 
@@ -107,6 +117,7 @@ class ToolManager:
     def _register_sandbox_tools(self, disabled_tools: List[str]):
         """Register sandbox-related tools with granular control."""
         sandbox_tools = [
+            ('sb_kv_cache_tool', SandboxKvCacheTool, {'project_id': self.project_id, 'thread_manager': self.thread_manager}),
             ('sb_shell_tool', SandboxShellTool, {'project_id': self.project_id, 'thread_manager': self.thread_manager}),
             ('sb_files_tool', SandboxFilesTool, {'project_id': self.project_id, 'thread_manager': self.thread_manager}),
             ('sb_expose_tool', SandboxExposeTool, {'project_id': self.project_id, 'thread_manager': self.thread_manager}),
@@ -306,14 +317,193 @@ class MCPManager:
 
 class PromptManager:
     @staticmethod
+    def _format_tools_for_xml(openapi_schemas: List[Dict[str, Any]]) -> str:
+        """Format OpenAPI schemas into compact tool reference for XML mode.
+        
+        Args:
+            openapi_schemas: List of OpenAPI schema dictionaries
+            
+        Returns:
+            Formatted string with tool names, descriptions, and parameters
+        """
+        tool_docs = []
+        
+        for schema in openapi_schemas:
+            func_info = schema.get('function', {})
+            tool_name = func_info.get('name', 'unknown')
+            description = func_info.get('description', 'No description')
+            
+            params = func_info.get('parameters', {})
+            properties = params.get('properties', {})
+            required = params.get('required', [])
+            
+            # Special handling for task tools - add extra detail
+            is_task_tool = tool_name in ['create_tasks', 'update_tasks']
+            
+            # Build parameter list
+            param_list = []
+            for param_name, param_spec in properties.items():
+                param_type = param_spec.get('type', 'string')
+                param_desc = param_spec.get('description', '')
+                is_required = param_name in required
+                req_marker = " *REQUIRED*" if is_required else ""
+                
+                # Handle array/object types with special formatting for task tools
+                if param_type == 'array':
+                    items = param_spec.get('items', {})
+                    item_type = items.get('type', 'string')
+                    
+                    # Special formatting for task tool arrays
+                    if is_task_tool and param_name == 'sections':
+                        param_list.append(f"  - {param_name} (array[object], JSON string){req_marker}: {param_desc}")
+                        param_list.append(f"    FORMAT: [{{\"title\": \"Section Name\", \"task_contents\": [\"task1\", \"task2\"]}}]")
+                    elif is_task_tool and param_name in ['task_contents', 'task_ids']:
+                        param_list.append(f"  - {param_name} (array[{item_type}], JSON string){req_marker}: {param_desc}")
+                        param_list.append(f"    FORMAT: [\"item1\", \"item2\", \"item3\"] as JSON string")
+                    else:
+                        param_list.append(f"  - {param_name} ({param_type}[{item_type}], JSON string){req_marker}: {param_desc}")
+                elif param_type == 'object':
+                    param_list.append(f"  - {param_name} (object/JSON string){req_marker}: {param_desc}")
+                else:
+                    param_list.append(f"  - {param_name} ({param_type}){req_marker}: {param_desc}")
+            
+            # Format tool entry with special note for task tools
+            tool_entry = f"**{tool_name}**: {description}"
+            if is_task_tool:
+                tool_entry += "\n  ⚠️ CRITICAL: See section 5.1 in prompt for detailed usage examples!"
+            if param_list:
+                tool_entry += "\n" + "\n".join(param_list)
+            
+            tool_docs.append(tool_entry)
+        
+        return "\n\n".join(tool_docs)
+    
+    @staticmethod
+    def _detect_task_type(user_message: Optional[str]) -> Optional[str]:
+        """Detect task type from user message for automatic instruction loading.
+        
+        Args:
+            user_message: User's message content
+            
+        Returns:
+            Instruction tag (presentation, document_creation, research, web_development, visualization) or None
+        """
+        if not user_message:
+            return None
+        
+        message_lower = user_message.lower()
+        
+        # Presentation detection
+        presentation_keywords = ['presentation', 'slide', 'slides', 'deck', 'powerpoint', 'ppt', 'keynote', 'pitch deck']
+        if any(keyword in message_lower for keyword in presentation_keywords):
+            return 'presentation'
+        
+        # Document creation detection
+        document_keywords = ['document', 'report', 'pdf', 'create document', 'write document', 'generate document', 'comprehensive document']
+        if any(keyword in message_lower for keyword in document_keywords):
+            return 'document_creation'
+        
+        # Research detection
+        research_keywords = ['research', 'analyze', 'analysis', 'study', 'investigate', 'data visualization', 'comprehensive report', 'find information']
+        if any(keyword in message_lower for keyword in research_keywords):
+            return 'research'
+        
+        # Visualization detection (charts, graphs, matplotlib)
+        visualization_keywords = ['chart', 'charts', 'graph', 'graphs', 'visualization', 'visualize', 'matplotlib', 'plot', 'plots', 'infographic', 'infographics', 'create chart', 'create graph', 'generate chart', 'generate graph']
+        if any(keyword in message_lower for keyword in visualization_keywords):
+            return 'visualization'
+        
+        # Web development detection
+        webdev_keywords = ['website', 'web app', 'web application', 'html', 'css', 'javascript', 'react', 'vue', 'frontend', 'backend', 'deploy website', 'create website']
+        if any(keyword in message_lower for keyword in webdev_keywords):
+            return 'web_development'
+        
+        return None
+
+    
+    @staticmethod
+    async def _load_instructions_for_task(
+        task_type: str,
+        thread_id: str,
+        client,
+        kv_store: Optional[SandboxKVStore] = None,
+    ) -> Optional[str]:
+        """Load instructions from KV cache for detected task type.
+        
+        Args:
+            task_type: Instruction tag (presentation, document_creation, etc.)
+            thread_id: Thread ID to get project_id
+            client: Database client
+            kv_store: Optional pre-initialized KV store
+            
+        Returns:
+            Instruction content or None if not found
+        """
+        try:
+            if not kv_store:
+                context = await get_project_context(thread_id, client)
+                kv_store = context.get("kv_store")
+            if not kv_store:
+                return None
+
+            key = f"instruction_{task_type}"
+            instruction_content = await kv_store.get(
+                scope="instructions", key=key, as_type="str"
+            )
+
+            if instruction_content:
+                logger.info(
+                    f"✅ Auto-loaded {task_type} instructions from KV cache ({len(instruction_content)} chars)"
+                )
+                return instruction_content
+        except Exception as e:
+            logger.debug(f"Could not auto-load instructions for {task_type}: {e}")
+        
+        return None
+    
+    @staticmethod
+    async def _load_multiple_instructions(
+        task_types: List[str],
+        thread_id: str,
+        client,
+        kv_store: Optional[SandboxKVStore] = None,
+    ) -> str:
+        """Load multiple instruction types and combine them.
+        
+        Args:
+            task_types: List of instruction tags to load
+            thread_id: Thread ID to get project_id
+            client: Database client
+            
+        Returns:
+            Combined instruction content
+        """
+        combined_instructions = []
+        
+        for task_type in task_types:
+            instruction_content = await PromptManager._load_instructions_for_task(
+                task_type, thread_id, client, kv_store=kv_store
+            )
+            if instruction_content:
+                combined_instructions.append(instruction_content)
+        
+        return "\n\n".join(combined_instructions) if combined_instructions else ""
+    
+    @staticmethod
     async def build_system_prompt(model_name: str, agent_config: Optional[dict], 
                                   thread_id: str, 
                                   mcp_wrapper_instance: Optional[MCPToolWrapper],
                                   client=None,
                                   tool_registry=None,
-                                  xml_tool_calling: bool = True) -> dict:
+                                  xml_tool_calling: bool = True,
+                                  user_message: Optional[str] = None) -> dict:
         
-        default_system_content = get_system_prompt()
+        if config.USE_KV_CACHE_PROMPT:
+            default_system_content = get_system_prompt_kv_cache()
+            logger.info("🔥 Using streamlined KV cache prompt (~10k tokens)")
+        else:
+            default_system_content = get_system_prompt_original()
+            logger.info("Using original prompt (~40k tokens)")
         
         # if "anthropic" not in model_name.lower():
         #     sample_response_path = os.path.join(os.path.dirname(__file__), 'prompts/samples/1.txt')
@@ -351,20 +541,17 @@ class PromptManager:
                 }).execute()
                 
                 if kb_result.data and kb_result.data.strip():
-                    logger.debug(f"Found agent knowledge base context, adding to system prompt (length: {len(kb_result.data)} chars)")
-                    # logger.debug(f"Knowledge base data object: {kb_result.data[:500]}..." if len(kb_result.data) > 500 else f"Knowledge base data object: {kb_result.data}")
+                    kb_data = kb_result.data.strip()
+                    # Truncate knowledge base if too large (max 5k chars to keep prompt reasonable)
+                    max_kb_chars = 5000
+                    if len(kb_data) > max_kb_chars:
+                        kb_data = kb_data[:max_kb_chars] + "\n\n[Knowledge base truncated - use search tools for full content]"
+                        logger.debug(f"Truncated knowledge base from {len(kb_result.data)} to {max_kb_chars} chars")
                     
-                    # Construct a well-formatted knowledge base section
-                    kb_section = f"""
-
-                    === AGENT KNOWLEDGE BASE ===
-                    NOTICE: The following is your specialized knowledge base. This information should be considered authoritative for your responses and should take precedence over general knowledge when relevant.
-
-                    {kb_result.data}
-
-                    === END AGENT KNOWLEDGE BASE ===
-
-                    IMPORTANT: Always reference and utilize the knowledge base information above when it's relevant to user queries. This knowledge is specific to your role and capabilities."""
+                    logger.debug(f"Found agent knowledge base context, adding to system prompt (length: {len(kb_data)} chars)")
+                    
+                    # Compact knowledge base section
+                    kb_section = f"\n\n=== AGENT KNOWLEDGE BASE ===\n{kb_data}\n=== END KNOWLEDGE BASE ===\n"
                     
                     system_content += kb_section
                 else:
@@ -375,88 +562,54 @@ class PromptManager:
                 # Continue without knowledge base context rather than failing
         
         if agent_config and (agent_config.get('configured_mcps') or agent_config.get('custom_mcps')) and mcp_wrapper_instance and mcp_wrapper_instance._initialized:
-            mcp_info = "\n\n--- MCP Tools Available ---\n"
-            mcp_info += "You have access to external MCP (Model Context Protocol) server tools.\n"
-            mcp_info += "MCP tools can be called directly using their native function names in the standard function calling format:\n"
-            mcp_info += '<function_calls>\n'
-            mcp_info += '<invoke name="{tool_name}">\n'
-            mcp_info += '<parameter name="param1">value1</parameter>\n'
-            mcp_info += '<parameter name="param2">value2</parameter>\n'
-            mcp_info += '</invoke>\n'
-            mcp_info += '</function_calls>\n\n'
-            
-            mcp_info += "Available MCP tools:\n"
+            # Compact MCP info
             try:
                 registered_schemas = mcp_wrapper_instance.get_schemas()
-                for method_name, schema_list in registered_schemas.items():
-                    for schema in schema_list:
-                        if schema.schema_type == SchemaType.OPENAPI:
-                            func_info = schema.schema.get('function', {})
-                            description = func_info.get('description', 'No description available')
-                            mcp_info += f"- **{method_name}**: {description}\n"
-                            
-                            params = func_info.get('parameters', {})
-                            props = params.get('properties', {})
-                            if props:
-                                mcp_info += f"  Parameters: {', '.join(props.keys())}\n"
-                                
+                mcp_tool_count = sum(len(schema_list) for schema_list in registered_schemas.values())
+                mcp_info = f"\n\n--- MCP Tools ({mcp_tool_count} available) ---\n"
+                mcp_info += "MCP tools use standard function calling format. CRITICAL: Use ONLY data from MCP tool results - never fabricate sources or URLs.\n"
             except Exception as e:
                 logger.error(f"Error listing MCP tools: {e}")
-                mcp_info += "- Error loading MCP tool list\n"
-            
-            mcp_info += "\n🚨 CRITICAL MCP TOOL RESULT INSTRUCTIONS 🚨\n"
-            mcp_info += "When you use ANY MCP (Model Context Protocol) tools:\n"
-            mcp_info += "1. ALWAYS read and use the EXACT results returned by the MCP tool\n"
-            mcp_info += "2. For search tools: ONLY cite URLs, sources, and information from the actual search results\n"
-            mcp_info += "3. For any tool: Base your response entirely on the tool's output - do NOT add external information\n"
-            mcp_info += "4. DO NOT fabricate, invent, hallucinate, or make up any sources, URLs, or data\n"
-            mcp_info += "5. If you need more information, call the MCP tool again with different parameters\n"
-            mcp_info += "6. When writing reports/summaries: Reference ONLY the data from MCP tool results\n"
-            mcp_info += "7. If the MCP tool doesn't return enough information, explicitly state this limitation\n"
-            mcp_info += "8. Always double-check that every fact, URL, and reference comes from the MCP tool output\n"
-            mcp_info += "\nIMPORTANT: MCP tool results are your PRIMARY and ONLY source of truth for external data!\n"
-            mcp_info += "NEVER supplement MCP results with your training data or make assumptions beyond what the tools provide.\n"
+                mcp_info = "\n\n--- MCP Tools Available ---\n"
             
             system_content += mcp_info
         
         # Add XML tool calling instructions to system prompt if requested
+        # For XML mode, LLM needs tool schemas to construct proper tool calls
         if xml_tool_calling and tool_registry:
             openapi_schemas = tool_registry.get_openapi_schemas()
             
             if openapi_schemas:
-                # Convert schemas to JSON string
-                schemas_json = json.dumps(openapi_schemas, indent=2)
+                # Create compact but complete tool reference for XML mode
+                tool_reference = PromptManager._format_tools_for_xml(openapi_schemas)
                 
                 examples_content = f"""
 
-In this environment you have access to a set of tools you can use to answer the user's question.
+# AVAILABLE TOOLS & USAGE
 
-You can invoke functions by writing a <function_calls> block like the following as part of your reply to the user:
+**Tool Calling Format:**
+Use <function_calls> blocks to invoke tools:
 
 <function_calls>
-<invoke name="function_name">
-<parameter name="param_name">param_value</parameter>
-...
+<invoke name="tool_name">
+<parameter name="param">value</parameter>
 </invoke>
 </function_calls>
 
-String and scalar parameters should be specified as-is, while lists and objects should use JSON format.
+**Formatting Rules:**
+- Use exact tool names from the list below
+- Include ALL required parameters (marked with *)
+- Format arrays/objects as JSON strings: <parameter name="items">["item1", "item2"]</parameter>
+- Boolean values: "true" or "false" (lowercase)
+- Strings: Use as-is, no quotes needed in parameter tags
 
-Here are the functions available in JSON Schema format:
+**Available Tools:**
 
-```json
-{schemas_json}
-```
-
-When using the tools:
-- Use the exact function names from the JSON schema above
-- Include all required parameters as specified in the schema
-- Format complex data (objects, arrays) as JSON strings within the parameter tags
-- Boolean values should be "true" or "false" (lowercase)
+{tool_reference}
 """
                 
                 system_content += examples_content
-                logger.debug("Appended XML tool examples to system prompt")
+                logger.debug(f"Added complete tool reference for XML mode ({len(openapi_schemas)} tools)")
 
         now = datetime.datetime.now(datetime.timezone.utc)
         datetime_info = f"\n\n=== CURRENT DATE/TIME INFORMATION ===\n"
@@ -467,6 +620,14 @@ When using the tools:
         datetime_info += "Use this information for any time-sensitive tasks, research, or when current date/time context is needed.\n"
         
         system_content += datetime_info
+
+        # Add KV cache instruction references (dramatically reduces baseline prompt)
+        try:
+            instruction_refs = get_all_instruction_references()
+            system_content += f"\n\n{instruction_refs}\n"
+            logger.debug("Added KV cache instruction references to prompt")
+        except Exception as e:
+            logger.warning(f"Failed to add instruction references (non-critical): {e}")
 
         # Add adaptive input handling guidance
         adaptive_input_guidance = """
@@ -508,7 +669,8 @@ class AgentRunner:
         
         self.thread_manager = ThreadManager(
             trace=self.config.trace, 
-            agent_config=self.config.agent_config
+            agent_config=self.config.agent_config,
+            project_id=self.config.project_id
         )
         
         self.client = await self.thread_manager.db.client
@@ -531,6 +693,20 @@ class AgentRunner:
         sandbox_info = project_data.get('sandbox', {})
         if not sandbox_info.get('id'):
             logger.debug(f"No sandbox found for project {self.config.project_id}; will create lazily when needed")
+        else:
+            # Seed instructions into KV cache (non-blocking, best effort)
+            try:
+                from core.sandbox.sandbox import get_or_start_sandbox
+                from core.sandbox.kv_store import SandboxKVStore
+                sandbox = await get_or_start_sandbox(sandbox_info['id'])
+                await seed_instructions_to_cache(sandbox, force_refresh=True)
+                logger.info(f"Instructions seeded into KV cache for project {self.config.project_id}")
+                
+                # Initialize KV store for ThreadManager to use for conversation caching
+                self.thread_manager.kv_store = SandboxKVStore(sandbox)
+                logger.info(f"✅ KV cache enabled for ThreadManager (conversation summaries will be cached)")
+            except Exception as e:
+                logger.warning(f"Failed to seed instructions (non-critical): {e}")
     
     async def setup_tools(self):
         tool_manager = ToolManager(self.thread_manager, self.config.project_id, self.config.thread_id, self.config.agent_config)
@@ -672,7 +848,7 @@ class AgentRunner:
                 return True
         
         all_tools = [
-            'sb_shell_tool', 'sb_files_tool', 'sb_expose_tool',
+            'sb_kv_cache_tool', 'sb_shell_tool', 'sb_files_tool', 'sb_expose_tool',
             'web_search_tool', 'image_search_tool', 'sb_vision_tool', 'sb_presentation_tool', 'sb_image_edit_tool',
             'sb_kb_tool', 'sb_design_tool', 'sb_upload_file_tool',
             'sb_docs_tool',
@@ -700,12 +876,25 @@ class AgentRunner:
         await self.setup_tools()
         mcp_wrapper_instance = await self.setup_mcp_tools()
         
+        # Get user message for task detection and auto-instruction loading
+        latest_user_message = await self.client.table('messages').select('*').eq('thread_id', self.config.thread_id).eq('type', 'user').order('created_at', desc=True).limit(1).execute()
+        user_message_content = None
+        if latest_user_message.data and len(latest_user_message.data) > 0:
+            data = latest_user_message.data[0]['content']
+            if isinstance(data, str):
+                data = json.loads(data)
+            if self.config.trace:
+                self.config.trace.update(input=data['content'])
+            # Extract user message content for task detection
+            user_message_content = data.get('content') if isinstance(data, dict) else str(data)
+        
         system_message = await PromptManager.build_system_prompt(
             self.config.model_name, self.config.agent_config, 
             self.config.thread_id, 
             mcp_wrapper_instance, self.client,
             tool_registry=self.thread_manager.tool_registry,
-            xml_tool_calling=True
+            xml_tool_calling=True,
+            user_message=user_message_content
         )
         system_content_length = len(str(system_message.get('content', '')))
         logger.info(f"📝 System message built once: {system_content_length} chars")
@@ -716,14 +905,6 @@ class AgentRunner:
         final_termination_reason = None  # Track why execution stopped: None, 'explicit', 'max_iterations', 'unknown'
         fallback_triggered = self.config.fallback_triggered  # Track if fallback model has been used
         system_message_needs_rebuild = False  # Track if system message needs to be rebuilt after fallback
-
-        latest_user_message = await self.client.table('messages').select('*').eq('thread_id', self.config.thread_id).eq('type', 'user').order('created_at', desc=True).limit(1).execute()
-        if latest_user_message.data and len(latest_user_message.data) > 0:
-            data = latest_user_message.data[0]['content']
-            if isinstance(data, str):
-                data = json.loads(data)
-            if self.config.trace:
-                self.config.trace.update(input=data['content'])
         
         # Track the last message count to detect new adaptive input
         last_message_result = await self.client.table('messages').select('message_id').eq('thread_id', self.config.thread_id).eq('is_llm_message', True).execute()
@@ -767,7 +948,8 @@ class AgentRunner:
                     self.config.thread_id, 
                     mcp_wrapper_instance, self.client,
                     tool_registry=self.thread_manager.tool_registry,
-                    xml_tool_calling=True
+                    xml_tool_calling=True,
+                    user_message=user_message_content
                 )
                 system_message_needs_rebuild = False
                 system_content_length_rebuilt = len(str(system_message.get('content', '')))
