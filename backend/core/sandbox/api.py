@@ -1,6 +1,6 @@
 import os
 import urllib.parse
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, APIRouter, Form, Depends, Request
 from fastapi.responses import Response
@@ -66,6 +66,33 @@ def normalize_path(path: str) -> str:
         logger.error(f"Error normalizing path '{path}': {str(e)}")
         return path  # Return original path if decoding fails
 
+PROTECTED_PATH_PREFIXES = [os.path.normpath("/workspace/.iris")]
+
+def _candidate_security_paths(path: str) -> List[str]:
+    candidates = []
+    normalized = os.path.normpath(path)
+    candidates.append(normalized)
+    workspace_prefixed = normalized
+    if not normalized.startswith("/"):
+        workspace_prefixed = os.path.normpath(f"/workspace/{normalized.lstrip('/')}")
+    elif not normalized.startswith("/workspace"):
+        workspace_prefixed = os.path.normpath(f"/workspace{normalized}")
+    if workspace_prefixed not in candidates:
+        candidates.append(workspace_prefixed)
+    return candidates
+
+def _is_protected_path(path: str) -> bool:
+    candidates = _candidate_security_paths(path)
+    for candidate in candidates:
+        for prefix in PROTECTED_PATH_PREFIXES:
+            if candidate == prefix or candidate.startswith(prefix + os.sep):
+                return True
+    return False
+
+def _ensure_path_allowed(path: str) -> None:
+    if _is_protected_path(path):
+        logger.warning(f"Attempted access to protected path: {path}")
+        raise HTTPException(status_code=403, detail="Access to this path is restricted")
 
 
 async def get_sandbox_by_id_safely(client, sandbox_id: str) -> AsyncSandbox:
@@ -114,6 +141,8 @@ async def create_file(
     """Create a file in the sandbox using direct file upload"""
     # Normalize the path to handle UTF-8 encoding correctly
     path = normalize_path(path)
+    _ensure_path_allowed(path)
+    _ensure_path_allowed(path)
     
     logger.debug(f"Received file upload request for sandbox {sandbox_id}, path: {path}, user_id: {user_id}")
     client = await db.client
@@ -152,6 +181,7 @@ async def update_file(
             raise HTTPException(status_code=400, detail="Path is required")
         
         path = normalize_path(path)
+        _ensure_path_allowed(path)
         
         logger.debug(f"Received file update request for sandbox {sandbox_id}, path: {path}, user_id: {user_id}")
         client = await db.client
@@ -177,6 +207,7 @@ async def list_files(
     user_id: Optional[str] = Depends(get_optional_user_id)
 ):
     path = normalize_path(path)
+    _ensure_path_allowed(path)
     
     logger.debug(f"Received list files request for sandbox {sandbox_id}, path: {path}, user_id: {user_id}")
     client = await db.client
@@ -196,6 +227,8 @@ async def list_files(
             # Convert file information to our model
             # Ensure forward slashes are used for paths, regardless of OS
             full_path = f"{path.rstrip('/')}/{file.name}" if path != '/' else f"/{file.name}"
+            if _is_protected_path(full_path):
+                continue
             file_info = FileInfo(
                 name=file.name,
                 path=full_path, # Use the constructed path
@@ -223,6 +256,7 @@ async def read_file(
     # Normalize the path to handle UTF-8 encoding correctly
     original_path = path
     path = normalize_path(path)
+    _ensure_path_allowed(path)
     
     logger.debug(f"Received file read request for sandbox {sandbox_id}, path: {path}, user_id: {user_id}")
     if original_path != path:
@@ -251,6 +285,7 @@ async def read_file(
             normalized_download_path = f"/workspace{path}"
         
         logger.debug(f"Normalized download path: {path} -> {normalized_download_path}")
+        _ensure_path_allowed(normalized_download_path)
         
         # Read file directly - don't check existence first with a separate call
         try:

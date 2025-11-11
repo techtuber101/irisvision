@@ -111,7 +111,7 @@ class CompressionReport:
         )
 
 DEFAULT_TOKEN_THRESHOLD = 50_000  # Lowered from 70k to trigger compression earlier
-SUMMARIZATION_TOKEN_THRESHOLD = 30_000  # Trigger summarization earlier (~30k tokens)
+SUMMARIZATION_TOKEN_THRESHOLD = 100_000  # Try to keep raw context comfortably under 100k tokens
 
 class ContextManager:
     """Manages thread context including token counting and summarization."""

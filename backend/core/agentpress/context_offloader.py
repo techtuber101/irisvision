@@ -25,11 +25,13 @@ Key Features:
 import json
 import uuid
 import asyncio
+import re
 from typing import Any, Dict, Optional, Union, Tuple, List
 from datetime import datetime
 from litellm.utils import token_counter
 
 from core.utils.logger import logger
+from core.services.langfuse import langfuse
 from core.sandbox.kv_store import SandboxKVStore, KVStoreError
 
 
@@ -48,19 +50,42 @@ class ContextOffloader:
     replacing it with lightweight references that the LLM can retrieve on demand.
     """
     
-    def __init__(self, kv_store: Optional[SandboxKVStore] = None):
+    def __init__(self, kv_store: Optional[SandboxKVStore] = None, trace=None):
         """Initialize the ContextOffloader.
         
         Args:
             kv_store: KV store instance for caching (if None, offloading disabled)
+            trace: Optional Langfuse trace to reuse
         """
         self.kv_store = kv_store
         self.enabled = kv_store is not None
+        self.trace = trace if trace is not None else (langfuse.trace(name="context_offloader") if self.enabled else None)
         
         if self.enabled:
             logger.info("✅ ContextOffloader: Enterprise-grade caching enabled")
         else:
             logger.debug("ContextOffloader: Caching disabled (no KV store)")
+
+    def _emit_event(
+        self,
+        name: str,
+        *,
+        level: str = "DEFAULT",
+        status_message: str = "",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Send structured telemetry via Langfuse (best-effort)."""
+        if not self.trace:
+            return
+        try:
+            self.trace.event(
+                name=name,
+                level=level,
+                status_message=status_message,
+                metadata=metadata or {},
+            )
+        except Exception as exc:
+            logger.debug(f"ContextOffloader telemetry error ({name}): {exc}")
     
     def _estimate_size(self, content: Any) -> Tuple[int, int]:
         """Estimate content size in tokens and characters.
@@ -165,6 +190,14 @@ class ContextOffloader:
         
         return base_key
     
+    def _normalize_content(self, content: Any) -> str:
+        """Normalize arbitrary content into a string for preview/summary generation."""
+        if isinstance(content, str):
+            return content
+        if isinstance(content, (dict, list)):
+            return json.dumps(content, ensure_ascii=False)
+        return str(content)
+
     def _create_preview(self, content: Any, max_chars: int = 200) -> str:
         """Create a preview of content for reference messages.
         
@@ -175,21 +208,74 @@ class ContextOffloader:
         Returns:
             Preview string
         """
-        if isinstance(content, str):
-            preview = content[:max_chars]
-            if len(content) > max_chars:
-                preview += "..."
-        elif isinstance(content, (dict, list)):
-            content_str = json.dumps(content, ensure_ascii=False)
-            preview = content_str[:max_chars]
-            if len(content_str) > max_chars:
-                preview += "..."
-        else:
-            preview = str(content)[:max_chars]
-            if len(str(content)) > max_chars:
-                preview += "..."
-        
+        normalized = self._normalize_content(content)
+        preview = normalized[:max_chars]
+        if len(normalized) > max_chars:
+            preview += "..."
         return preview
+
+    def _create_summary(self, content: Any, max_chars: int = 400) -> str:
+        """Create a lightweight summary that can help the planner decide when to hydrate."""
+        normalized = self._normalize_content(content)
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        if not normalized:
+            return ""
+        if len(normalized) <= max_chars:
+            return normalized
+
+        sentences = re.split(r"(?<=[.!?]) +", normalized)
+        summary_parts: List[str] = []
+        current_length = 0
+        for sentence in sentences:
+            if not sentence:
+                continue
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            additional_length = len(sentence) + (1 if summary_parts else 0)
+            if current_length + additional_length > max_chars:
+                break
+            summary_parts.append(sentence)
+            current_length += additional_length
+
+        summary = " ".join(summary_parts).strip()
+        if not summary:
+            summary = normalized[:max_chars]
+        if len(summary) < len(normalized):
+            summary = summary.rstrip() + " ..."
+        return summary
+
+    def _build_artifact_reference(
+        self,
+        *,
+        artifact_key: str,
+        scope: str,
+        content_type: str,
+        source_id: Optional[str],
+        preview: str,
+        summary: str,
+        token_count: int,
+        char_count: int,
+        metadata_snapshot: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Create the lightweight reference block shared with the planner/LLM."""
+        retrieval_hint = (
+            "Full content stored in KV cache. Planner auto-hydrates required sections without "
+            "user-facing tool calls."
+        )
+        return {
+            "_cached": True,
+            "artifact_key": artifact_key,
+            "scope": scope,
+            "content_type": content_type,
+            "source_id": source_id,
+            "preview": preview,
+            "summary": summary,
+            "size_tokens": token_count,
+            "size_chars": char_count,
+            "retrieval_hint": retrieval_hint,
+            "metadata": metadata_snapshot or {},
+        }
     
     async def offload_content(
         self,
@@ -224,6 +310,16 @@ class ContextOffloader:
             logger.debug(
                 f"⏭️  Content not cached ({content_type}): {token_count:,} tokens, {char_count:,} chars - "
                 f"below threshold ({TOKEN_THRESHOLD} tokens / {CHAR_THRESHOLD} chars) or caching disabled"
+            )
+            self._emit_event(
+                "context_offloader.cache_skipped",
+                metadata={
+                    "content_type": content_type,
+                    "source_id": source_id,
+                    "size_tokens": token_count,
+                    "size_chars": char_count,
+                    "force_cache": force_cache,
+                },
             )
             return None
         
@@ -260,6 +356,10 @@ class ContextOffloader:
             # Generate artifact key
             artifact_key = self._generate_artifact_key(content_type, source_id, custom_key)
             
+            # Create preview/summary before writing metadata so we can store them
+            preview = self._create_preview(content)
+            summary = self._create_summary(content)
+
             # Prepare metadata
             cache_metadata = {
                 "content_type": content_type,
@@ -267,6 +367,8 @@ class ContextOffloader:
                 "cached_at": datetime.now().isoformat(),
                 "size_tokens": token_count,
                 "size_chars": char_count,
+                "preview": preview,
+                "summary": summary,
                 **(metadata or {})
             }
             
@@ -279,12 +381,21 @@ class ContextOffloader:
                 metadata=cache_metadata
             )
             
-            # Create preview
-            preview = self._create_preview(content)
-            
             logger.info(
                 f"💾 Offloaded {content_type}: {token_count:,} tokens, {char_count:,} chars -> "
                 f"artifact: {artifact_key} (scope: {scope}, TTL: {ttl}h)"
+            )
+            self._emit_event(
+                "context_offloader.cache_write",
+                metadata={
+                    "artifact_key": artifact_key,
+                    "scope": scope,
+                    "content_type": content_type,
+                    "size_tokens": token_count,
+                    "size_chars": char_count,
+                    "ttl_hours": ttl,
+                    "source_id": source_id,
+                },
             )
             
             # Log to help debug why artifacts folder might not be visible
@@ -292,21 +403,33 @@ class ContextOffloader:
                 f"📁 KV cache artifact stored: {self.kv_store.root_path}/{scope}/{artifact_key}"
             )
             
+            
             # Return reference
-            return {
-                "_cached": True,
-                "artifact_key": artifact_key,
-                "scope": scope,
-                "preview": preview,
-                "size_tokens": token_count,
-                "size_chars": char_count,
-                "retrieval_hint": f"Full content stored in KV cache. Use get_artifact(key='{artifact_key}') to retrieve.",
-                "note": f"Content type: {content_type}. Cached at {cache_metadata['cached_at']}"
-            }
+            return self._build_artifact_reference(
+                artifact_key=artifact_key,
+                scope=scope,
+                content_type=content_type,
+                source_id=source_id,
+                preview=preview,
+                summary=summary,
+                token_count=token_count,
+                char_count=char_count,
+                metadata_snapshot={
+                    "cached_at": cache_metadata["cached_at"],
+                    "thread_id": metadata.get("thread_id") if metadata else None,
+                    "forced_for_tool": metadata.get("forced_for_tool") if metadata else None,
+                },
+            )
             
         except KVStoreError as e:
             # Specific KV store errors (quota, permissions, etc.) - log at debug level
             logger.debug(f"⏭️  KV store error for {content_type} (non-critical): {e}")
+            self._emit_event(
+                "context_offloader.cache_error",
+                level="WARNING",
+                status_message=str(e),
+                metadata={"content_type": content_type, "source_id": source_id},
+            )
             return None
         except Exception as e:
             # Check if error is related to sandbox/filesystem not being ready
@@ -326,6 +449,12 @@ class ContextOffloader:
             else:
                 # Other unexpected errors - log as warning
                 logger.warning(f"⚠️  Failed to offload content ({content_type}): {e}")
+                self._emit_event(
+                    "context_offloader.cache_error",
+                    level="ERROR",
+                    status_message=str(e),
+                    metadata={"content_type": content_type, "source_id": source_id},
+                )
             return None
     
     async def offload_tool_output(
@@ -372,7 +501,12 @@ class ContextOffloader:
         }
         
         source_id = tool_call_id or tool_name
-        custom_key = f"tool_output_{tool_name}"
+        if tool_call_id:
+            safe_tool_call = "".join(c if c.isalnum() or c in "_-" else "_" for c in str(tool_call_id))[:50]
+            custom_key = f"tool_output_{tool_name}_{safe_tool_call}"
+        else:
+            unique_suffix = str(uuid.uuid4())[:8]
+            custom_key = f"tool_output_{tool_name}_{unique_suffix}"
         
         # For web search, use lower threshold to ensure caching
         # If it's still below threshold, we'll force cache it anyway
@@ -504,9 +638,23 @@ class ContextOffloader:
         try:
             content = await self.kv_store.get(scope=scope, key=artifact_key, as_type="auto")
             logger.debug(f"✓ Retrieved content from cache: {artifact_key}")
+            self._emit_event(
+                "context_offloader.retrieve_hit",
+                metadata={
+                    "artifact_key": artifact_key,
+                    "scope": scope,
+                    "content_type": type(content).__name__ if content is not None else "None",
+                },
+            )
             return content
         except Exception as e:
             logger.debug(f"Cache miss for {artifact_key}: {e}")
+            self._emit_event(
+                "context_offloader.retrieve_miss",
+                level="WARNING",
+                status_message=str(e),
+                metadata={"artifact_key": artifact_key, "scope": scope},
+            )
             return None
     
     def create_reference_message(
@@ -764,4 +912,3 @@ class ContextOffloader:
         else:
             # Primitive type, return as-is
             return obj
-

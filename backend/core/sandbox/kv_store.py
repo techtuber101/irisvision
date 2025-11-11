@@ -41,6 +41,17 @@ MAX_KEY_LENGTH = 255
 MAX_VALUE_SIZE_MB = 50
 INDEX_FILENAME = "_index.json"
 
+# TTL override (hours). Set via env KV_CACHE_TTL_OVERRIDE_HOURS; default 0 (no expiry).
+_ttl_override_raw = os.getenv("KV_CACHE_TTL_OVERRIDE_HOURS", "0")
+try:
+    _ttl_override_val = int(_ttl_override_raw)
+except ValueError:
+    _ttl_override_val = 0
+if _ttl_override_val < 0:
+    KV_CACHE_TTL_OVERRIDE_HOURS: Optional[int] = None
+else:
+    KV_CACHE_TTL_OVERRIDE_HOURS = _ttl_override_val
+
 # Scope configurations
 SCOPE_CONFIG = {
     "system": {"ttl_hours": 168, "max_size_mb": 10},  # 1 week
@@ -350,9 +361,15 @@ class SandboxKVStore:
             file_path = self._key_path(scope, key)
             await self.sandbox.fs.upload_file(value_bytes, file_path)
             
-            # Update index
-            index = await self._load_index(scope)
-            ttl = ttl_hours or SCOPE_CONFIG[scope]["ttl_hours"]
+        # Update index
+        index = await self._load_index(scope)
+        default_ttl = ttl_hours if ttl_hours is not None else SCOPE_CONFIG[scope]["ttl_hours"]
+        ttl_override = KV_CACHE_TTL_OVERRIDE_HOURS
+        ttl = default_ttl
+        if ttl_override is not None:
+            ttl = ttl_override
+        expiry = None
+        if ttl and ttl > 0:
             expiry = datetime.utcnow() + timedelta(hours=ttl)
             
             index[sanitized_key] = {
@@ -362,7 +379,7 @@ class SandboxKVStore:
                 "size_bytes": value_size,
                 "fingerprint": generate_fingerprint(value_bytes),
                 "created_at": datetime.utcnow().isoformat(),
-                "expires_at": expiry.isoformat(),
+                "expires_at": expiry.isoformat() if expiry else None,
                 "ttl_hours": ttl,
                 "metadata": metadata or {}
             }
@@ -411,11 +428,13 @@ class SandboxKVStore:
         entry = index[sanitized_key]
         
         # Check expiration
-        expiry = datetime.fromisoformat(entry["expires_at"])
-        if datetime.utcnow() > expiry:
-            logger.info(f"KV cache key expired: scope={scope} key={key}")
-            await self.delete(scope, key)
-            raise KVKeyError(f"Key '{key}' expired in scope '{scope}'")
+        expiry_str = entry.get("expires_at")
+        if expiry_str:
+            expiry = datetime.fromisoformat(expiry_str)
+            if datetime.utcnow() > expiry:
+                logger.info(f"KV cache key expired: scope={scope} key={key}")
+                await self.delete(scope, key)
+                raise KVKeyError(f"Key '{key}' expired in scope '{scope}'")
         
         # Read file
         file_path = entry["path"]
@@ -478,7 +497,10 @@ class SandboxKVStore:
         if sanitized_key not in index:
             raise KVKeyError(f"Key '{key}' not found in scope '{scope}'")
         
-        return index[sanitized_key]
+        entry = index[sanitized_key].copy()
+        entry["scope"] = scope
+        entry["key"] = entry.get("original_key", key)
+        return entry
     
     async def delete(self, scope: str, key: str) -> bool:
         """
@@ -519,53 +541,48 @@ class SandboxKVStore:
     
     async def list_keys(
         self,
-        scope: str,
+        scope: Optional[str] = None,
         pattern: Optional[str] = None,
         include_expired: bool = False
     ) -> List[Dict[str, Any]]:
         """
-        List all keys in a scope.
-        
-        Args:
-            scope: Cache scope
-            pattern: Optional regex pattern to filter keys
-            include_expired: Whether to include expired keys
-            
-        Returns:
-            List of dicts with key metadata
+        List keys across one or all scopes with optional regex filtering.
         """
-        # Ensure KV cache is initialized
         await self._ensure_initialized()
         
-        scope = validate_scope(scope)
-        index = await self._load_index(scope)
-        
-        results = []
+        scopes = [validate_scope(scope)] if scope else list(SCOPE_CONFIG.keys())
+        results: List[Dict[str, Any]] = []
         now = datetime.utcnow()
+        regex = re.compile(pattern) if pattern else None
         
-        for sanitized_key, entry in index.items():
-            # Check expiration
-            expiry = datetime.fromisoformat(entry["expires_at"])
-            if not include_expired and now > expiry:
-                continue
-            
-            # Check pattern
-            if pattern and not re.search(pattern, entry["original_key"]):
-                continue
-            
-            results.append({
-                "key": entry["original_key"],
-                "sanitized_key": sanitized_key,
-                "path": entry["path"],
-                "content_type": entry["content_type"],
-                "size_bytes": entry["size_bytes"],
-                "created_at": entry["created_at"],
-                "expires_at": entry["expires_at"],
-                "ttl_hours": entry["ttl_hours"],
-                "is_expired": now > expiry,
-                "metadata": entry.get("metadata", {})
-            })
+        for scope_name in scopes:
+            index = await self._load_index(scope_name)
+            for sanitized_key, entry in index.items():
+                expiry_str = entry.get("expires_at")
+                expiry = datetime.fromisoformat(expiry_str) if expiry_str else None
+                is_expired = expiry and now > expiry
+                if not include_expired and is_expired:
+                    continue
+                if regex and not regex.search(entry["original_key"]):
+                    continue
+
+                results.append({
+                    "key": entry["original_key"],
+                    "sanitized_key": sanitized_key,
+                    "scope": scope_name,
+                    "path": entry["path"],
+                    "content_type": entry["content_type"],
+                    "size_bytes": entry["size_bytes"],
+                    "created_at": entry["created_at"],
+                    "updated_at": entry.get("updated_at"),
+                    "expires_at": entry.get("expires_at"),
+                    "ttl_hours": entry["ttl_hours"],
+                    "is_expired": bool(is_expired),
+                    "metadata": entry.get("metadata", {}),
+                    "tags": entry.get("tags", []),
+                })
         
+        results.sort(key=lambda item: item.get("created_at") or "", reverse=True)
         return results
     
     async def prune_expired(self, scope: Optional[str] = None) -> Dict[str, int]:

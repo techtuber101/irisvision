@@ -48,9 +48,11 @@ class ArtifactCandidate:
     scope: str = "artifacts"
     description: Optional[str] = None
     preview: Optional[str] = None
+    summary: Optional[str] = None
     created_at: Optional[str] = None
     expires_at: Optional[str] = None
     size_bytes: Optional[int] = None
+    size_tokens: Optional[int] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_prompt_dict(self) -> Dict[str, Any]:
@@ -59,9 +61,11 @@ class ArtifactCandidate:
             "scope": self.scope,
             "description": self.description,
             "preview": self.preview,
+            "summary": self.summary,
             "created_at": self.created_at,
             "expires_at": self.expires_at,
             "size_bytes": self.size_bytes,
+            "size_tokens": self.size_tokens,
             "metadata": self.metadata,
         }
 
@@ -89,6 +93,14 @@ class ContextPlan:
         return bool(self.instruction_tags or self.artifacts or self.include_project_summary)
 
 
+@dataclass
+class PlannerSectionResult:
+    """Return value for build_auto_context_section containing content + telemetry."""
+
+    section: str
+    telemetry: Dict[str, Any] = field(default_factory=dict)
+
+
 class ContextPlanner:
     """LLM-powered planner that chooses what context to load."""
 
@@ -110,6 +122,7 @@ class ContextPlanner:
         artifact_catalog: List[ArtifactCandidate],
         project_summary_preview: Optional[str] = None,
         recent_context_hint: Optional[str] = None,
+        aggressive_mode: bool = False,
     ) -> ContextPlan:
         """Ask the planner model which context objects to load."""
         if not user_request:
@@ -121,6 +134,7 @@ class ContextPlanner:
             "project_summary_preview": project_summary_preview or "",
             "instruction_catalog": [item.to_prompt_dict() for item in instruction_catalog],
             "artifact_catalog": [item.to_prompt_dict() for item in artifact_catalog],
+            "aggressive_mode": aggressive_mode,
             "limits": {
                 "max_instructions": self.max_instructions,
                 "max_artifacts": self.max_artifacts,
@@ -152,7 +166,10 @@ class ContextPlanner:
                     "ONLY the artifacts that contain essential prior research/results.\n"
                     "5. Never include artifacts just because they exist—each must have a concrete use in the "
                     "upcoming step. If you can't explain why it's required now, leave it out.\n"
-                    "6. Only include the project summary when strategic planning or continuity is clearly needed."
+                    "6. Only include the project summary when strategic planning or continuity is clearly needed.\n"
+                    "7. When the payload marks aggressive_mode=true, behave as if the token budget is nearly "
+                    "exhausted: prefer referencing artifacts via their summaries/previews and only request "
+                    "full hydration when it is absolutely essential (e.g., verbatim insertion into a deliverable)."
                 ),
             },
             {
@@ -430,15 +447,25 @@ async def build_artifact_candidates(
 
     for entry in sorted_entries[:max_candidates]:
         metadata = entry.get("metadata", {}) or {}
+        summary = metadata.get("summary") or metadata.get("description")
+        preview = metadata.get("preview")
+        size_tokens = metadata.get("size_tokens")
+        if not size_tokens and metadata.get("size_chars"):
+            try:
+                size_tokens = max(1, int(metadata["size_chars"] / 4))
+            except Exception:
+                size_tokens = None
         candidates.append(
             ArtifactCandidate(
                 key=entry.get("key", ""),
                 scope="artifacts",
-                description=metadata.get("description"),
-                preview=metadata.get("preview"),
+                description=summary or metadata.get("description"),
+                preview=preview,
+                summary=summary,
                 created_at=entry.get("created_at"),
                 expires_at=entry.get("expires_at"),
                 size_bytes=entry.get("size_bytes"),
+                size_tokens=size_tokens,
                 metadata=metadata,
             )
         )
@@ -462,6 +489,151 @@ def serialize_artifact_content(value: Any, max_chars: int = 4000) -> str:
     return rendered
 
 
+def _format_artifact_stub(
+    *,
+    metadata_entry: Optional[Dict[str, Any]],
+    reason: Optional[str],
+    aggressive_mode: bool,
+) -> str:
+    custom_metadata = (metadata_entry or {}).get("metadata", {}) or {}
+    summary = custom_metadata.get("summary")
+    preview = custom_metadata.get("preview")
+    cached_at = custom_metadata.get("cached_at")
+    forced_for_tool = custom_metadata.get("forced_for_tool")
+    size_tokens = custom_metadata.get("size_tokens")
+    size_chars = custom_metadata.get("size_chars")
+    if not summary and preview:
+        summary = preview
+
+    limit = 280 if aggressive_mode else 480
+    summary_line = trim_text(summary, limit) if summary else "No summary stored."
+    lines = [
+        f"- summary: {summary_line}",
+    ]
+    if reason:
+        lines.append(f"- planner_reason: {trim_text(reason, 300)}")
+    if size_tokens:
+        lines.append(f"- est_tokens: {size_tokens:,}")
+    if size_chars:
+        lines.append(f"- size_chars: {size_chars:,}")
+    if cached_at:
+        lines.append(f"- cached_at: {cached_at}")
+    if forced_for_tool:
+        lines.append(f"- origin_tool: {forced_for_tool}")
+    lines.append("- note: Full artifact stays cached; planner hydrates the needed slices automatically. No get_artifact tool calls are required.")
+    return "\n".join(lines)
+
+
+def _should_hydrate_full_artifact(
+    *,
+    metadata_entry: Optional[Dict[str, Any]],
+    reason: Optional[str],
+    aggressive_mode: bool,
+) -> bool:
+    custom_metadata = (metadata_entry or {}).get("metadata", {}) or {}
+    size_tokens = custom_metadata.get("size_tokens")
+    if not size_tokens and custom_metadata.get("size_chars"):
+        try:
+            size_tokens = max(1, int(custom_metadata["size_chars"] / 4))
+        except Exception:
+            size_tokens = None
+
+    reason_text = (reason or "").lower()
+    keyword_trigger = any(
+        token in reason_text
+        for token in [
+            "insert",
+            "include",
+            "verbatim",
+            "quote",
+            "paste",
+            "deliverable",
+            "final draft",
+            "document body",
+            "table",
+            "chart data",
+            "appendix",
+        ]
+    )
+
+    if custom_metadata.get("forced_for_tool") == "create_document":
+        return True
+
+    if size_tokens is None:
+        return keyword_trigger and not aggressive_mode
+
+    if aggressive_mode:
+        if size_tokens <= 900:
+            return True
+        return keyword_trigger and size_tokens <= 3200
+
+    if size_tokens <= 2000:
+        return True
+    return keyword_trigger and size_tokens <= 5000
+
+
+async def _render_artifact_block(
+    *,
+    kv_store: SandboxKVStore,
+    artifact: ContextArtifactSelection,
+    aggressive_mode: bool,
+    stats_collector: Optional[List[Dict[str, Any]]] = None,
+) -> Optional[str]:
+    scope = artifact.scope or "artifacts"
+    metadata_entry: Optional[Dict[str, Any]] = None
+    try:
+        metadata_entry = await kv_store.get_metadata(scope=scope, key=artifact.key)
+    except Exception as exc:
+        logger.debug(f"Planner failed to load metadata for {artifact.key}: {exc}")
+
+    hydrate_full = _should_hydrate_full_artifact(
+        metadata_entry=metadata_entry,
+        reason=artifact.reason,
+        aggressive_mode=aggressive_mode,
+    )
+
+    reason_line = f"\nReason: {artifact.reason}" if artifact.reason else ""
+
+    stub = _format_artifact_stub(
+        metadata_entry=metadata_entry,
+        reason=artifact.reason,
+        aggressive_mode=aggressive_mode,
+    )
+
+    custom_metadata = (metadata_entry or {}).get("metadata", {}) or {}
+    size_tokens = custom_metadata.get("size_tokens")
+    if not size_tokens and custom_metadata.get("size_chars"):
+        try:
+            size_tokens = max(1, int(custom_metadata["size_chars"] / 4))
+        except Exception:
+            size_tokens = None
+    size_chars = custom_metadata.get("size_chars")
+
+    stat_record = {
+        "key": artifact.key,
+        "scope": scope,
+        "hydrated": hydrate_full,
+        "reason": artifact.reason,
+        "size_tokens": size_tokens,
+        "size_chars": size_chars,
+    }
+    if stats_collector is not None:
+        stats_collector.append(stat_record)
+
+    if not hydrate_full:
+        return f"### Cached Artifact: {artifact.key}{reason_line}\n{stub}"
+
+    try:
+        payload = await kv_store.get(scope=scope, key=artifact.key, as_type="auto")
+    except Exception as exc:
+        logger.debug(f"Planner failed to hydrate artifact {artifact.key}: {exc}")
+        return f"### Cached Artifact: {artifact.key}{reason_line}\n{stub}\n- note: full artifact unavailable (cache miss)"
+
+    max_chars = 1500 if aggressive_mode else 4000
+    excerpt = serialize_artifact_content(payload, max_chars=max_chars)
+    return f"### Cached Artifact: {artifact.key}{reason_line}\n{stub}\n\nHydrated excerpt:\n{excerpt}"
+
+
 def trim_text(text: Optional[str], max_chars: int = 800) -> Optional[str]:
     if not text:
         return None
@@ -477,7 +649,21 @@ async def build_auto_context_section(
     kv_store: Optional[SandboxKVStore],
     project_summary: Optional[str],
     turn_label: Optional[str] = None,
-) -> str:
+    aggressive_mode: bool = False,
+) -> PlannerSectionResult:
+    def _empty_result(reason: str) -> PlannerSectionResult:
+        return PlannerSectionResult(
+            section="",
+            telemetry={
+                "aggressive_mode": aggressive_mode,
+                "reason": reason,
+                "instruction_count": 0,
+                "artifact_count": 0,
+                "hydrated_count": 0,
+                "stub_count": 0,
+            },
+        )
+
     if not user_message or not kv_store:
         logger.info(
             "🧭 Context planner skipped | thread=%s | reason=%s | turn=%s",
@@ -485,7 +671,7 @@ async def build_auto_context_section(
             "missing_user_message" if not user_message else "kv_unavailable",
             turn_label,
         )
-        return ""
+        return _empty_result("kv_or_message_missing")
 
     instruction_candidates = await build_instruction_candidates(kv_store)
     artifact_candidates = await build_artifact_candidates(kv_store)
@@ -496,21 +682,23 @@ async def build_auto_context_section(
             thread_id,
             turn_label,
         )
-        return ""
+        return _empty_result("no_candidates")
 
     planner = ContextPlanner()
     logger.info(
-        "🧭 Context planner start | thread=%s | instructions=%d | artifacts=%d | turn=%s",
+        "🧭 Context planner start | thread=%s | instructions=%d | artifacts=%d | turn=%s | aggressive=%s",
         thread_id,
         len(instruction_candidates),
         len(artifact_candidates),
         turn_label,
+        aggressive_mode,
     )
     plan = await planner.plan_context(
         user_request=user_message,
         instruction_catalog=instruction_candidates,
         artifact_catalog=artifact_candidates,
         project_summary_preview=trim_text(project_summary, 400),
+        aggressive_mode=aggressive_mode,
     )
 
     if "document_creation" in plan.instruction_tags and "visualization" not in plan.instruction_tags:
@@ -524,7 +712,7 @@ async def build_auto_context_section(
             turn_label,
             plan.reasoning,
         )
-        return ""
+        return _empty_result("empty_plan")
 
     sections: List[str] = []
 
@@ -545,35 +733,29 @@ async def build_auto_context_section(
         if instruction_blocks:
             sections.append("## Auto-loaded Instructions\n" + "\n\n".join(instruction_blocks))
 
+    artifact_stats: List[Dict[str, Any]] = []
+
     if plan.artifacts:
         artifact_blocks: List[str] = []
         for artifact in plan.artifacts:
-            try:
-                payload = await kv_store.get(
-                    scope=artifact.scope or "artifacts",
-                    key=artifact.key,
-                    as_type="auto",
-                )
-                serialized = serialize_artifact_content(payload)
-                reason_line = (
-                    f"\nReason: {artifact.reason}"
-                    if artifact.reason
-                    else ""
-                )
-                artifact_blocks.append(
-                    f"### Cached Artifact: {artifact.key}{reason_line}\n{serialized}"
-                )
-            except Exception as exc:
-                logger.debug(f"Context planner artifact miss ({artifact.key}): {exc}")
+            block = await _render_artifact_block(
+                kv_store=kv_store,
+                artifact=artifact,
+                aggressive_mode=aggressive_mode,
+                stats_collector=artifact_stats,
+            )
+            if block:
+                artifact_blocks.append(block)
 
         if artifact_blocks:
             sections.append("## Cached Artifacts\n" + "\n\n".join(artifact_blocks))
 
     if plan.include_project_summary and project_summary:
-        sections.append("## Project Summary\n" + project_summary)
+        summary_max = 300 if aggressive_mode else 800
+        sections.append("## Project Summary\n" + (trim_text(project_summary, summary_max) or project_summary))
 
     if not sections:
-        return ""
+        return _empty_result("no_sections_generated")
 
     planner_note = f"Planner rationale: {plan.reasoning}\n" if plan.reasoning else ""
 
@@ -585,6 +767,27 @@ async def build_auto_context_section(
         }
         for artifact in plan.artifacts
     ]
+    hydrated_count = sum(1 for stat in artifact_stats if stat.get("hydrated"))
+    stub_count = len(artifact_stats) - hydrated_count
+    est_tokens_hydrated = sum(
+        stat.get("size_tokens") or 0 for stat in artifact_stats if stat.get("hydrated")
+    )
+    est_tokens_stubbed = sum(
+        stat.get("size_tokens") or 0 for stat in artifact_stats if not stat.get("hydrated")
+    )
+
+    telemetry = {
+        "aggressive_mode": aggressive_mode,
+        "instruction_count": len(plan.instruction_tags),
+        "artifact_count": len(plan.artifacts),
+        "hydrated_count": hydrated_count,
+        "stub_count": stub_count,
+        "est_tokens_hydrated": est_tokens_hydrated,
+        "est_tokens_stubbed": est_tokens_stubbed,
+        "artifact_stats": artifact_stats,
+        "instructions": plan.instruction_tags,
+    }
+
     analysis_payload = {
         "thread_id": thread_id,
         "turn_label": turn_label,
@@ -593,6 +796,7 @@ async def build_auto_context_section(
         "include_project_summary": plan.include_project_summary,
         "reasoning": plan.reasoning,
         "raw_plan": plan.raw_response,
+        "telemetry": telemetry,
     }
     try:
         logger.info(
@@ -603,4 +807,5 @@ async def build_auto_context_section(
     except Exception as exc:
         logger.debug(f"Failed to serialize planner analysis payload: {exc}")
 
-    return "\n\n# AUTO-LOADED CONTEXT\n" + planner_note + "\n".join(sections)
+    section_text = "\n\n# AUTO-LOADED CONTEXT\n" + planner_note + "\n".join(sections)
+    return PlannerSectionResult(section=section_text, telemetry=telemetry)

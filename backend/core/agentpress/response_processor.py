@@ -1934,18 +1934,17 @@ class ResponseProcessor:
             # 1. Rich version for the frontend (always full output)
             structured_result_for_frontend = self._create_structured_tool_result(tool_call, result, parsing_details, for_llm=False)
             # 2. Use full output for LLM (caching happens in background, will be used next time)
-            artifact_key_for_llm = artifact_reference_for_llm.get("artifact_key") if artifact_reference_for_llm else None
             structured_result_for_llm = self._create_structured_tool_result(
                 tool_call,
                 result,
                 parsing_details,
                 for_llm=True,
-                artifact_key=artifact_key_for_llm,
+                artifact_reference=artifact_reference_for_llm,
             )
-            if function_name == "create_document" and not artifact_key_for_llm:
+            if function_name == "create_document" and not artifact_reference_for_llm:
                 structured_result_for_llm["tool_execution"]["result"]["output"] = {
                     "_cached": False,
-                    "note": "Document HTML omitted to protect context window. Use the create_document output from metadata.frontend_content or call get_artifact() if needed."
+                    "note": "Document HTML omitted to protect context window. Planner will hydrate the saved document automatically whenever richer context is required."
                 }
 
             # Add the message with the appropriate role to the conversation history
@@ -2099,14 +2098,22 @@ class ResponseProcessor:
             kv_store = SandboxKVStore(sandbox)
             
             # Create and cache offloader
-            self.context_offloader = ContextOffloader(kv_store)
+            self.context_offloader = ContextOffloader(kv_store, trace=self.trace)
             return self.context_offloader
             
         except Exception as e:
             logger.debug(f"Could not create ContextOffloader: {e}")
             return None
     
-    def _create_structured_tool_result(self, tool_call: Dict[str, Any], result: ToolResult, parsing_details: Optional[Dict[str, Any]] = None, for_llm: bool = False, artifact_key: Optional[str] = None):
+    def _create_structured_tool_result(
+        self,
+        tool_call: Dict[str, Any],
+        result: ToolResult,
+        parsing_details: Optional[Dict[str, Any]] = None,
+        for_llm: bool = False,
+        artifact_reference: Optional[Dict[str, Any]] = None,
+        artifact_key: Optional[str] = None,
+    ):
         """Create a structured tool result format that's tool-agnostic and provides rich information.
         
         Args:
@@ -2141,26 +2148,11 @@ class ResponseProcessor:
                 # If parsing fails, keep the original string
                 pass
 
-        # For LLM version: if artifact_key exists, replace output with reference
-        if for_llm and artifact_key:
-            # Create a concise reference instead of full output
-            output_size = len(str(original_output))
-            if isinstance(original_output, str):
-                # Show first 500 chars as preview
-                preview = original_output[:500] + "..." if len(original_output) > 500 else original_output
-            elif isinstance(original_output, (dict, list)):
-                output_str = json.dumps(original_output)
-                preview = output_str[:500] + "..." if len(output_str) > 500 else output_str
-            else:
-                preview = str(original_output)[:500]
-            
-            output = {
-                "_cached": True,
-                "artifact_key": artifact_key,
-                "preview": preview,
-                "size_bytes": output_size,
-                "note": f"Full output stored in KV cache (artifact: {artifact_key}). Use get_artifact(key='{artifact_key}') to retrieve."
-            }
+        reference_payload = artifact_reference or ({"artifact_key": artifact_key} if artifact_key else None)
+
+        # For LLM version: if artifact reference exists, replace output with structured stub
+        if for_llm and reference_payload:
+            output = self._build_cached_output_stub(reference_payload, original_output)
 
         structured_result_v1 = {
             "tool_execution": {
@@ -2177,6 +2169,52 @@ class ResponseProcessor:
         } 
             
         return structured_result_v1
+
+    def _build_cached_output_stub(self, reference_payload: Dict[str, Any], original_output: Any, max_chars: int = 500) -> Dict[str, Any]:
+        """Build a consistent lightweight stub for cached artifacts exposed to the LLM."""
+        artifact_key = reference_payload.get("artifact_key")
+        scope = reference_payload.get("scope")
+        preview = reference_payload.get("preview")
+        summary = reference_payload.get("summary")
+
+        if not preview:
+            preview = self._truncate_output(original_output, max_chars)
+        if not summary:
+            summary = self._truncate_output(original_output, max_chars * 2 if max_chars else 1000)
+
+        stub: Dict[str, Any] = {
+            "_cached": True,
+            "artifact_key": artifact_key,
+            "scope": scope,
+            "preview": preview,
+            "summary": summary,
+            "size_tokens": reference_payload.get("size_tokens"),
+            "size_chars": reference_payload.get("size_chars"),
+            "retrieval_hint": reference_payload.get("retrieval_hint")
+            or "Full content stored in KV cache; planner hydrates the required slices automatically.",
+        }
+
+        if "metadata" in reference_payload and reference_payload["metadata"]:
+            stub["metadata"] = reference_payload["metadata"]
+        elif "metadata_snapshot" in reference_payload and reference_payload["metadata_snapshot"]:
+            stub["metadata"] = reference_payload["metadata_snapshot"]
+
+        return stub
+
+    def _truncate_output(self, output: Any, max_chars: int = 500) -> str:
+        """Helper to trim arbitrary tool output for previews."""
+        if max_chars <= 0:
+            return ""
+        if isinstance(output, str):
+            snippet = output[:max_chars]
+            return snippet + ("..." if len(output) > max_chars else "")
+        if isinstance(output, (dict, list)):
+            serialized = json.dumps(output, ensure_ascii=False)
+            snippet = serialized[:max_chars]
+            return snippet + ("..." if len(serialized) > max_chars else "")
+        output_str = str(output)
+        snippet = output_str[:max_chars]
+        return snippet + ("..." if len(output_str) > max_chars else "")
 
     def _create_tool_context(self, tool_call: Dict[str, Any], tool_index: int, assistant_message_id: Optional[str] = None, parsing_details: Optional[Dict[str, Any]] = None) -> ToolExecutionContext:
         """Create a tool execution context with display name and parsing details populated."""

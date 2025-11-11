@@ -402,7 +402,10 @@ class ThreadManager:
                 
                 # Initialize ContextOffloader for ResponseProcessor
                 from core.agentpress.context_offloader import ContextOffloader
-                context_offloader = ContextOffloader(kv_store_for_context) if kv_store_for_context else None
+                context_offloader = ContextOffloader(
+                    kv_store_for_context,
+                    trace=self.response_processor.trace if kv_store_for_context else None,
+                ) if kv_store_for_context else None
                 if context_offloader:
                     self.response_processor.context_offloader = context_offloader
                     logger.debug(f"✅ ContextOffloader initialized for thread {thread_id}")

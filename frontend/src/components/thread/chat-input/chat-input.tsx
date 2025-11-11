@@ -378,10 +378,18 @@ Now enhance this prompt:\n\n${value}`;
       setMounted(true);
     }, []);
 
+    // Determine the actual placeholder based on agent running state
+    const actualPlaceholder = useMemo(() => {
+      if (isAgentRunning) {
+        return 'Talk & send additional instructions as Iris is active...';
+      }
+      return placeholder;
+    }, [isAgentRunning, placeholder]);
+
     // Typewriter effect for placeholder
     useEffect(() => {
       if (!mounted || value || !animatePlaceholder) {
-        setAnimatedPlaceholder(placeholder);
+        setAnimatedPlaceholder(actualPlaceholder);
         return;
       }
 
@@ -389,8 +397,8 @@ Now enhance this prompt:\n\n${value}`;
       setAnimatedPlaceholder('');
 
       const typingInterval = setInterval(() => {
-        if (currentIndex < placeholder.length) {
-          setAnimatedPlaceholder(placeholder.slice(0, currentIndex + 1));
+        if (currentIndex < actualPlaceholder.length) {
+          setAnimatedPlaceholder(actualPlaceholder.slice(0, currentIndex + 1));
           currentIndex++;
         } else {
           clearInterval(typingInterval);
@@ -398,7 +406,7 @@ Now enhance this prompt:\n\n${value}`;
       }, 50); // 50ms per character
 
       return () => clearInterval(typingInterval);
-    }, [mounted, placeholder, value, animatePlaceholder]);
+    }, [mounted, actualPlaceholder, value, animatePlaceholder]);
 
     // Reset mode dismissing state when selectedMode changes
     useEffect(() => {
