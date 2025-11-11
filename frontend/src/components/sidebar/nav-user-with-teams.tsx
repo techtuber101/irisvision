@@ -297,14 +297,16 @@ export function NavUserWithTeams({
                 <div className="rounded-2xl border border-black/10 bg-black/5 p-2 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)] transition-all duration-300 hover:bg-black/8 hover:border-black/15 dark:border-white/10 dark:bg-white/5 dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] dark:hover:bg-white/8 dark:hover:border-white/15">
                   <div className="text-xs text-black/50 mb-2 px-1 dark:text-white/50">Settings</div>
                   <div className="space-y-1">
-                    <DropdownMenuItem onClick={() => setShowBillingModal(true)} className="h-auto p-3 rounded-xl bg-black/5 border border-black/10 text-black/80 hover:bg-black/10 hover:border-black/20 transition-all duration-200 focus:bg-black/10 focus:border-black/20 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:border-white/20 dark:focus:bg-white/10 dark:focus:border-white/20 flex items-center">
-                      <Zap className="h-4 w-4 mr-3 flex-shrink-0" />
-                      <span className="text-sm">Upgrade</span>
+                    <DropdownMenuItem asChild className="h-auto p-3 rounded-xl bg-black/5 border border-black/10 text-black/80 hover:bg-black/10 hover:border-black/20 transition-all duration-200 focus:bg-black/10 focus:border-black/20 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:border-white/20 dark:focus:bg-white/10 dark:focus:border-white/20 flex items-center">
+                      <Link href="/settings" className="flex items-center">
+                        <Settings className="h-4 w-4 mr-3 flex-shrink-0" />
+                        <span className="text-sm">Preferences</span>
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild className="h-auto p-3 rounded-xl bg-black/5 border border-black/10 text-black/80 hover:bg-black/10 hover:border-black/20 transition-all duration-200 focus:bg-black/10 focus:border-black/20 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:border-white/20 dark:focus:bg-white/10 dark:focus:border-white/20 flex items-center">
-                      <Link href="/settings/billing" className="flex items-center">
-                        <CreditCard className="h-4 w-4 mr-3 flex-shrink-0" />
-                        <span className="text-sm">Billing</span>
+                      <Link href="/settings/usage" className="flex items-center">
+                        <Zap className="h-4 w-4 mr-3 flex-shrink-0" />
+                        <span className="text-sm">Usage & Coins</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild className="h-auto p-3 rounded-xl bg-black/5 border border-black/10 text-black/80 hover:bg-black/10 hover:border-black/20 transition-all duration-200 focus:bg-black/10 focus:border-black/20 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10 dark:hover:border-white/20 dark:focus:bg-white/10 dark:focus:border-white/20 flex items-center">

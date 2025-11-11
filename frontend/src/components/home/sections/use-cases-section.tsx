@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { SectionHeader } from "@/components/home/section-header";
 import { siteConfig } from "@/lib/home";
 import { cn } from "@/lib/utils";
@@ -154,8 +154,52 @@ export function UseCasesSection() {
     [featuredUseCases, selected]
   );
 
+  // Typewriter effect state
+  const [displayedText, setDisplayedText] = useState("");
+  const [isInView, setIsInView] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+  const fullText = "See Iris in action";
+
+  // Intersection Observer to trigger typewriter when section comes into view
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !isInView) {
+          setIsInView(true);
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    if (sectionRef.current) {
+      observer.observe(sectionRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [isInView]);
+
+  // Typewriter animation
+  useEffect(() => {
+    if (!isInView) return;
+
+    let currentIndex = 0;
+    const typingSpeed = 50; // milliseconds per character (faster)
+
+    const typeNextChar = () => {
+      if (currentIndex <= fullText.length) {
+        setDisplayedText(fullText.slice(0, currentIndex));
+        currentIndex++;
+      }
+    };
+
+    const intervalId = setInterval(typeNextChar, typingSpeed);
+
+    return () => clearInterval(intervalId);
+  }, [isInView, fullText]);
+
   return (
     <section
+      ref={sectionRef}
       id="use-cases"
       className="relative w-full flex flex-col items-center justify-center gap-10 pb-20"
     >
@@ -163,9 +207,18 @@ export function UseCasesSection() {
       <div className="pointer-events-none absolute inset-x-0 -top-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
       <SectionHeader>
-        <h2 className="bg-gradient-to-b from-white to-white/70 bg-clip-text text-transparent text-3xl md:text-4xl font-semibold tracking-tight text-center text-balance">
-          See Iris in action
-        </h2>
+        <div className="flex items-center justify-center">
+          <h2 className="bg-gradient-to-b from-white to-white/70 bg-clip-text text-transparent text-3xl md:text-4xl font-semibold tracking-tight text-center text-balance">
+            {displayedText}
+            <span 
+              className={`inline-block ml-0.5 transition-opacity duration-200 ${displayedText.length < fullText.length ? 'animate-pulse opacity-100' : 'opacity-0'}`}
+              style={{ width: '0.5ch' }}
+              aria-hidden="true"
+            >
+              |
+            </span>
+          </h2>
+        </div>
         <p className="text-center text-balance font-medium text-white/70">
           Explore real-world examples of how Iris completes complex tasks autonomously
         </p>

@@ -320,16 +320,18 @@ const HeroSection: React.FC<HeroProps> = ({
         }}
       />
 
-      {/* Traveling spotlight that moves down with scroll - thin rectangular beam visible from start */}
-      {pauseComplete && (
+      {/* Traveling spotlight that moves down with scroll - thin rectangular beam with gradual fade-in */}
+      {(animationComplete || scrollProgress > 0) && (
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 h-[1200px] blur-[120px] opacity-75"
+          className="pointer-events-none absolute inset-x-0 h-[1200px] blur-[150px]"
           style={{
             top: `${400 + scrollPosition}px`, // Start from above chat input area and move with scroll
+            opacity: pauseComplete ? 0.75 : scrollProgress * 0.75, // Fade in during animation, full opacity after
             background:
-              "radial-gradient(ellipse 15% 60% at 50% 0%, rgba(120,160,255,0.45) 0%, rgba(120,160,255,0.42) 3%, rgba(120,160,255,0.40) 6%, rgba(120,160,255,0.38) 9%, rgba(120,160,255,0.36) 12%, rgba(120,160,255,0.34) 15%, rgba(120,160,255,0.32) 18%, rgba(120,160,255,0.30) 21%, rgba(120,160,255,0.28) 24%, rgba(120,160,255,0.26) 27%, rgba(120,160,255,0.24) 30%, rgba(120,160,255,0.22) 33%, rgba(120,160,255,0.20) 36%, rgba(120,160,255,0.18) 39%, rgba(120,160,255,0.16) 42%, rgba(120,160,255,0.14) 45%, rgba(120,160,255,0.12) 50%, rgba(120,160,255,0.10) 55%, rgba(120,160,255,0.08) 60%, rgba(120,160,255,0.07) 65%, rgba(120,160,255,0.06) 70%, rgba(120,160,255,0.05) 75%, rgba(120,160,255,0.04) 80%, rgba(120,160,255,0.03) 85%, rgba(120,160,255,0.02) 90%, rgba(120,160,255,0.01) 95%, transparent 100%)",
+              "radial-gradient(ellipse 15% 60% at 50% 0%, rgba(120,160,255,0.70) 0%, rgba(120,160,255,0.685) 2%, rgba(120,160,255,0.67) 4%, rgba(120,160,255,0.655) 6%, rgba(120,160,255,0.64) 8%, rgba(120,160,255,0.625) 10%, rgba(120,160,255,0.61) 12%, rgba(120,160,255,0.595) 14%, rgba(120,160,255,0.58) 16%, rgba(120,160,255,0.565) 18%, rgba(120,160,255,0.55) 20%, rgba(120,160,255,0.53) 22%, rgba(120,160,255,0.51) 24%, rgba(120,160,255,0.49) 26%, rgba(120,160,255,0.47) 28%, rgba(120,160,255,0.45) 30%, rgba(120,160,255,0.43) 32%, rgba(120,160,255,0.41) 34%, rgba(120,160,255,0.39) 36%, rgba(120,160,255,0.37) 38%, rgba(120,160,255,0.35) 40%, rgba(120,160,255,0.33) 42%, rgba(120,160,255,0.31) 44%, rgba(120,160,255,0.29) 46%, rgba(120,160,255,0.27) 48%, rgba(120,160,255,0.25) 50%, rgba(120,160,255,0.23) 52%, rgba(120,160,255,0.21) 54%, rgba(120,160,255,0.19) 56%, rgba(120,160,255,0.17) 58%, rgba(120,160,255,0.15) 60%, rgba(120,160,255,0.135) 62%, rgba(120,160,255,0.12) 64%, rgba(120,160,255,0.105) 66%, rgba(120,160,255,0.09) 68%, rgba(120,160,255,0.08) 70%, rgba(120,160,255,0.07) 72%, rgba(120,160,255,0.06) 74%, rgba(120,160,255,0.05) 76%, rgba(120,160,255,0.042) 78%, rgba(120,160,255,0.035) 80%, rgba(120,160,255,0.028) 82%, rgba(120,160,255,0.022) 84%, rgba(120,160,255,0.017) 86%, rgba(120,160,255,0.013) 88%, rgba(120,160,255,0.009) 90%, rgba(120,160,255,0.006) 92%, rgba(120,160,255,0.004) 94%, rgba(120,160,255,0.002) 96%, rgba(120,160,255,0.001) 98%, transparent 100%)",
             mixBlendMode: "screen",
+            transition: pauseComplete ? 'opacity 0.3s ease-out' : 'none',
           }}
         />
       )}
@@ -356,16 +358,21 @@ const HeroSection: React.FC<HeroProps> = ({
           {title}
         </motion.h1>
 
-        {/* Subhead - with scroll effect */}
-        <div 
-          className="max-w-2xl text-balance text-center text-lg text-white/70 font-semibold"
-          style={{
-            transform: `translateY(${translateY}px) scale(${scale})`,
-            transformOrigin: 'center center',
-            fontWeight: 500 + (scrollProgress * 100), // Gradually increase weight from 500 to 600
-            marginTop: `${textMarginTop}px`, // Gradually increases during scroll
-          }}
+        {/* Subhead - with scroll effect and entry animation */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.2 }}
         >
+          <div 
+            className="max-w-2xl text-balance text-center text-lg text-white/70 font-semibold"
+            style={{
+              transform: `translateY(${translateY}px) scale(${scale})`,
+              transformOrigin: 'center center',
+              fontWeight: 500 + (scrollProgress * 100), // Gradually increase weight from 500 to 600
+              marginTop: `${textMarginTop}px`, // Gradually increases during scroll
+            }}
+          >
           <div 
             style={{
               opacity: oldTextOpacity,
@@ -410,7 +417,8 @@ const HeroSection: React.FC<HeroProps> = ({
               ))}
             </span>
           </div>
-        </div>
+          </div>
+        </motion.div>
         
         {/* CSS animation for sliding fade effect and letter glow */}
         <style jsx>{`

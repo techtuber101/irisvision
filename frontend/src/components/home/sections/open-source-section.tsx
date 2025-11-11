@@ -78,8 +78,11 @@ export function OpenSourceSection() {
         {/* Vision pipeline */}
         <div className="mt-12 grid grid-cols-1 md:grid-cols-4 gap-6">
           <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
             whileHover={prefersReducedMotion ? {} : { y: -3 }}
-            transition={{ type: "spring", stiffness: 400, damping: 17 }}
             className="relative flex flex-col items-center text-center"
           >
             <GlassCard className="p-6 flex flex-col items-center gap-3">
@@ -93,8 +96,11 @@ export function OpenSourceSection() {
           </motion.div>
 
           <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
             whileHover={prefersReducedMotion ? {} : { y: -3 }}
-            transition={{ type: "spring", stiffness: 400, damping: 17 }}
             className="relative flex flex-col items-center text-center"
           >
             <GlassCard className="p-6 flex flex-col items-center gap-3">
@@ -108,8 +114,11 @@ export function OpenSourceSection() {
           </motion.div>
 
           <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
             whileHover={prefersReducedMotion ? {} : { y: -3 }}
-            transition={{ type: "spring", stiffness: 400, damping: 17 }}
             className="relative flex flex-col items-center text-center"
           >
             <GlassCard className="p-6 flex flex-col items-center gap-3">
@@ -123,8 +132,11 @@ export function OpenSourceSection() {
           </motion.div>
 
           <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
             whileHover={prefersReducedMotion ? {} : { y: -3 }}
-            transition={{ type: "spring", stiffness: 400, damping: 17 }}
             className="relative flex flex-col items-center text-center"
           >
             <GlassCard className="p-6 flex flex-col items-center gap-3">
