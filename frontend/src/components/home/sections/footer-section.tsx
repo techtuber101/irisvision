@@ -75,7 +75,7 @@ export function FooterSection() {
                   href="https://x.com/irisai" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors duration-200 group"
+                  className="p-2 rounded-lg transition-colors duration-200 group"
                   aria-label="X (Twitter)"
                 >
                   <Twitter className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors duration-200" />
@@ -84,14 +84,14 @@ export function FooterSection() {
                   href="https://www.linkedin.com/company/irisai" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors duration-200 group"
+                  className="p-2 rounded-lg transition-colors duration-200 group"
                   aria-label="LinkedIn"
                 >
                   <Linkedin className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors duration-200" />
                 </a>
                 <a 
                   href="mailto:hello@iris.ai" 
-                  className="p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors duration-200 group"
+                  className="p-2 rounded-lg transition-colors duration-200 group"
                   aria-label="Email"
                 >
                   <Mail className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors duration-200" />

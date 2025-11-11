@@ -33,43 +33,58 @@ export function NavMenu() {
   }, []);
 
   React.useEffect(() => {
+    let ticking = false;
+    let rafId: number | null = null;
+
     const handleScroll = () => {
       // Skip scroll handling during manual click scrolling
       if (isManualScroll) return;
 
-      const sections = navs.map((item) => item.href.substring(1));
+      if (!ticking) {
+        rafId = requestAnimationFrame(() => {
+          const sections = navs.map((item) => item.href.substring(1));
 
-      // Find the section closest to viewport top
-      let closestSection = sections[0];
-      let minDistance = Infinity;
+          // Find the section closest to viewport top
+          let closestSection = sections[0];
+          let minDistance = Infinity;
 
-      for (const section of sections) {
-        const element = document.getElementById(section);
-        if (element) {
-          const rect = element.getBoundingClientRect();
-          const distance = Math.abs(rect.top - 100); // Offset by 100px to trigger earlier
-          if (distance < minDistance) {
-            minDistance = distance;
-            closestSection = section;
+          for (const section of sections) {
+            const element = document.getElementById(section);
+            if (element) {
+              const rect = element.getBoundingClientRect();
+              const distance = Math.abs(rect.top - 100); // Offset by 100px to trigger earlier
+              if (distance < minDistance) {
+                minDistance = distance;
+                closestSection = section;
+              }
+            }
           }
-        }
-      }
 
-      // Update active section and nav indicator
-      setActiveSection(closestSection);
-      const navItem = ref.current?.querySelector(
-        `[href="#${closestSection}"]`,
-      )?.parentElement;
-      if (navItem) {
-        const rect = navItem.getBoundingClientRect();
-        setLeft(navItem.offsetLeft);
-        setWidth(rect.width);
+          // Update active section and nav indicator
+          setActiveSection(closestSection);
+          const navItem = ref.current?.querySelector(
+            `[href="#${closestSection}"]`,
+          )?.parentElement;
+          if (navItem) {
+            const rect = navItem.getBoundingClientRect();
+            setLeft(navItem.offsetLeft);
+            setWidth(rect.width);
+          }
+
+          ticking = false;
+        });
+        ticking = true;
       }
     };
 
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll(); // Initial check
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
   }, [isManualScroll]);
 
   const handleClick = (
@@ -120,13 +135,17 @@ export function NavMenu() {
         {navs.map((item) => (
           <li
             key={item.name}
-            className={`z-10 cursor-pointer h-full flex items-center justify-center px-4 py-2 text-sm font-medium transition-colors duration-200 ${
-              activeSection === item.href.substring(1)
-                ? "text-primary"
-                : "text-primary/60 hover:text-primary"
-            } tracking-tight`}
+            className="z-10 h-full"
           >
-            <a href={item.href} onClick={(e) => handleClick(e, item)}>
+            <a
+              href={item.href}
+              onClick={(e) => handleClick(e, item)}
+              className={`cursor-pointer h-full flex items-center justify-center px-4 py-2 text-sm font-medium transition-colors duration-200 ${
+                activeSection === item.href.substring(1)
+                  ? "text-primary"
+                  : "text-primary/60 hover:text-primary"
+              } tracking-tight block`}
+            >
               {item.name}
             </a>
           </li>

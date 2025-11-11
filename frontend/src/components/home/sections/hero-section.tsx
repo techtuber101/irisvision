@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -76,120 +76,50 @@ function GlassCard({ className = "", children }: { className?: string; children:
           mixBlendMode: "overlay",
         }}
       />
-      {/* Corner screws */}
-      <div className="pointer-events-none" aria-hidden>
-        <div className="absolute left-3 top-3 h-1.5 w-1.5 rounded-full bg-white/30" />
-        <div className="absolute right-3 top-3 h-1.5 w-1.5 rounded-full bg-white/30" />
-        <div className="absolute left-3 bottom-3 h-1.5 w-1.5 rounded-full bg-white/30" />
-        <div className="absolute right-3 bottom-3 h-1.5 w-1.5 rounded-full bg-white/30" />
-      </div>
       {children}
     </div>
   );
 }
 
-function ChatBubble({ messages, onSend, samplePrompts }: { messages: ChatMessage[]; onSend: (text: string) => void; samplePrompts: string[] }) {
+function ChatBubble({ onSend }: { onSend: (text: string) => void }) {
   const [text, setText] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const [showPrompts, setShowPrompts] = useState(true);
-  const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages.length]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const t = text.trim();
     if (!t) return;
     setText("");
-    setShowPrompts(false);
     onSend(t);
-  };
-
-  const handlePromptClick = (prompt: string) => {
-    setText(prompt);
-    setShowPrompts(false);
-    onSend(prompt);
-  };
-
-  const handleInputFocus = () => {
-    setIsTyping(true);
-  };
-
-  const handleInputBlur = () => {
-    if (!text.trim()) {
-      setIsTyping(false);
-    }
   };
 
   return (
     <div className="relative h-full flex flex-col">
-      {/* Main chat container with integrated input */}
-      <div
-        ref={listRef}
-        className="relative flex-1 min-h-[28vh] max-h-[48vh] overflow-y-auto px-5 pb-6 pt-3 transition-all duration-300"
-      >
-        {/* Messages */}
-        <div className="space-y-4">
-          {messages.map((m) => (
-            <div key={m.id} className="flex">
-              <div
-                className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ring-1 shadow-[0_10px_20px_-10px_rgba(0,0,0,0.6)] ${
-                  m.role === "user" ? "ml-auto bg-white/10 ring-white/15" : "bg-white/5 ring-white/10"
-                }`}
-              >
-                {m.content}
-              </div>
+      {/* Input area - wrapped in GlassCard */}
+      <GlassCard>
+        <div className="p-4">
+          <form onSubmit={submit} className="flex items-center gap-3">
+            <div className="flex-1 relative">
+              <input
+                ref={inputRef}
+                type="text"
+                aria-label="Ask Iris"
+                placeholder="Ask Iris anything…"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                className="w-full h-10 rounded-2xl border-0 bg-transparent px-4 text-sm placeholder:text-white/40 outline-none ring-0 focus:outline-none transition-all duration-200"
+              />
             </div>
-          ))}
+            <button
+              type="submit"
+              disabled={!text.trim()}
+              className="h-10 rounded-2xl border border-white/20 bg-white/10 px-6 text-sm font-medium text-white/90 transition-all duration-200 hover:border-white/30 hover:bg-white/15 active:translate-y-[1px] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Send
+            </button>
+          </form>
         </div>
-
-        {/* Sample prompts */}
-        {showPrompts && messages.length === 1 && (
-          <div className="mt-8 space-y-3">
-            <p className="text-xs text-white/50 font-medium">Try these examples:</p>
-            <div className="flex flex-wrap gap-2.5">
-              {samplePrompts.map((prompt, index) => (
-                <button
-                  key={index}
-                  onClick={() => handlePromptClick(prompt)}
-                  className="px-4 py-2 text-xs rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:border-white/20 transition-all duration-200"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Integrated input area */}
-      <div className="sticky bottom-0 px-5 pb-5 pt-8 border-t border-white/10 bg-gradient-to-t from-[rgba(10,14,22,0.95)] via-[rgba(10,14,22,0.8)] to-transparent">
-        <form onSubmit={submit} className="flex items-center gap-3">
-          <div className="flex-1 relative">
-            <input
-              ref={inputRef}
-              type="text"
-              aria-label="Ask Iris"
-              placeholder="Ask Iris anything…"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onFocus={handleInputFocus}
-              onBlur={handleInputBlur}
-              className="w-full h-12 rounded-2xl border border-white/15 bg-white/5 px-4 text-sm placeholder:text-white/40 outline-none ring-0 backdrop-blur-sm focus:border-white/25 focus:bg-white/8 transition-all duration-200"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={!text.trim()}
-            className="h-12 rounded-2xl border border-white/20 bg-white/10 px-6 text-sm font-medium text-white/90 transition-all duration-200 hover:border-white/30 hover:bg-white/15 active:translate-y-[1px] disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Send
-          </button>
-        </form>
-      </div>
+      </GlassCard>
     </div>
   );
 }
@@ -217,22 +147,151 @@ const HeroSection: React.FC<HeroProps> = ({
   storageKey = "iris.chat",
   returnUrl = "/dashboard",
 }) => {
-  const seed: ChatMessage[] = useMemo(
-    () => [{ id: "seed-assistant", role: "assistant", content: "Hi there! I'm Iris, your AI assistant. I can help you build websites, create apps, write and send emails, analyze data, create all kinds of documents, and much more. What would you like to accomplish today?" }],
-    []
-  );
-
-  const samplePrompts = [
-    "Send me a summary of my emails this morning",
-    "Create an executive report",
-    "Create a website for my cooking brand",
-    
-    "Fix code issues and raise a pull request"
-  ];
-
-  const { messages, setMessages } = useLocalMessages(storageKey, seed);
   const router = useRouter();
   const { user } = useAuth();
+  const [virtualScroll, setVirtualScroll] = useState(0);
+  const [animationComplete, setAnimationComplete] = useState(false);
+  const [pauseComplete, setPauseComplete] = useState(false);
+  const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
+  const [userHasScrolled, setUserHasScrolled] = useState(false);
+  const [scrollPosition, setScrollPosition] = useState(0);
+  const heroRef = useRef<HTMLElement>(null);
+
+  // Array of phrases that change after "The Intelligence that"
+  const phrases = [
+    "creates for you",
+    "creates stunning slides",
+    "builds complete websites.",
+    "researches like experts.",
+    "generates vivid images.",
+    "codes autonomously",
+    "automates spreadsheets.",
+    "brings ideas alive.",
+    "executes your vision",
+  ];
+
+  // Rotate phrases every 1.3 seconds after animation completes
+  useEffect(() => {
+    if (animationComplete) {
+      const interval = setInterval(() => {
+        setCurrentPhraseIndex((prev) => (prev + 1) % phrases.length);
+      }, 1300);
+
+      return () => clearInterval(interval);
+    }
+  }, [animationComplete, phrases.length]);
+
+  // Auto-expand after 6 seconds if user hasn't scrolled
+  useEffect(() => {
+    const autoExpandTimer = setTimeout(() => {
+      if (!userHasScrolled && !animationComplete) {
+        // Smoothly animate to fully expanded state
+        const startTime = Date.now();
+        const duration = 2000; // 2 second animation
+        const targetScroll = 500;
+
+        const animate = () => {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          
+          // Ease-in-out function for smooth animation
+          const easeInOutCubic = (t: number) => 
+            t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+          
+          const newScroll = targetScroll * easeInOutCubic(progress);
+          setVirtualScroll(newScroll);
+
+          if (progress < 1) {
+            requestAnimationFrame(animate);
+          } else {
+            // Animation complete
+            setAnimationComplete(true);
+            setTimeout(() => {
+              setPauseComplete(true);
+            }, 1000);
+          }
+        };
+
+        requestAnimationFrame(animate);
+      }
+    }, 6000); // 6 seconds delay
+
+    return () => clearTimeout(autoExpandTimer);
+  }, [userHasScrolled, animationComplete]);
+
+  useEffect(() => {
+    let scrollAccumulator = 0;
+    const maxVirtualScroll = 500; // 500px for the text animation
+
+    const handleWheel = (e: WheelEvent) => {
+      // Mark that user has manually scrolled
+      if (!userHasScrolled) {
+        setUserHasScrolled(true);
+      }
+
+      // Block scrolling if animation is not complete OR if we're in the 1-second pause
+      if (!animationComplete || (animationComplete && !pauseComplete)) {
+        e.preventDefault();
+        
+        // Only accumulate scroll if animation isn't complete yet
+        if (!animationComplete) {
+          scrollAccumulator += e.deltaY;
+          const newVirtualScroll = Math.max(0, Math.min(scrollAccumulator, maxVirtualScroll));
+          setVirtualScroll(newVirtualScroll);
+          
+          // Mark animation as complete when we reach the end
+          if (newVirtualScroll >= maxVirtualScroll && !animationComplete) {
+            setAnimationComplete(true);
+            // Start 1-second pause
+            setTimeout(() => {
+              setPauseComplete(true);
+            }, 1000);
+          }
+        }
+      }
+    };
+
+    const heroElement = heroRef.current;
+    if (heroElement) {
+      heroElement.addEventListener('wheel', handleWheel, { passive: false });
+    }
+
+    return () => {
+      if (heroElement) {
+        heroElement.removeEventListener('wheel', handleWheel);
+      }
+    };
+  }, [animationComplete, pauseComplete, userHasScrolled]);
+
+  // Track scroll position for traveling spotlight
+  useEffect(() => {
+    const handleScroll = () => {
+      if (pauseComplete) {
+        setScrollPosition(window.scrollY);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [pauseComplete]);
+
+  // Calculate scroll progress (0 to 1) for the text animation
+  const scrollProgress = Math.min(virtualScroll / 500, 1);
+  
+  // Text changes at 50% scroll progress
+  const showNewText = scrollProgress > 0.5;
+  
+  // Calculate transformations
+  const translateY = scrollProgress * 20; // Very slight downward movement (20px max)
+  const scale = 1 + (scrollProgress * 0.8); // Scale from 1x to 1.8x (reduced from 2.5x)
+  
+  // Smooth fade transitions for text swap
+  const oldTextOpacity = showNewText ? 0 : 1;
+  const newTextOpacity = showNewText ? (scrollProgress - 0.5) * 2 : 0; // Fade in after 50%
+  
+  // Gradually adjust spacing during scroll (not suddenly)
+  const textMarginTop = 16 + (scrollProgress * 24); // From 16px to 40px
+  const cardMarginTop = 48 + (scrollProgress * 32); // From 48px to 80px
 
   const handleSend = async (text: string) => {
     const trimmed = text.trim();
@@ -249,20 +308,34 @@ const HeroSection: React.FC<HeroProps> = ({
   };
 
   return (
-    <section id="hero" className="relative min-h-[92vh] w-full overflow-hidden pt-[140px] text-white">
+    <section ref={heroRef} id="hero" className="relative w-full overflow-hidden text-white" style={{ minHeight: animationComplete ? '92vh' : '100vh' }}>
       {/* very soft local halo to keep hero focus without duplicating the global spotlight */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 -top-10 h-72 blur-3xl opacity-40"
+        className="pointer-events-none fixed inset-x-0 top-0 h-[700px] blur-[180px] opacity-50"
         style={{
           background:
-            "radial-gradient(60% 60% at 50% 0%, rgba(120,160,255,0.18), rgba(120,160,255,0.06) 55%, transparent 85%)",
+            "radial-gradient(ellipse 50% 40% at 50% 0%, rgba(120,160,255,0.22) 0%, rgba(120,160,255,0.215) 3%, rgba(120,160,255,0.21) 6%, rgba(120,160,255,0.205) 9%, rgba(120,160,255,0.20) 12%, rgba(120,160,255,0.19) 15%, rgba(120,160,255,0.18) 18%, rgba(120,160,255,0.17) 21%, rgba(120,160,255,0.16) 24%, rgba(120,160,255,0.15) 27%, rgba(120,160,255,0.14) 30%, rgba(120,160,255,0.13) 33%, rgba(120,160,255,0.12) 36%, rgba(120,160,255,0.11) 39%, rgba(120,160,255,0.10) 42%, rgba(120,160,255,0.09) 45%, rgba(120,160,255,0.08) 48%, rgba(120,160,255,0.07) 52%, rgba(120,160,255,0.06) 56%, rgba(120,160,255,0.05) 60%, rgba(120,160,255,0.04) 64%, rgba(120,160,255,0.035) 68%, rgba(120,160,255,0.03) 72%, rgba(120,160,255,0.025) 76%, rgba(120,160,255,0.02) 80%, rgba(120,160,255,0.015) 84%, rgba(120,160,255,0.01) 88%, rgba(120,160,255,0.006) 92%, rgba(120,160,255,0.003) 96%, transparent 100%)",
           mixBlendMode: "screen",
         }}
       />
 
+      {/* Traveling spotlight that moves down with scroll - thin rectangular beam visible from start */}
+      {pauseComplete && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 h-[1200px] blur-[120px] opacity-75"
+          style={{
+            top: `${400 + scrollPosition}px`, // Start from above chat input area and move with scroll
+            background:
+              "radial-gradient(ellipse 15% 60% at 50% 0%, rgba(120,160,255,0.45) 0%, rgba(120,160,255,0.42) 3%, rgba(120,160,255,0.40) 6%, rgba(120,160,255,0.38) 9%, rgba(120,160,255,0.36) 12%, rgba(120,160,255,0.34) 15%, rgba(120,160,255,0.32) 18%, rgba(120,160,255,0.30) 21%, rgba(120,160,255,0.28) 24%, rgba(120,160,255,0.26) 27%, rgba(120,160,255,0.24) 30%, rgba(120,160,255,0.22) 33%, rgba(120,160,255,0.20) 36%, rgba(120,160,255,0.18) 39%, rgba(120,160,255,0.16) 42%, rgba(120,160,255,0.14) 45%, rgba(120,160,255,0.12) 50%, rgba(120,160,255,0.10) 55%, rgba(120,160,255,0.08) 60%, rgba(120,160,255,0.07) 65%, rgba(120,160,255,0.06) 70%, rgba(120,160,255,0.05) 75%, rgba(120,160,255,0.04) 80%, rgba(120,160,255,0.03) 85%, rgba(120,160,255,0.02) 90%, rgba(120,160,255,0.01) 95%, transparent 100%)",
+            mixBlendMode: "screen",
+          }}
+        />
+      )}
+
       {/* Content container */}
-      <div className="relative mx-auto flex h-full max-w-6xl flex-col items-center justify-center px-6 py-24">
+      <div className="relative mx-auto flex h-screen max-w-6xl flex-col items-center justify-center px-6 py-24">
         {/* Eyebrow */}
         <motion.div
           initial={{ opacity: 0, y: -8 }}
@@ -283,18 +356,109 @@ const HeroSection: React.FC<HeroProps> = ({
           {title}
         </motion.h1>
 
-        {/* Subhead */}
-        <motion.p
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.25 }}
-          className="mt-4 max-w-2xl text-balance text-center text-lg text-white/70"
+        {/* Subhead - with scroll effect */}
+        <div 
+          className="max-w-2xl text-balance text-center text-lg text-white/70 font-semibold"
+          style={{
+            transform: `translateY(${translateY}px) scale(${scale})`,
+            transformOrigin: 'center center',
+            fontWeight: 500 + (scrollProgress * 100), // Gradually increase weight from 500 to 600
+            marginTop: `${textMarginTop}px`, // Gradually increases during scroll
+          }}
         >
-          {subhead}
-        </motion.p>
+          <div 
+            style={{
+              opacity: oldTextOpacity,
+              transition: 'opacity 0.4s ease-out',
+              position: showNewText ? 'absolute' : 'relative',
+              inset: 0,
+            }}
+          >
+            {subhead}
+          </div>
+          <div 
+            style={{
+              opacity: newTextOpacity,
+              transition: 'opacity 0.4s ease-out',
+              position: showNewText ? 'relative' : 'absolute',
+              inset: 0,
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+              gap: '0.3em',
+            }}
+          >
+            <span>The Intelligence that</span>
+            <span 
+              key={currentPhraseIndex}
+              style={{
+                animation: animationComplete ? 'slideUpFade 1.3s ease-in-out' : 'none',
+                display: 'inline-block',
+              }}
+            >
+              {phrases[currentPhraseIndex].split('').map((char, index) => (
+                <span
+                  key={index}
+                  className="glow-letter"
+                  style={{
+                    animationDelay: animationComplete ? `${index * 0.03}s` : '0s',
+                    display: 'inline-block',
+                  }}
+                >
+                  {char === ' ' ? '\u00A0' : char}
+                </span>
+              ))}
+            </span>
+          </div>
+        </div>
+        
+        {/* CSS animation for sliding fade effect and letter glow */}
+        <style jsx>{`
+          @keyframes slideUpFade {
+            0% {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            10% {
+              opacity: 1;
+              transform: translateY(0);
+            }
+            90% {
+              opacity: 1;
+              transform: translateY(0);
+            }
+            100% {
+              opacity: 0;
+              transform: translateY(-20px);
+            }
+          }
+
+          @keyframes letterGlow {
+            0% {
+              color: rgba(255, 255, 255, 0.7);
+              filter: brightness(1);
+            }
+            50% {
+              color: rgba(255, 255, 255, 1);
+              filter: brightness(1.8);
+            }
+            100% {
+              color: rgba(255, 255, 255, 0.7);
+              filter: brightness(1);
+            }
+          }
+
+          .glow-letter {
+            animation: letterGlow 1s ease-in-out;
+            color: rgba(255, 255, 255, 0.7);
+          }
+        `}</style>
 
         {/* Card stack */}
-        <div className="relative mt-12 w-full max-w-6xl">
+        <div 
+          className="relative w-full max-w-6xl"
+          style={{ marginTop: `${cardMarginTop}px` }}
+        >
           <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-6">
             {/* Left placeholder card */}
             <motion.div
@@ -327,26 +491,12 @@ const HeroSection: React.FC<HeroProps> = ({
               transition={{ duration: 0.6, delay: 0.45 }}
               className="relative z-10 mx-auto w-[92%] md:w-[75%] p-0"
             >
-              <GlassCard>
-                <div className="p-6 md:p-7">
-                  <header className="mb-4 flex items-center gap-2">
-                    <div className="h-6 w-6 rounded-full bg-white/10 ring-1 ring-white/20 flex items-center justify-center">
-                      <img 
-                        src="/irislogoblack.png" 
-                        alt="Iris Logo" 
-                        className="h-4 w-4 dark:hidden"
-                      />
-                      <img 
-                        src="/irissymbolwhite.png" 
-                        alt="Iris Logo" 
-                        className="h-4 w-4 hidden dark:block"
-                      />
-                    </div>
-                    <h3 className="text-sm font-medium text-white/80">Iris</h3>
-                  </header>
-                  <ChatBubble messages={messages} onSend={handleSend} samplePrompts={samplePrompts} />
-                </div>
-              </GlassCard>
+              <div className="space-y-4">
+                {/* Input box only */}
+                <ChatBubble 
+                  onSend={handleSend}
+                />
+              </div>
             </motion.div>
 
             {/* Right placeholder card */}
@@ -456,3 +606,4 @@ function PlaceholderCard({ direction }: { direction: "left" | "right" }) {
 
 export default HeroSection;
 export { HeroSection };
+
