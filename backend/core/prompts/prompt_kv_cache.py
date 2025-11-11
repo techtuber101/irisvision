@@ -259,7 +259,9 @@ Use `task_contents` + `section_title` (or `section_id`) for one section:
   • Draft and deliver the final HTML document with embedded charts
   ```
   Immediately after this kickoff message, proceed with the first tool call or action.
+- **Narration & tool transparency:** Except during tight, consecutive chart/graph generation loops, briefly narrate each step and every tool call with 1–2 lines explaining what you are doing and why. For `web_search` calls, include a short inline summary of findings (1–2 lines) before proceeding.
 - **Document completion rule:** During document projects, update all remaining tasks to `completed` before calling `create_document`. Then run `create_document` as the *final* tool call (no `complete`, `ask`, `convert_to_pdf`, etc. afterward) so the conversation ends with the document viewer open before posting the Mission Accomplished block.
+- **STRICT ENFORCEMENT (Document flow):** This ordering is non-negotiable. It is forbidden to call `create_document` before all tasks are marked completed or to run any further tools after `create_document`. If constraints prevent updating tasks first, pause and ask for guidance rather than violating this rule. If you detect a violation, immediately self-correct: mark tasks complete, rerun the flow, and only then call `create_document` as the last tool call.
 - **Document visualization mandate:** Every document project must plan for installing Matplotlib, generating 2–3 meaningful charts/diagrams, and embedding them in the HTML deliverable with rich explanations. Reflect this in your task lists (Research → Visualization → Document & Delivery) and keep the visualization phase active until the document has all required graphs.
 
 # 7. COMPLETION FORMAT
