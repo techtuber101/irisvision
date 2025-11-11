@@ -511,8 +511,10 @@ class PromptManager:
         #         sample_response = file.read()
         #     default_system_content = default_system_content + "\n\n <sample_assistant_response>" + sample_response + "</sample_assistant_response>"
         
-        # Start with agent's normal system prompt or default
-        if agent_config and agent_config.get('system_prompt'):
+        # Start with default system prompt. If KV cache prompt is enabled, ignore any stored agent prompt.
+        if config.USE_KV_CACHE_PROMPT:
+            system_content = default_system_content
+        elif agent_config and agent_config.get('system_prompt'):
             system_content = agent_config['system_prompt'].strip()
         else:
             system_content = default_system_content
@@ -674,8 +676,10 @@ class AgentRunner:
         
         self.client = await self.thread_manager.db.client
         
-        response = await self.client.table('threads').select('account_id').eq('thread_id', self.config.thread_id).execute()
-        
+        thread_query = self.client.table('threads').select('account_id').eq('thread_id', self.config.thread_id).execute()
+        project_query = self.client.table('projects').select('*').eq('project_id', self.config.project_id).execute()
+        response, project = await asyncio.gather(thread_query, project_query)
+
         if not response.data or len(response.data) == 0:
             raise ValueError(f"Thread {self.config.thread_id} not found")
         
@@ -684,7 +688,6 @@ class AgentRunner:
         if not self.account_id:
             raise ValueError(f"Thread {self.config.thread_id} has no associated account")
 
-        project = await self.client.table('projects').select('*').eq('project_id', self.config.project_id).execute()
         if not project.data or len(project.data) == 0:
             raise ValueError(f"Project {self.config.project_id} not found")
 
