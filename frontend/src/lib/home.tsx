@@ -112,8 +112,8 @@ export const siteConfig = {
   cloudPricingItems: [
     {
       name: 'Free',
-      price: '$0',
-      yearlyPrice: 'Free',
+      price: '₹0',
+      yearlyPrice: '₹0',
       originalYearlyPrice: undefined,
       description: 'Get started & explore, no cost',
       buttonText: 'Get started',
@@ -136,7 +136,7 @@ export const siteConfig = {
       originalYearlyPrice: '₹12,000',
       discountPercentage: 15,
       description: 'Feel the intelligence',
-      buttonText: 'Get started',
+      buttonText: 'Get Air',
       buttonColor: 'bg-primary text-white dark:text-black',
       isPopular: true,
       /** @deprecated */
@@ -157,12 +157,12 @@ export const siteConfig = {
     },
     {
       name: 'Pro',
-      price: '₹2,999',
+      price: '₹3,000',
       yearlyPrice: '₹30,590',
       originalYearlyPrice: '₹35,988',
       discountPercentage: 15,
       description: 'Built for fast-moving professionals',
-      buttonText: 'Get started',
+      buttonText: 'Get Pro',
       buttonColor: 'bg-secondary text-white',
       isPopular: false,
       /** @deprecated */
@@ -212,8 +212,8 @@ export const siteConfig = {
       yearlyPrice: '₹36,710',
       originalYearlyPrice: '₹43,188',
       discountPercentage: 15,
-      description: 'Advanced power, maximum capability',
-      buttonText: 'Get started',
+      description: 'Full access to the best of Iris',
+      buttonText: 'Get Ultra',
       buttonColor: 'bg-secondary text-white',
       isPopular: false,
       hours: '25 hours',

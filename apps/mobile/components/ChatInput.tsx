@@ -2,9 +2,10 @@ import { AttachmentGroup } from '@/components/AttachmentGroup';
 import { useTheme } from '@/hooks/useThemeColor';
 import { useSelectedProject } from '@/stores/ui-store';
 import { handleLocalFiles, pickFiles, UploadedFile, uploadFilesToSandbox } from '@/utils/file-upload';
-import { ArrowUp, ChevronUp, Mic, Paperclip, Square } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import { Keyboard, KeyboardEvent, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { QuickChatAttachment, sendQuickChat } from '@/api/quick-chat-api';
+import { ChevronUp, Mic, Paperclip, Square } from 'lucide-react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Keyboard, KeyboardEvent, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, {
     Easing,
     Extrapolate,
@@ -16,7 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { sendQuickChat } from '@/api/quick-chat-api';
+import * as FileSystem from 'expo-file-system';
 
 interface ChatInputProps {
     onSendMessage: (message: string, files?: UploadedFile[]) => Promise<void> | void;
@@ -104,17 +105,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
             // Route message based on selected mode
             if (irisMode === 'quick') {
-                // Use Quick Chat API
                 try {
+                    const attachmentsPayload = await prepareQuickChatAttachments();
                     const response = await sendQuickChat({
                         message: finalMessage,
                         model: 'gemini-2.5-flash',
+                        attachments: attachmentsPayload,
                     });
                     
-                    // Handle quick chat response by creating a message
                     console.log('Quick chat response:', response.response);
                     
-                    // Create a message object for the quick chat response
                     const quickChatMessage = {
                         message_id: `quick-${Date.now()}`,
                         thread_id: 'quick-chat',
@@ -126,11 +126,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                         updated_at: new Date().toISOString(),
                     };
                     
-                    // Pass the response to the parent component
                     onQuickChatResponse?.(response.response);
                 } catch (error) {
                     console.error('Quick chat error:', error);
-                    // You might want to show an error message to the user
+                    const description = error instanceof Error ? error.message : 'Unable to send quick chat message.';
+                    Alert.alert('Quick chat failed', description);
+                    return;
                 }
             } else {
                 // Use default agent (Iris Intelligence) - existing behavior
@@ -242,6 +243,43 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     });
 
     const shouldShowCancel = isSending || isGenerating;
+
+    const prepareQuickChatAttachments = useCallback(async (): Promise<QuickChatAttachment[] | undefined> => {
+        if (attachedFiles.length === 0) {
+            return undefined;
+        }
+
+        const unsupported = attachedFiles.filter(file => !file.type?.startsWith('image/'));
+        if (unsupported.length > 0) {
+            const label = unsupported.map(file => file.name || 'Unknown file').join(', ');
+            throw new Error(`Quick Chat currently supports images only. Remove unsupported files: ${label}`);
+        }
+
+        const encoded: QuickChatAttachment[] = [];
+
+        for (const file of attachedFiles) {
+            if (!file.localUri) {
+                throw new Error(`Couldn't access ${file.name || 'attachment'}. Please reattach it.`);
+            }
+
+            try {
+                const data = await FileSystem.readAsStringAsync(file.localUri, {
+                    encoding: 'base64',
+                });
+
+                encoded.push({
+                    name: file.name,
+                    mimeType: file.type || 'image/jpeg',
+                    data,
+                });
+            } catch (error) {
+                console.error('[ChatInput] Failed to read attachment', error);
+                throw new Error(`Failed to read ${file.name}. Please try again.`);
+            }
+        }
+
+        return encoded;
+    }, [attachedFiles]);
 
     return (
         <>

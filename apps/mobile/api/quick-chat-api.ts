@@ -6,11 +6,18 @@ export interface QuickChatMessage {
   content: string;
 }
 
+export interface QuickChatAttachment {
+  name?: string;
+  mimeType: string;
+  data: string;
+}
+
 export interface QuickChatRequest {
   message: string;
   model?: string;
   systemInstructions?: string;
   chatContext?: QuickChatMessage[];
+  attachments?: QuickChatAttachment[];
 }
 
 export interface QuickChatResponse {
@@ -31,6 +38,11 @@ export const sendQuickChat = async (payload: QuickChatRequest): Promise<QuickCha
       model: payload.model,
       system_instructions: payload.systemInstructions,
       chat_context: payload.chatContext,
+      attachments: payload.attachments?.map((attachment) => ({
+        name: attachment.name,
+        mime_type: attachment.mimeType,
+        data: attachment.data,
+      })),
     }),
   });
 
