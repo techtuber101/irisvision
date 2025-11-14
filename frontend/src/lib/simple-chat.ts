@@ -9,6 +9,11 @@ const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000/ap
 
 export interface SimpleChatRequest {
   message: string;
+  file_paths?: Array<{
+    storage_path: string;
+    original_filename: string;
+    content_type: string;
+  }>;
 }
 
 export interface SimpleChatResponse {
@@ -18,10 +23,55 @@ export interface SimpleChatResponse {
   time_ms: number;
 }
 
+export interface FileUploadInfo {
+  storage_path: string;
+  original_filename: string;
+  content_type: string;
+  file_size: number;
+}
+
+/**
+ * Upload a file to Supabase storage for quick chat
+ */
+export async function uploadFileForQuickChat(file: File): Promise<FileUploadInfo> {
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.user?.id) {
+    throw new Error('No authenticated user');
+  }
+
+  // Create storage path: user_id/timestamp_filename
+  const timestamp = Date.now();
+  const filename = file.name;
+  const storagePath = `${session.user.id}/${timestamp}_${filename}`;
+
+  // Upload to Supabase storage
+  const { data, error } = await supabase.storage
+    .from('file-uploads')
+    .upload(storagePath, file, {
+      cacheControl: '3600',
+      upsert: false,
+    });
+
+  if (error) {
+    throw new Error(`Failed to upload file: ${error.message}`);
+  }
+
+  return {
+    storage_path: storagePath,
+    original_filename: filename,
+    content_type: file.type || 'application/octet-stream',
+    file_size: file.size,
+  };
+}
+
 /**
  * Simple chat - direct API call, no streaming, no complexity
  */
-export async function simpleChat(message: string): Promise<SimpleChatResponse> {
+export async function simpleChat(message: string, filePaths?: FileUploadInfo[]): Promise<SimpleChatResponse> {
   const supabase = createClient();
   const {
     data: { session },
@@ -33,6 +83,10 @@ export async function simpleChat(message: string): Promise<SimpleChatResponse> {
 
   const formData = new FormData();
   formData.append('message', message);
+  
+  if (filePaths && filePaths.length > 0) {
+    formData.append('file_paths', JSON.stringify(filePaths));
+  }
 
   const response = await fetch(`${API_URL}/simple-chat/simple`, {
     method: 'POST',
@@ -53,7 +107,7 @@ export async function simpleChat(message: string): Promise<SimpleChatResponse> {
 /**
  * Continue simple chat conversation
  */
-export async function continueSimpleChat(threadId: string, message: string): Promise<SimpleChatResponse> {
+export async function continueSimpleChat(threadId: string, message: string, filePaths?: FileUploadInfo[]): Promise<SimpleChatResponse> {
   const supabase = createClient();
   const {
     data: { session },
@@ -66,6 +120,10 @@ export async function continueSimpleChat(threadId: string, message: string): Pro
   const formData = new FormData();
   formData.append('thread_id', threadId);
   formData.append('message', message);
+  
+  if (filePaths && filePaths.length > 0) {
+    formData.append('file_paths', JSON.stringify(filePaths));
+  }
 
   const response = await fetch(`${API_URL}/simple-chat/simple/continue`, {
     method: 'POST',
@@ -93,7 +151,8 @@ export async function simpleChatStream(
     onContent?: (content: string) => void;
     onDone?: () => void;
     onError?: (error: string) => void;
-  }
+  },
+  filePaths?: FileUploadInfo[]
 ): Promise<void> {
   const supabase = createClient();
   const {
@@ -106,6 +165,10 @@ export async function simpleChatStream(
 
   const formData = new FormData();
   formData.append('message', message);
+  
+  if (filePaths && filePaths.length > 0) {
+    formData.append('file_paths', JSON.stringify(filePaths));
+  }
 
   const response = await fetch(`${API_URL}/simple-chat/simple/stream`, {
     method: 'POST',
@@ -179,7 +242,8 @@ export async function continueSimpleChatStream(
     onContent?: (content: string) => void;
     onDone?: () => void;
     onError?: (error: string) => void;
-  }
+  },
+  filePaths?: FileUploadInfo[]
 ): Promise<void> {
   const supabase = createClient();
   const {
@@ -193,6 +257,10 @@ export async function continueSimpleChatStream(
   const formData = new FormData();
   formData.append('thread_id', threadId);
   formData.append('message', message);
+  
+  if (filePaths && filePaths.length > 0) {
+    formData.append('file_paths', JSON.stringify(filePaths));
+  }
 
   const response = await fetch(`${API_URL}/simple-chat/simple/continue/stream`, {
     method: 'POST',

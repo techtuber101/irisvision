@@ -675,8 +675,35 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
           };
           
           try {
-            // Use the streaming simple chat continue endpoint
-            await continueSimpleChatStream(threadId, message, {
+            // Upload files to Supabase storage first if any (for chat mode)
+            let fileUploadInfos: any[] = [];
+            
+            // For chat mode, we need to upload files to Supabase storage
+            // Get pending files from chat input
+            const pendingFiles = chatInputRef.current?.getPendingFiles() || [];
+            
+            if (pendingFiles.length > 0) {
+              try {
+                const { uploadFileForQuickChat } = await import('@/lib/simple-chat');
+                const uploadPromises = pendingFiles.map(file => uploadFileForQuickChat(file));
+                fileUploadInfos = await Promise.all(uploadPromises);
+                
+                // Clear pending files after upload
+                chatInputRef.current?.clearPendingFiles();
+              } catch (error) {
+                console.error('File upload failed for chat mode:', error);
+                toast.error('Failed to upload files');
+                // Don't continue without files if upload fails
+                setIsSimpleChatLoading(false);
+                return;
+              }
+            }
+            
+            // Use the streaming simple chat continue endpoint with file attachments
+            await continueSimpleChatStream(
+              threadId, 
+              message, 
+              {
               onContent: (content: string) => {
                 console.log('ThreadComponent received content chunk:', content.length, 'characters');
                 // Clear loading indicator on first content chunk
@@ -748,7 +775,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
                   prev.filter((msg) => msg.message_id !== assistantMessageId)
                 );
               }
-            });
+            },
+            fileUploadInfos.length > 0 ? fileUploadInfos : undefined
+            );
             
           } catch (error) {
             console.error('Simple chat error:', error);
