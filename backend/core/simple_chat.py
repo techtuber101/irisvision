@@ -9,10 +9,11 @@ import uuid
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException, Form, Depends
+from fastapi import APIRouter, HTTPException, Form, Depends, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import google.generativeai as genai
+import base64
 from core.utils.config import config
 from core.utils.logger import logger
 from core.utils.auth_utils import verify_and_get_user_id_from_jwt
@@ -95,6 +96,7 @@ def _record_to_history(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 @router.post("/simple", response_model=SimpleChatResponse, summary="Simple Chat", operation_id="simple_chat")
 async def simple_chat(
     message: str = Form(...),
+    file_paths: Optional[str] = Form(None),  # JSON array of file paths from Supabase storage
     user_id: str = Depends(verify_and_get_user_id_from_jwt)
 ):
     """
@@ -152,19 +154,53 @@ async def simple_chat(
         
         logger.debug(f"Saved user message: {user_message_id}")
         
-        # 4. Call Gemini API with minimal system instructions
+        # 4. Process file attachments if provided
+        file_parts = []
+        if file_paths:
+            try:
+                import json as json_lib
+                file_paths_list = json_lib.loads(file_paths)
+                
+                for file_info in file_paths_list:
+                    storage_path = file_info.get('storage_path')
+                    content_type = file_info.get('content_type', 'application/octet-stream')
+                    
+                    if storage_path:
+                        # Get file data from Supabase storage
+                        from supabase import create_client as create_supabase_client
+                        supabase = create_supabase_client(config.SUPABASE_URL, config.SUPABASE_SERVICE_KEY)
+                        
+                        file_data = supabase.storage.from_('file-uploads').download(storage_path)
+                        
+                        if file_data:
+                            # Convert to base64 for Gemini
+                            base64_data = base64.b64encode(file_data).decode('utf-8')
+                            file_parts.append({
+                                "inline_data": {
+                                    "mime_type": content_type,
+                                    "data": base64_data
+                                }
+                            })
+            except Exception as e:
+                logger.error(f"Error processing file attachments: {e}")
+        
+        # 5. Call Gemini API with minimal system instructions and file attachments
         model = genai.GenerativeModel("gemini-2.5-flash")
         
         # Minimal system instructions for quick chat mode
         system_instructions = """You are Iris Intelligence. Never mention Google/LLM. Use rich formatting: H1-H6 headings, tables, lists. Especially H1 which for big answers must always be used. You are chat mode of an agentic AI. Give amazing answers always."""
         
-        response = model.generate_content(f"System Instructions: {system_instructions}\n\nUser: {message}")
+        # Build content parts: system instructions + user message + files
+        content_parts = [{"text": f"System Instructions: {system_instructions}\n\nUser: {message}"}]
+        content_parts.extend(file_parts)
+        
+        response = model.generate_content(content_parts)
         assistant_response = response.text
         
         elapsed_ms = (time.time() - start_time) * 1000
         logger.debug(f"Gemini API call completed in {elapsed_ms:.2f}ms")
         
-        # 5. Save Assistant Response
+        # 6. Save Assistant Response
         assistant_message_id = str(uuid.uuid4())
         assistant_message_payload = {"role": "assistant", "content": assistant_response}
         await client.table('messages').insert({
@@ -178,7 +214,7 @@ async def simple_chat(
         
         logger.debug(f"Saved assistant message: {assistant_message_id}")
         
-        # 6. Return response with thread_id for redirect
+        # 7. Return response with thread_id for redirect
         return SimpleChatResponse(
             thread_id=thread_id,
             project_id=project_id,
@@ -270,6 +306,7 @@ async def continue_simple_chat(
 @router.post("/simple/stream")
 async def simple_chat_streaming(
     message: str = Form(...),
+    file_paths: Optional[str] = Form(None),  # JSON array of file paths from Supabase storage
     user_id: str = Depends(verify_and_get_user_id_from_jwt)
 ):
     """
@@ -308,9 +345,52 @@ async def simple_chat_streaming(
             # 3. Send metadata immediately so the frontend can redirect without delay
             yield f"data: {json.dumps({'type': 'metadata', 'thread_id': thread_id, 'project_id': project_id})}\n\n"
             
-            # 4. Persist user message asynchronously to avoid blocking the first model token
+            # 4. Process file attachments if provided
+            file_parts = []
+            if file_paths:
+                try:
+                    import json as json_lib
+                    file_paths_list = json_lib.loads(file_paths)
+                    
+                    for file_info in file_paths_list:
+                        storage_path = file_info.get('storage_path')
+                        content_type = file_info.get('content_type', 'application/octet-stream')
+                        
+                        if storage_path:
+                            # Get file data from Supabase storage
+                            from supabase import create_client as create_supabase_client
+                            supabase = create_supabase_client(config.SUPABASE_URL, config.SUPABASE_SERVICE_KEY)
+                            
+                            file_data = supabase.storage.from_('file-uploads').download(storage_path)
+                            
+                            if file_data:
+                                # Convert to base64 for Gemini
+                                base64_data = base64.b64encode(file_data).decode('utf-8')
+                                file_parts.append({
+                                    "inline_data": {
+                                        "mime_type": content_type,
+                                        "data": base64_data
+                                    }
+                                })
+                                logger.debug(f"Added file attachment: {storage_path}")
+                except Exception as e:
+                    logger.error(f"Error processing file attachments: {e}")
+            
+            # 5. Persist user message asynchronously to avoid blocking the first model token
             user_message_id = str(uuid.uuid4())
-            user_message_payload = {"role": "user", "content": message}
+            # Include file references in message content
+            message_content = message
+            if file_paths:
+                try:
+                    import json as json_lib
+                    file_paths_list = json_lib.loads(file_paths)
+                    if file_paths_list:
+                        file_refs = "\n\n".join([f"[Attached File: {f.get('original_filename', 'unknown')}]" for f in file_paths_list])
+                        message_content = f"{message}\n\n{file_refs}"
+                except:
+                    pass
+            
+            user_message_payload = {"role": "user", "content": message_content}
             user_message_task = asyncio.create_task(client.table('messages').insert({
                 "message_id": user_message_id,
                 "thread_id": thread_id,
@@ -322,15 +402,19 @@ async def simple_chat_streaming(
             
             logger.debug(f"Saving user message asynchronously: {user_message_id}")
             
-            # 5. Call Gemini API with streaming and minimal system instructions
+            # 6. Call Gemini API with streaming and minimal system instructions
             model = genai.GenerativeModel("gemini-2.5-flash")
             
             # Minimal system instructions for quick chat mode
-            system_instructions = """You are a helpful AI assistant. Provide clear, concise, and helpful responses. Be conversational and friendly."""
+            system_instructions = """You are Iris Intelligence. Never mention Google/LLM. Use rich formatting: H1-H6 headings, tables, lists. Especially H1 which for big answers must always be used. You are chat mode of an agentic AI. Give amazing answers always."""
             
-            response = model.generate_content(f"System Instructions: {system_instructions}\n\nUser: {message}", stream=True)
+            # Build content parts: system instructions + user message + files
+            content_parts = [{"text": f"System Instructions: {system_instructions}\n\nUser: {message}"}]
+            content_parts.extend(file_parts)
             
-            # 6. Stream response chunks
+            response = model.generate_content(content_parts, stream=True)
+            
+            # 7. Stream response chunks
             full_response = ""
             for chunk in response:
                 if chunk.text:
@@ -344,7 +428,7 @@ async def simple_chat_streaming(
             except Exception as insert_error:
                 logger.error(f"Failed to persist user message {user_message_id}: {insert_error}")
             
-            # 7. Save complete assistant response
+            # 8. Save complete assistant response
             assistant_message_id = str(uuid.uuid4())
             assistant_message_payload = {"role": "assistant", "content": full_response}
             await client.table('messages').insert({
@@ -379,6 +463,7 @@ async def simple_chat_streaming(
 async def continue_simple_chat_streaming(
     thread_id: str = Form(...),
     message: str = Form(...),
+    file_paths: Optional[str] = Form(None),  # JSON array of file paths from Supabase storage
     user_id: str = Depends(verify_and_get_user_id_from_jwt)
 ):
     """
@@ -400,6 +485,37 @@ async def continue_simple_chat_streaming(
                 return
             
             logger.debug(f"Streaming continue simple chat for thread {thread_id} with message: {message[:50]}...")
+            
+            # Process file attachments if provided
+            file_parts = []
+            if file_paths:
+                try:
+                    import json as json_lib
+                    file_paths_list = json_lib.loads(file_paths)
+                    
+                    for file_info in file_paths_list:
+                        storage_path = file_info.get('storage_path')
+                        content_type = file_info.get('content_type', 'application/octet-stream')
+                        
+                        if storage_path:
+                            # Get file data from Supabase storage
+                            from supabase import create_client as create_supabase_client
+                            supabase = create_supabase_client(config.SUPABASE_URL, config.SUPABASE_SERVICE_KEY)
+                            
+                            file_data = supabase.storage.from_('file-uploads').download(storage_path)
+                            
+                            if file_data:
+                                # Convert to base64 for Gemini
+                                base64_data = base64.b64encode(file_data).decode('utf-8')
+                                file_parts.append({
+                                    "inline_data": {
+                                        "mime_type": content_type,
+                                        "data": base64_data
+                                    }
+                                })
+                                logger.debug(f"Added file attachment: {storage_path}")
+                except Exception as e:
+                    logger.error(f"Error processing file attachments: {e}")
             
             # Build chat history from prior messages (before the new user message)
             history: List[Dict[str, Any]] = []
@@ -427,9 +543,20 @@ async def continue_simple_chat_streaming(
                 if history_entry:
                     history.append(history_entry)
             
-            # Persist the new user message without blocking streaming
+            # Persist the new user message without blocking streaming (with file references)
             user_message_id = str(uuid.uuid4())
-            user_message_payload = {"role": "user", "content": message}
+            message_content = message
+            if file_paths:
+                try:
+                    import json as json_lib
+                    file_paths_list = json_lib.loads(file_paths)
+                    if file_paths_list:
+                        file_refs = "\n\n".join([f"[Attached File: {f.get('original_filename', 'unknown')}]" for f in file_paths_list])
+                        message_content = f"{message}\n\n{file_refs}"
+                except:
+                    pass
+            
+            user_message_payload = {"role": "user", "content": message_content}
             user_message_task = asyncio.create_task(client.table('messages').insert({
                 "message_id": user_message_id,
                 "thread_id": thread_id,
@@ -441,10 +568,18 @@ async def continue_simple_chat_streaming(
             
             logger.debug(f"Saving user message asynchronously: {user_message_id}")
             
-            # Call Gemini API with true streaming
+            # Call Gemini API with true streaming and file attachments
             model = genai.GenerativeModel("gemini-2.5-flash")
             chat = model.start_chat(history=history)
-            response = chat.send_message(message, stream=True)
+            
+            # Build message parts: text + files
+            if file_parts:
+                message_parts = [{"text": message}]
+                message_parts.extend(file_parts)
+                response = chat.send_message(message_parts, stream=True)
+            else:
+                response = chat.send_message(message, stream=True)
+            
             full_response = ""
             
             for chunk in response:
