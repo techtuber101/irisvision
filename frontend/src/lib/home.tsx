@@ -69,9 +69,10 @@ export const siteConfig = {
   nav: {
     links: [
       { id: 1, name: 'Home', href: '#hero' },
-      { id: 2, name: 'The Vision', href: '#vision' },
-      { id: 3, name: 'Use Cases', href: '#use-cases' },
-      { id: 4, name: 'Pricing', href: '#pricing' },
+      { id: 2, name: 'Process', href: '#process' },
+      // { id: 3, name: 'Use Cases', href: '#use-cases' },
+      { id: 4, name: 'Open Source', href: '#open-source' },
+      { id: 5, name: 'Pricing', href: '#pricing' },
     ],
   },
   hero: {
@@ -110,7 +111,7 @@ export const siteConfig = {
   },
   cloudPricingItems: [
     {
-      name: 'Free Forever',
+      name: 'Free',
       price: '$0',
       yearlyPrice: 'Free',
       originalYearlyPrice: undefined,
@@ -831,15 +832,15 @@ export const siteConfig = {
     },
   },
   pricing: {
-    title: 'Open Source & Free Forever',
+    title: 'Free',
     description:
-      'Iris is 100% open source and free to use. No hidden fees, no premium features locked behind paywalls.',
+      'Iris is free to use. No hidden fees, no premium features locked behind paywalls.',
     pricingItems: [
       {
         name: 'Community',
         href: '#',
         price: 'Free',
-        period: 'forever',
+        period: '',
         yearlyPrice: 'Free',
         features: [
           'Full agent capabilities',
@@ -856,7 +857,7 @@ export const siteConfig = {
         name: 'Self-Hosted',
         href: '#',
         price: 'Free',
-        period: 'forever',
+        period: '',
         yearlyPrice: 'Free',
         features: [
           'Full agent capabilities',
@@ -1187,13 +1188,12 @@ export const siteConfig = {
     },
   ],
   useCases: [
-    // Research Category - 8 examples
     {
-      id: 'patent-tracker',
-      title: 'Patent Portfolio Analysis',
+      id: 'competitor-analysis',
+      title: 'Competitor Analysis',
       description:
-        'Track all blockchain-related patents filed in Asia during Q4 2024. Extract filing dates, inventors, assignees, and abstract summaries. Create a comparative analysis highlighting innovation trends.',
-      category: 'Research',
+        'Analyze the market for my next company in the healthcare industry, located in the UK. Give me the major players, their market size, strengths, and weaknesses, and add their website URLs. Once done, generate a PDF report.',
+      category: 'research',
       featured: true,
       icon: (
         <svg
@@ -1228,15 +1228,15 @@ export const siteConfig = {
       ),
       image:
         'https://images.unsplash.com/photo-1576091160550-2173dba999ef?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/patent-tracker',
+      url: 'https://iris.so/share/2fbf0552-87d6-4d12-be25-d54f435bc493',
     },
     {
-      id: 'academic-sentiment',
-      title: 'Climate Change Sentiment Mapping',
+      id: 'vc-list',
+      title: 'VC List',
       description:
-        'Scan 500+ academic journals from 2020-2025 for climate policy discourse. Identify shifting sentiment, key terminology evolution, and emerging research institutions leading the conversation.',
-      category: 'Research',
-      featured: false,
+        'Give me the list of the most important VC Funds in the United States based on Assets Under Management. Give me website URLs, and if possible an email to reach them out.',
+      category: 'finance',
+      featured: true,
       icon: (
         <svg
           width="24"
@@ -1263,275 +1263,14 @@ export const siteConfig = {
       ),
       image:
         'https://images.unsplash.com/photo-1444653614773-995cb1ef9efa?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/climate-sentiment',
+      url: 'https://iris.so/share/a172382b-aa77-42a2-a3e1-46f32a0f9c37',
     },
     {
-      id: 'regulatory-watch',
-      title: 'Global Regulatory Intelligence',
+      id: 'candidate-search',
+      title: 'Looking for Candidates',
       description:
-        'Monitor FDA, EMA, and PMDA announcements for drug approvals in oncology. Generate weekly digests with approval timelines, competitor movements, and market entry predictions for strategic planning.',
-      category: 'Research',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M17.25 10C17.25 12.8995 14.8995 15.25 12 15.25C9.10051 15.25 6.75 12.8995 6.75 10C6.75 7.10051 9.10051 4.75 12 4.75C14.8995 4.75 17.25 7.10051 17.25 10Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8.25 14.75L5.25 19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M15.75 14.75L18.75 19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/regulatory-watch',
-    },
-    {
-      id: 'supply-chain-intel',
-      title: 'Semiconductor Supply Chain Deep Dive',
-      description:
-        'Map the entire supply chain for TSMC 3nm chip production. Identify tier-1, tier-2, and tier-3 suppliers, their geographic distribution, and vulnerability points for risk assessment and backup sourcing.',
-      category: 'Research',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 8.75C4.75 7.64543 5.64543 6.75 6.75 6.75H17.25C18.3546 6.75 19.25 7.64543 19.25 8.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V8.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8 4.75V8.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M16 4.75V8.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M7.75 10.75H16.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/supply-chain',
-    },
-    {
-      id: 'startup-graveyard',
-      title: 'Failed Startup Forensics',
-      description:
-        'Analyze 200 defunct B2B SaaS companies from 2022-2024. Extract shutdown announcements, post-mortems, founder interviews, and financial data to identify patterns in failure modes and preventable mistakes.',
-      category: 'Research',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 6.75C4.75 5.64543 5.64543 4.75 6.75 4.75H17.25C18.3546 4.75 19.25 5.64543 19.25 6.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V6.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75V19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5 8.25H19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1532153975070-2e9ab71f1b14?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/startup-forensics',
-    },
-    {
-      id: 'podcast-mining',
-      title: 'Executive Podcast Intelligence',
-      description:
-        'Transcribe and analyze 100+ tech CEO podcast appearances. Extract strategic insights, future product hints, acquisition targets mentioned, and competitive intel to inform investment and partnership decisions.',
-      category: 'Research',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M5.75 19.2502H18.25C18.8023 19.2502 19.25 18.8025 19.25 18.2502V5.75C19.25 5.19772 18.8023 4.75 18.25 4.75H5.75C5.19772 4.75 4.75 5.19772 4.75 5.75V18.2502C4.75 18.8025 5.19772 19.2502 5.75 19.2502Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75C9.75 9.44036 9.19036 10 8.5 10C7.80964 10 7.25 9.44036 7.25 8.75C7.25 8.05964 7.80964 7.5 8.5 7.5C9.19036 7.5 9.75 8.05964 9.75 8.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M19.25 13.75L14.75 9.25L7.25 16.75"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1523580494863-6f3031224c94?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/podcast-intel',
-    },
-    {
-      id: 'github-archaeology',
-      title: 'Open Source Trend Forecasting',
-      description:
-        'Analyze GitHub star velocity, contributor growth, and commit patterns across 1000+ repositories in quantum computing. Predict which projects will dominate in 18 months based on community health metrics.',
-      category: 'Research',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 6.75C4.75 5.64543 5.64543 4.75 6.75 4.75H17.25C18.3546 4.75 19.25 5.64543 19.25 6.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V6.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75V19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5 8.25H19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1532153975070-2e9ab71f1b14?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/github-trends',
-    },
-    {
-      id: 'talent-poaching-map',
-      title: 'Competitor Talent Flow Analysis',
-      description:
-        'Track employee movements between Google DeepMind, OpenAI, and Anthropic over 24 months. Identify key researchers changing teams, their specializations, and infer strategic shifts in AI lab priorities.',
-      category: 'Research',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 11.75L10.25 6.25L14.75 10.75L19.25 6.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5.75 19.25H18.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M12 11.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1552581234-26160f608093?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/talent-flow',
-    },
-
-    // Finance Category - 8 examples  
-    {
-      id: 'insider-trading-patterns',
-      title: 'C-Suite Trading Signal Detection',
-      description:
-        'Monitor SEC Form 4 filings for unusual insider trading patterns among Fortune 500 tech executives. Flag clusters of sales/purchases, calculate trade timing relative to earnings, and generate early warning alerts.',
-      category: 'Finance',
+        "Go on LinkedIn, and find 10 profiles available - they are not working right now - for a junior software engineer position, who are located in Munich, Germany. They should have at least one bachelor's degree in Computer Science or anything related to it, and 1-year of experience in any field/role.",
+      category: 'recruitment',
       featured: true,
       icon: (
         <svg
@@ -1542,139 +1281,6 @@ export const siteConfig = {
           xmlns="http://www.w3.org/2000/svg"
         >
           <path
-            d="M4.75 11.75L10.25 6.25L14.75 10.75L19.25 6.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M19.25 6.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M4.75 6.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M4.75 19.25H19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/insider-trading',
-    },
-    {
-      id: 'alternative-data-scrape',
-      title: 'Satellite Parking Lot Counter',
-      description:
-        'Analyze satellite imagery of Walmart, Target, and Costco parking lots across US regions. Count vehicle density monthly to predict retail earnings before official reports and inform equity positions.',
-      category: 'Finance',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 8.75C4.75 7.64543 5.64543 6.75 6.75 6.75H17.25C18.3546 6.75 19.25 7.64543 19.25 8.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V8.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8 4.75V8.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M16 4.75V8.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M7.75 10.75H16.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/satellite-parking',
-    },
-    {
-      id: 'spac-arbitrage-scanner',
-      title: 'SPAC Merger Arbitrage Finder',
-      description:
-        'Scan all active SPACs for merger announcements, redemption deadlines, and trust value discrepancies. Calculate risk-adjusted spreads and identify arbitrage opportunities with asymmetric return profiles.',
-      category: 'Finance',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M12 4.75L19.25 9L12 13.25L4.75 9L12 4.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.25 11.5L4.75 14L12 18.25L19.25 14L14.6722 11.5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1444653614773-995cb1ef9efa?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/spac-arbitrage',
-    },
-    {
-      id: 'crypto-whale-tracker',
-      title: 'Whale Wallet Movement Analysis',
-      description:
-        'Monitor top 500 crypto wallets for large transfers between exchanges and cold storage. Correlate movements with price action to detect accumulation/distribution phases ahead of major market moves.',
-      category: 'Finance',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
             d="M17.25 10C17.25 12.8995 14.8995 15.25 12 15.25C9.10051 15.25 6.75 12.8995 6.75 10C6.75 7.10051 9.10051 4.75 12 4.75C14.8995 4.75 17.25 7.10051 17.25 10Z"
             stroke="currentColor"
             strokeWidth="1.5"
@@ -1699,578 +1305,14 @@ export const siteConfig = {
       ),
       image:
         'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/whale-tracker',
+      url: 'https://iris.so/share/d9e39c94-4f6f-4b5a-b1a0-b681bfe0dee8',
     },
     {
-      id: 'distressed-debt-hunter',
-      title: 'Distressed Asset Opportunity Scout',
+      id: 'company-trip',
+      title: 'Planning Company Trip',
       description:
-        'Crawl bankruptcy court filings, corporate restructuring announcements, and creditor committees to identify undervalued assets in chapter 11 proceedings. Build target lists for distressed debt funds.',
-      category: 'Finance',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 6.75C4.75 5.64543 5.64543 4.75 6.75 4.75H17.25C18.3546 4.75 19.25 5.64543 19.25 6.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V6.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75V19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5 8.25H19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1532153975070-2e9ab71f1b14?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/distressed-debt',
-    },
-    {
-      id: 'options-flow-decoder',
-      title: 'Unusual Options Activity Scanner',
-      description:
-        'Parse real-time options flow for abnormal volume, open interest spikes, and block trades in tech megacaps. Identify smart money positioning and generate trade ideas based on options market signals.',
-      category: 'Finance',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M5.75 19.2502H18.25C18.8023 19.2502 19.25 18.8025 19.25 18.2502V5.75C19.25 5.19772 18.8023 4.75 18.25 4.75H5.75C5.19772 4.75 4.75 5.19772 4.75 5.75V18.2502C4.75 18.8025 5.19772 19.2502 5.75 19.2502Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75C9.75 9.44036 9.19036 10 8.5 10C7.80964 10 7.25 9.44036 7.25 8.75C7.25 8.05964 7.80964 7.5 8.5 7.5C9.19036 7.5 9.75 8.05964 9.75 8.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M19.25 13.75L14.75 9.25L7.25 16.75"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1523580494863-6f3031224c94?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/options-flow',
-    },
-    {
-      id: 'macro-indicator-dashboard',
-      title: 'Global Macro Indicator Aggregator',
-      description:
-        'Pull central bank statements, PMI data, yield curves, and commodity prices from 20+ countries. Build a unified dashboard that highlights regime changes and generates macro trade recommendations.',
-      category: 'Finance',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 6.75C4.75 5.64543 5.64543 4.75 6.75 4.75H17.25C18.3546 4.75 19.25 5.64543 19.25 6.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V6.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75V19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5 8.25H19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1532153975070-2e9ab71f1b14?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/macro-dashboard',
-    },
-    {
-      id: 'esg-scoring-engine',
-      title: 'Custom ESG Score Calculator',
-      description:
-        'Build proprietary ESG scores for S&P 500 companies using alternative data: carbon emissions, board diversity stats, supply chain audits, and whistleblower reports. Compare against MSCI ratings for alpha.',
-      category: 'Finance',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 11.75L10.25 6.25L14.75 10.75L19.25 6.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5.75 19.25H18.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M12 11.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1552581234-26160f608093?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/esg-scoring',
-    },
-
-    // Recruitment Category - 8 examples
-    {
-      id: 'github-talent-scout',
-      title: 'Elite Developer Talent Finder',
-      description:
-        'Identify top 1% Python developers by analyzing GitHub contributions, pull request quality, issue discussions, and open source project leadership. Generate shortlists with contact info and salary expectations.',
-      category: 'Recruitment',
-      featured: true,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M5.75 19.2502H18.25C18.8023 19.2502 19.25 18.8025 19.25 18.2502V5.75C19.25 5.19772 18.8023 4.75 18.25 4.75H5.75C5.19772 4.75 4.75 5.19772 4.75 5.75V18.2502C4.75 18.8025 5.19772 19.2502 5.75 19.2502Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75C9.75 9.44036 9.19036 10 8.5 10C7.80964 10 7.25 9.44036 7.25 8.75C7.25 8.05964 7.80964 7.5 8.5 7.5C9.19036 7.5 9.75 8.05964 9.75 8.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M19.25 13.75L14.75 9.25L7.25 16.75"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1523580494863-6f3031224c94?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/github-talent',
-    },
-    {
-      id: 'university-pipeline',
-      title: 'Campus Recruiting Pipeline Builder',
-      description:
-        'Scrape computer science graduation rosters from top 50 universities. Cross-reference Hackathon winners, research papers, and professor recommendations to build a pre-graduation talent pipeline for early offers.',
-      category: 'Recruitment',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M17.25 10C17.25 12.8995 14.8995 15.25 12 15.25C9.10051 15.25 6.75 12.8995 6.75 10C6.75 7.10051 9.10051 4.75 12 4.75C14.8995 4.75 17.25 7.10051 17.25 10Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8.25 14.75L5.25 19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M15.75 14.75L18.75 19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/university-pipeline',
-    },
-    {
-      id: 'executive-headhunting',
-      title: 'C-Level Executive Profiler',
-      description:
-        'Build comprehensive profiles of 100+ CXOs in the SaaS vertical. Aggregate career trajectories, board positions, speaking engagements, and compensation history to identify ideal candidates for board advisor roles.',
-      category: 'Recruitment',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 8.75C4.75 7.64543 5.64543 6.75 6.75 6.75H17.25C18.3546 6.75 19.25 7.64543 19.25 8.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V8.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8 4.75V8.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M16 4.75V8.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M7.75 10.75H16.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/executive-headhunting',
-    },
-    {
-      id: 'skills-gap-analyzer',
-      title: 'Industry Skills Gap Mapper',
-      description:
-        'Analyze 10,000+ job postings in fintech to identify most-demanded skills versus available talent pool. Generate heat maps showing geographic skills shortages and recommend training programs to close gaps.',
-      category: 'Recruitment',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 6.75C4.75 5.64543 5.64543 4.75 6.75 4.75H17.25C18.3546 4.75 19.25 5.64543 19.25 6.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V6.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75V19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5 8.25H19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1532153975070-2e9ab71f1b14?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/skills-gap',
-    },
-    {
-      id: 'passive-candidate-engagement',
-      title: 'Passive Candidate Warmup Engine',
-      description:
-        'Identify software engineers at competitor companies with low LinkedIn activity but high tenure. Generate personalized outreach sequences based on their interests, side projects, and career aspirations.',
-      category: 'Recruitment',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M5.75 19.2502H18.25C18.8023 19.2502 19.25 18.8025 19.25 18.2502V5.75C19.25 5.19772 18.8023 4.75 18.25 4.75H5.75C5.19772 4.75 4.75 5.19772 4.75 5.75V18.2502C4.75 18.8025 5.19772 19.2502 5.75 19.2502Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75C9.75 9.44036 9.19036 10 8.5 10C7.80964 10 7.25 9.44036 7.25 8.75C7.25 8.05964 7.80964 7.5 8.5 7.5C9.19036 7.5 9.75 8.05964 9.75 8.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M19.25 13.75L14.75 9.25L7.25 16.75"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1523580494863-6f3031224c94?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/passive-candidates',
-    },
-    {
-      id: 'diversity-sourcing',
-      title: 'Diversity Pipeline Accelerator',
-      description:
-        'Source underrepresented talent from 50+ diversity-focused tech communities, bootcamps, and scholarship programs. Build curated candidate pools with verified credentials and culture-fit scoring.',
-      category: 'Recruitment',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 6.75C4.75 5.64543 5.64543 4.75 6.75 4.75H17.25C18.3546 4.75 19.25 5.64543 19.25 6.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V6.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75V19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5 8.25H19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1532153975070-2e9ab71f1b14?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/diversity-sourcing',
-    },
-    {
-      id: 'remote-talent-arbitrage',
-      title: 'Global Remote Talent Cost Optimizer',
-      description:
-        'Map salary expectations for senior engineers across 30 countries with strong tech talent. Factor in time zones, language skills, and cost-of-living to identify optimal hiring locations for remote-first teams.',
-      category: 'Recruitment',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 11.75L10.25 6.25L14.75 10.75L19.25 6.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5.75 19.25H18.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M12 11.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1552581234-26160f608093?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/remote-arbitrage',
-    },
-    {
-      id: 'interview-prep-intelligence',
-      title: 'Candidate Interview Intelligence',
-      description:
-        'Research candidates before interviews by aggregating their blog posts, conference talks, open source contributions, and online presence. Generate talking points and technical questions tailored to their expertise.',
-      category: 'Recruitment',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 11.75L10.25 6.25L14.75 10.75L19.25 6.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M19.25 6.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M4.75 6.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M4.75 19.25H19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/interview-prep',
-    },
-    {
-      id: 'competitor-layoff-tracker',
-      title: 'Competitor Layoff Opportunity Mapper',
-      description:
-        'Monitor tech company layoff announcements, WARN notices, and employee LinkedIn updates. Instantly identify newly available talent from target companies and automate first-touch outreach within 24 hours.',
-      category: 'Recruitment',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M17.25 10C17.25 12.8995 14.8995 15.25 12 15.25C9.10051 15.25 6.75 12.8995 6.75 10C6.75 7.10051 9.10051 4.75 12 4.75C14.8995 4.75 17.25 7.10051 17.25 10Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8.25 14.75L5.25 19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M15.75 14.75L18.75 19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/layoff-tracker',
-    },
-
-    // Travel Category - 8 examples
-    {
-      id: 'visa-optimization',
-      title: 'Multi-Country Visa Pathway Planner',
-      description:
-        'Plan a 6-month digital nomad journey across 12 countries. Automatically calculate visa requirements, length-of-stay limits, entry restrictions, and optimal routing to maximize visa-free travel and minimize application complexity.',
-      category: 'Travel',
+        "Generate a route plan for my company. We should go to California. We'll be 8 people. Compose the trip from the departure (Paris, France) to the activities we can do considering that the trip will be 7 days long - departure on the 21st of Jun 2025.",
+      category: 'travel',
       featured: true,
       icon: (
         <svg
@@ -2312,317 +1354,14 @@ export const siteConfig = {
       ),
       image:
         'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/visa-optimization',
+      url: 'https://iris.so/share/23f7d904-eb66-4a9c-9247-b9704ddfd233',
     },
     {
-      id: 'hidden-gems-finder',
-      title: 'Undiscovered Destination Scout',
+      id: 'excel-spreadsheet',
+      title: 'Working on Excel',
       description:
-        'Find 20 underrated travel destinations in Southeast Asia with <5000 annual tourists, high-speed internet, low cost of living, and English-speaking communities. Rank by safety scores and expat infrastructure quality.',
-      category: 'Travel',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M12 4.75L19.25 9L12 13.25L4.75 9L12 4.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.25 11.5L4.75 14L12 18.25L19.25 14L14.6722 11.5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1444653614773-995cb1ef9efa?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/hidden-gems',
-    },
-    {
-      id: 'flight-deals-arbitrage',
-      title: 'Error Fare & Mistake Price Hunter',
-      description:
-        'Monitor airline pricing APIs 24/7 for mistake fares, fuel surcharge glitches, and currency conversion errors. Alert within minutes of business class tickets priced at economy rates for immediate booking.',
-      category: 'Travel',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M17.25 10C17.25 12.8995 14.8995 15.25 12 15.25C9.10051 15.25 6.75 12.8995 6.75 10C6.75 7.10051 9.10051 4.75 12 4.75C14.8995 4.75 17.25 7.10051 17.25 10Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8.25 14.75L5.25 19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M15.75 14.75L18.75 19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/flight-arbitrage',
-    },
-    {
-      id: 'culinary-tourism-planner',
-      title: 'Michelin Star Dining Marathon',
-      description:
-        'Design a 3-week European tour hitting 30 Michelin-starred restaurants. Optimize for reservation availability, minimize travel time between cities, and suggest complementary wine tours and food markets in each region.',
-      category: 'Travel',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 6.75C4.75 5.64543 5.64543 4.75 6.75 4.75H17.25C18.3546 4.75 19.25 5.64543 19.25 6.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V6.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75V19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5 8.25H19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1532153975070-2e9ab71f1b14?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/culinary-tour',
-    },
-    {
-      id: 'adventure-risk-assessment',
-      title: 'Extreme Adventure Safety Scorer',
-      description:
-        'Research volcano hiking in Indonesia, cave diving in Mexico, and paragliding in Switzerland. Assess operator safety records, insurance requirements, weather patterns, and medical facility proximity for each activity.',
-      category: 'Travel',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M5.75 19.2502H18.25C18.8023 19.2502 19.25 18.8025 19.25 18.2502V5.75C19.25 5.19772 18.8023 4.75 18.25 4.75H5.75C5.19772 4.75 4.75 5.19772 4.75 5.75V18.2502C4.75 18.8025 5.19772 19.2502 5.75 19.2502Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75C9.75 9.44036 9.19036 10 8.5 10C7.80964 10 7.25 9.44036 7.25 8.75C7.25 8.05964 7.80964 7.5 8.5 7.5C9.19036 7.5 9.75 8.05964 9.75 8.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M19.25 13.75L14.75 9.25L7.25 16.75"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1523580494863-6f3031224c94?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/adventure-safety',
-    },
-    {
-      id: 'festival-circuit-optimizer',
-      title: 'Music Festival Circuit Planner',
-      description:
-        'Plan attendance at 15 major music festivals across North America and Europe in summer 2025. Optimize travel routes, compare ticket packages, track lineup announcements, and suggest budget accommodation options.',
-      category: 'Travel',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 11.75L10.25 6.25L14.75 10.75L19.25 6.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5.75 19.25H18.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M12 11.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1552581234-26160f608093?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/festival-circuit',
-    },
-    {
-      id: 'slow-travel-sustainability',
-      title: 'Carbon-Neutral Travel Route Designer',
-      description:
-        'Plan a 4-month slow travel journey prioritizing trains over flights. Calculate carbon footprint for each leg, recommend eco-certified hotels, identify zero-waste restaurants, and offset unavoidable emissions.',
-      category: 'Travel',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 11.75L10.25 6.25L14.75 10.75L19.25 6.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M19.25 6.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M4.75 6.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M4.75 19.25H19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/sustainable-travel',
-    },
-    {
-      id: 'photography-location-scout',
-      title: 'Instagram-Worthy Location Hunter',
-      description:
-        'Find the 50 most photogenic spots in Iceland with optimal lighting times, crowd levels, equipment recommendations, and exact GPS coordinates. Include hidden gems not yet overrun by influencers.',
-      category: 'Travel',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 8.75C4.75 7.64543 5.64543 6.75 6.75 6.75H17.25C18.3546 6.75 19.25 7.64543 19.25 8.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V8.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8 4.75V8.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M16 4.75V8.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M7.75 10.75H16.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/photography-scout',
-    },
-
-    // Data Category - 8 examples
-    {
-      id: 'dataset-aggregator',
-      title: 'Cross-Platform Dataset Merger',
-      description:
-        'Combine customer data from Salesforce, Stripe, Intercom, and Google Analytics. Resolve duplicate entries, normalize schemas, enrich with demographic data, and export unified customer profiles to Snowflake.',
-      category: 'Data',
+        'My company asked to set up an Excel spreadsheet with all the information about Italian lottery games (Lotto, 10eLotto, and Million Day). Based on that, generate and send me a spreadsheet with all the basic information (public ones).',
+      category: 'data',
       featured: true,
       icon: (
         <svg
@@ -2657,183 +1396,15 @@ export const siteConfig = {
       ),
       image:
         'https://images.unsplash.com/photo-1532153975070-2e9ab71f1b14?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/dataset-merger',
+      url: 'https://iris.so/share/2a147a3a-3778-4624-8285-42474c8c1c9c',
     },
     {
-      id: 'web-scraping-pipeline',
-      title: 'Real Estate Listing Aggregator',
+      id: 'speaker-prospecting',
+      title: 'Automate Event Speaker Prospecting',
       description:
-        'Scrape 50,000+ property listings from Zillow, Realtor.com, and Redfin daily. Extract prices, square footage, amenities, and listing history. Detect price drops and new listings matching specific criteria.',
-      category: 'Data',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M12 4.75L19.25 9L12 13.25L4.75 9L12 4.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.25 11.5L4.75 14L12 18.25L19.25 14L14.6722 11.5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1444653614773-995cb1ef9efa?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/real-estate-scraper',
-    },
-    {
-      id: 'sentiment-time-series',
-      title: 'Brand Sentiment Time Series Analyzer',
-      description:
-        'Track brand mentions across Twitter, Reddit, and review sites over 12 months. Build sentiment time series, correlate with product launches and PR events, and forecast reputation trajectory using ARIMA models.',
-      category: 'Data',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M17.25 10C17.25 12.8995 14.8995 15.25 12 15.25C9.10051 15.25 6.75 12.8995 6.75 10C6.75 7.10051 9.10051 4.75 12 4.75C14.8995 4.75 17.25 7.10051 17.25 10Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8.25 14.75L5.25 19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M15.75 14.75L18.75 19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/sentiment-analysis',
-    },
-    {
-      id: 'excel-automation',
-      title: 'Monthly Financial Report Automator',
-      description:
-        'Pull data from 8 different accounting systems, reconcile transactions, calculate KPIs, generate P&L statements, and build Excel dashboards with pivot tables and charts - all automatically on the 1st of each month.',
-      category: 'Data',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 8.75C4.75 7.64543 5.64543 6.75 6.75 6.75H17.25C18.3546 6.75 19.25 7.64543 19.25 8.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V8.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8 4.75V8.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M16 4.75V8.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M7.75 10.75H16.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/excel-automation',
-    },
-    {
-      id: 'data-quality-auditor',
-      title: 'Database Health & Quality Checker',
-      description:
-        'Audit 10M+ database records for missing values, duplicate entries, schema violations, and referential integrity issues. Generate data quality scores by table and recommend cleanup priorities.',
-      category: 'Data',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 6.75C4.75 5.64543 5.64543 4.75 6.75 4.75H17.25C18.3546 4.75 19.25 5.64543 19.25 6.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V6.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75V19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5 8.25H19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1532153975070-2e9ab71f1b14?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/data-quality',
-    },
-    {
-      id: 'api-data-pipeline',
-      title: 'Multi-API Data Warehouse Builder',
-      description:
-        'Set up automated ETL pipelines pulling from 15 APIs (Shopify, HubSpot, AWS, etc.). Transform data with custom business logic, load into BigQuery, and schedule incremental updates every hour.',
-      category: 'Data',
-      featured: false,
+        "Find 20 AI ethics speakers from Europe who've spoken at conferences in the past year. Scrapes conference sites, cross-references LinkedIn and YouTube, and outputs contact info + talk summaries.",
+      category: 'research',
+      featured: true,
       icon: (
         <svg
           width="24"
@@ -2867,15 +1438,15 @@ export const siteConfig = {
       ),
       image:
         'https://images.unsplash.com/photo-1523580494863-6f3031224c94?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/api-pipeline',
+      url: 'https://iris.so/share/6830cc6d-3fbd-492a-93f8-510a5f48ce50',
     },
     {
-      id: 'pdf-data-extractor',
-      title: 'Invoice & Receipt Data Extractor',
+      id: 'scientific-papers',
+      title: 'Summarize and Cross-Reference Scientific Papers',
       description:
-        'Process 1000+ PDF invoices and receipts. Extract vendor names, amounts, dates, line items, and tax info using OCR. Structure data into standardized format and flag anomalies for manual review.',
-      category: 'Data',
-      featured: false,
+        'Research and compare scientific papers talking about Alcohol effects on our bodies during the last 5 years. Generate a report about the most important scientific papers talking about the topic I wrote before.',
+      category: 'research',
+      featured: true,
       icon: (
         <svg
           width="24"
@@ -2885,21 +1456,21 @@ export const siteConfig = {
           xmlns="http://www.w3.org/2000/svg"
         >
           <path
-            d="M4.75 11.75L10.25 6.25L14.75 10.75L19.25 6.25"
+            d="M4.75 6.75C4.75 5.64543 5.64543 4.75 6.75 4.75H17.25C18.3546 4.75 19.25 5.64543 19.25 6.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V6.75Z"
             stroke="currentColor"
             strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
           <path
-            d="M5.75 19.25H18.25"
+            d="M9.75 8.75V19"
             stroke="currentColor"
             strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
           <path
-            d="M12 11.25V19.25"
+            d="M5 8.25H19"
             stroke="currentColor"
             strokeWidth="1.5"
             strokeLinecap="round"
@@ -2908,66 +1479,15 @@ export const siteConfig = {
         </svg>
       ),
       image:
-        'https://images.unsplash.com/photo-1552581234-26160f608093?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/pdf-extractor',
+        'https://images.unsplash.com/photo-1532153975070-2e9ab71f1b14?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
+      url: 'https://iris.so/share/a106ef9f-ed97-46ee-8e51-7bfaf2ac3c29',
     },
     {
-      id: 'predictive-churn-model',
-      title: 'Customer Churn Prediction Engine',
+      id: 'lead-generation',
+      title: 'Research + First Contact Draft',
       description:
-        'Analyze 3 years of customer behavior data: login frequency, feature usage, support tickets, and billing history. Train ML model to predict churn probability and identify at-risk accounts 30 days in advance.',
-      category: 'Data',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 11.75L10.25 6.25L14.75 10.75L19.25 6.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M19.25 6.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M4.75 6.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M4.75 19.25H19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/churn-prediction',
-    },
-
-    // Sales Category - 8 examples
-    {
-      id: 'lead-enrichment-engine',
-      title: 'Automated Lead Enrichment Pipeline',
-      description:
-        'Take raw email lists and enrich with company size, revenue, tech stack, funding history, decision-maker contacts, and intent signals. Score leads by ICP fit and route to appropriate sales reps.',
-      category: 'Sales',
+        'Research my potential customers (B2B) on LinkedIn. They should be in the clean tech industry. Find their websites and their email addresses. After that, based on the company profile, generate a personalized first contact email.',
+      category: 'sales',
       featured: true,
       icon: (
         <svg
@@ -3002,366 +1522,14 @@ export const siteConfig = {
       ),
       image:
         'https://images.unsplash.com/photo-1552581234-26160f608093?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/lead-enrichment',
+      url: 'https://iris.so/share/c3472df7-adc1-4d5f-9927-4f8f513ec2fe',
     },
     {
-      id: 'competitor-intel-dossier',
-      title: 'Deal Competitor Intelligence Builder',
+      id: 'seo-analysis',
+      title: 'SEO Analysis',
       description:
-        'When a prospect mentions competitors, instantly compile battle cards: pricing comparisons, feature gaps, customer reviews, recent product launches, and recommended positioning to differentiate your solution.',
-      category: 'Sales',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 11.75L10.25 6.25L14.75 10.75L19.25 6.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M19.25 6.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M4.75 6.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M4.75 19.25H19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/competitor-intel',
-    },
-    {
-      id: 'proposal-generator',
-      title: 'Custom Proposal & ROI Calculator',
-      description:
-        'Generate tailored sales proposals by pulling prospect company data, calculating ROI based on their metrics, inserting relevant case studies, and customizing pricing tables - all automatically from Salesforce opportunity data.',
-      category: 'Sales',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 8.75C4.75 7.64543 5.64543 6.75 6.75 6.75H17.25C18.3546 6.75 19.25 7.64543 19.25 8.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V8.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8 4.75V8.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M16 4.75V8.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M7.75 10.75H16.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/proposal-generator',
-    },
-    {
-      id: 'cold-email-personalization',
-      title: 'Hyper-Personalized Cold Email Engine',
-      description:
-        'Research each prospect company, find recent news mentions, identify pain points from job postings, and generate unique cold emails referencing specific challenges - no templates, every email custom-written.',
-      category: 'Sales',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M12 4.75L19.25 9L12 13.25L4.75 9L12 4.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.25 11.5L4.75 14L12 18.25L19.25 14L14.6722 11.5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1444653614773-995cb1ef9efa?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/cold-email',
-    },
-    {
-      id: 'account-territory-mapper',
-      title: 'Territory & Account Assignment Optimizer',
-      description:
-        'Analyze 5000+ accounts by geography, revenue potential, industry vertical, and relationship history. Optimally distribute accounts across sales team to balance workload and maximize win probability.',
-      category: 'Sales',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M17.25 10C17.25 12.8995 14.8995 15.25 12 15.25C9.10051 15.25 6.75 12.8995 6.75 10C6.75 7.10051 9.10051 4.75 12 4.75C14.8995 4.75 17.25 7.10051 17.25 10Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8.25 14.75L5.25 19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M15.75 14.75L18.75 19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/territory-mapper',
-    },
-    {
-      id: 'referral-network-builder',
-      title: 'Customer Referral Network Mapper',
-      description:
-        'Analyze LinkedIn connections between your customers and target accounts. Identify warm introduction paths, calculate relationship strength scores, and draft personalized referral request messages.',
-      category: 'Sales',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 6.75C4.75 5.64543 5.64543 4.75 6.75 4.75H17.25C18.3546 4.75 19.25 5.64543 19.25 6.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V6.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75V19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5 8.25H19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1532153975070-2e9ab71f1b14?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/referral-network',
-    },
-    {
-      id: 'win-loss-analyzer',
-      title: 'Deal Win/Loss Pattern Detector',
-      description:
-        'Analyze 500+ closed deals to identify win/loss patterns. Extract common objections, deal velocity trends, pricing sensitivities, and champion personas. Generate playbooks for improving close rates.',
-      category: 'Sales',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M5.75 19.2502H18.25C18.8023 19.2502 19.25 18.8025 19.25 18.2502V5.75C19.25 5.19772 18.8023 4.75 18.25 4.75H5.75C5.19772 4.75 4.75 5.19772 4.75 5.75V18.2502C4.75 18.8025 5.19772 19.2502 5.75 19.2502Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75C9.75 9.44036 9.19036 10 8.5 10C7.80964 10 7.25 9.44036 7.25 8.75C7.25 8.05964 7.80964 7.5 8.5 7.5C9.19036 7.5 9.75 8.05964 9.75 8.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M19.25 13.75L14.75 9.25L7.25 16.75"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1523580494863-6f3031224c94?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/win-loss',
-    },
-    {
-      id: 'contract-renewal-predictor',
-      title: 'Contract Renewal Risk Scorer',
-      description:
-        'Predict renewal likelihood 90 days before contract end using product usage data, support ticket sentiment, executive engagement, and payment history. Trigger proactive retention workflows for at-risk accounts.',
-      category: 'Sales',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 11.75L10.25 6.25L14.75 10.75L19.25 6.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5.75 19.25H18.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M12 11.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1552581234-26160f608093?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/renewal-predictor',
-    },
-    {
-      id: 'linkedin-engagement-automator',
-      title: 'LinkedIn Social Selling Automator',
-      description:
-        'Monitor target accounts for job changes, funding announcements, and content posts. Automatically engage with relevant posts, draft congratulatory messages, and schedule personalized connection requests at optimal times.',
-      category: 'Sales',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 11.75L10.25 6.25L14.75 10.75L19.25 6.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M19.25 6.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M4.75 6.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M4.75 19.25H19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/linkedin-automation',
-    },
-
-    // Marketing Category - 8 examples
-    {
-      id: 'content-gap-analyzer',
-      title: 'SEO Content Gap & Opportunity Finder',
-      description:
-        'Compare your content library against top 10 competitors for 100+ target keywords. Identify missing topics, low-quality pages to refresh, and high-value keywords where you can rank with strategic content.',
-      category: 'Marketing',
+        "Based on my website iris.so, generate an SEO report analysis, find top-ranking pages by keyword clusters, and identify topics I'm missing.",
+      category: 'marketing',
       featured: true,
       icon: (
         <svg
@@ -3403,310 +1571,14 @@ export const siteConfig = {
       ),
       image:
         'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/content-gap',
+      url: 'https://iris.so/share/cf756e02-fee9-4281-a0e4-76ac850f1ac9',
     },
     {
-      id: 'influencer-campaign-matcher',
-      title: 'Micro-Influencer Discovery Engine',
+      id: 'personal-trip',
+      title: 'Generate a Personal Trip',
       description:
-        'Find 200+ micro-influencers (10K-100K followers) in your niche with genuine engagement rates above 5%. Analyze audience demographics, past brand partnerships, and typical pricing to build outreach lists.',
-      category: 'Marketing',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 11.75L10.25 6.25L14.75 10.75L19.25 6.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5.75 19.25H18.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M12 11.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1552581234-26160f608093?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/influencer-finder',
-    },
-    {
-      id: 'campaign-attribution-model',
-      title: 'Multi-Touch Attribution Analyzer',
-      description:
-        'Build custom attribution models across 8 marketing channels. Track customer journey touchpoints from first anonymous visit to closed deal. Calculate true channel ROI and optimize budget allocation.',
-      category: 'Marketing',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 8.75C4.75 7.64543 5.64543 6.75 6.75 6.75H17.25C18.3546 6.75 19.25 7.64543 19.25 8.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V8.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8 4.75V8.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M16 4.75V8.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M7.75 10.75H16.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/attribution',
-    },
-    {
-      id: 'viral-content-predictor',
-      title: 'Viral Content Trend Forecaster',
-      description:
-        'Analyze trending topics across Twitter, TikTok, and Reddit in real-time. Predict which trends will go mainstream in 24-48 hours. Generate content briefs to capitalize on emerging viral moments before competitors.',
-      category: 'Marketing',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M12 4.75L19.25 9L12 13.25L4.75 9L12 4.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.25 11.5L4.75 14L12 18.25L19.25 14L14.6722 11.5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1444653614773-995cb1ef9efa?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/viral-trends',
-    },
-    {
-      id: 'email-segment-optimizer',
-      title: 'Behavioral Email Segmentation Engine',
-      description:
-        'Segment email list into 20+ micro-audiences based on website behavior, email engagement history, product interests, and lifecycle stage. Generate personalized campaigns for each segment automatically.',
-      category: 'Marketing',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M17.25 10C17.25 12.8995 14.8995 15.25 12 15.25C9.10051 15.25 6.75 12.8995 6.75 10C6.75 7.10051 9.10051 4.75 12 4.75C14.8995 4.75 17.25 7.10051 17.25 10Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8.25 14.75L5.25 19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M15.75 14.75L18.75 19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/email-segmentation',
-    },
-    {
-      id: 'competitor-ad-spy',
-      title: 'Competitor Advertising Intelligence',
-      description:
-        'Track competitor Google Ads, Facebook ads, and landing pages. Identify their top-performing creatives, keyword strategies, and messaging angles. Generate counter-positioning ad copy and creative briefs.',
-      category: 'Marketing',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 6.75C4.75 5.64543 5.64543 4.75 6.75 4.75H17.25C18.3546 4.75 19.25 5.64543 19.25 6.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V6.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75V19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5 8.25H19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1532153975070-2e9ab71f1b14?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/ad-spy',
-    },
-    {
-      id: 'social-listening-alerts',
-      title: 'Real-Time Brand Mention Monitor',
-      description:
-        'Track brand mentions across social media, forums, review sites, and news in real-time. Identify crisis moments, respond to customer complaints immediately, and amplify positive sentiment with engagement.',
-      category: 'Marketing',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M5.75 19.2502H18.25C18.8023 19.2502 19.25 18.8025 19.25 18.2502V5.75C19.25 5.19772 18.8023 4.75 18.25 4.75H5.75C5.19772 4.75 4.75 5.19772 4.75 5.75V18.2502C4.75 18.8025 5.19772 19.2502 5.75 19.2502Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75C9.75 9.44036 9.19036 10 8.5 10C7.80964 10 7.25 9.44036 7.25 8.75C7.25 8.05964 7.80964 7.5 8.5 7.5C9.19036 7.5 9.75 8.05964 9.75 8.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M19.25 13.75L14.75 9.25L7.25 16.75"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1523580494863-6f3031224c94?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/social-listening',
-    },
-    {
-      id: 'landing-page-optimizer',
-      title: 'A/B Test Hypothesis Generator',
-      description:
-        'Analyze landing page performance across 20+ metrics. Use heatmaps, scroll depth, and conversion funnels to identify friction points. Generate prioritized A/B test ideas with predicted impact on conversion rates.',
-      category: 'Marketing',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 11.75L10.25 6.25L14.75 10.75L19.25 6.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5.75 19.25H18.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M12 11.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1552581234-26160f608093?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/ab-testing',
-    },
-
-    // All Category - 8 assorted examples from different categories
-    {
-      id: 'all-quantum-research',
-      title: 'Quantum Computing Patent Landscape',
-      description:
-        'Map all quantum computing patents filed globally in the last 3 years. Identify key players, technology clusters, citation networks, and emerging sub-fields to inform R&D strategy and competitive positioning.',
-      category: 'All',
+        'Generate a personal trip to London, with departure from Bangkok on the 1st of May. The trip will last 10 days. Find an accommodation in the center of London, with a rating on Google reviews of at least 4.5.',
+      category: 'travel',
       featured: true,
       icon: (
         <svg
@@ -3717,139 +1589,6 @@ export const siteConfig = {
           xmlns="http://www.w3.org/2000/svg"
         >
           <path
-            d="M7.75 19.25H16.25C17.3546 19.25 18.25 18.3546 18.25 17.25V8.75L13.75 4.25H7.75C6.64543 4.25 5.75 5.14543 5.75 6.25V17.25C5.75 18.3546 6.64543 19.25 7.75 19.25Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M18 9L14 9C13.4477 9 13 8.55228 13 8L13 4"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.5 14.5L11 13L12.5 14.5L14.5 12.5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1576091160550-2173dba999ef?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/quantum-research',
-    },
-    {
-      id: 'all-crypto-whale-tracker',
-      title: 'Crypto Whale Movement Detector',
-      description:
-        'Monitor on-chain data for large cryptocurrency transfers (>$10M) across Bitcoin, Ethereum, and 20 other chains. Correlate whale movements with price action and exchange flows to predict market volatility.',
-      category: 'All',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 11.75L10.25 6.25L14.75 10.75L19.25 6.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M19.25 6.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M4.75 6.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M4.75 19.25H19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/whale-tracker',
-    },
-    {
-      id: 'all-ai-engineer-sourcing',
-      title: 'AI/ML Specialist Talent Pool Builder',
-      description:
-        'Build a database of 5000+ AI/ML engineers by scraping research papers, GitHub repos, Kaggle competitions, and conference speaker lists. Rank by publication impact, code quality, and specialization areas.',
-      category: 'All',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M17.25 10C17.25 12.8995 14.8995 15.25 12 15.25C9.10051 15.25 6.75 12.8995 6.75 10C6.75 7.10051 9.10051 4.75 12 4.75C14.8995 4.75 17.25 7.10051 17.25 10Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8.25 14.75L5.25 19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M15.75 14.75L18.75 19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/ai-talent',
-    },
-    {
-      id: 'all-nomad-relocation',
-      title: 'Digital Nomad Tax Optimization Planner',
-      description:
-        'Calculate optimal country rotation for digital nomads to minimize tax liability while maintaining legal residency. Factor in tax treaties, 183-day rules, cost of living, and quality of life scores.',
-      category: 'All',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
             d="M4.75 8.75C4.75 7.64543 5.64543 6.75 6.75 6.75H17.25C18.3546 6.75 19.25 7.64543 19.25 8.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V8.75Z"
             stroke="currentColor"
             strokeWidth="1.5"
@@ -3881,15 +1620,15 @@ export const siteConfig = {
       ),
       image:
         'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/nomad-tax',
+      url: 'https://iris.so/share/8442cc76-ac8b-438c-b539-4b93909a2218',
     },
     {
-      id: 'all-ecommerce-scraper',
-      title: 'E-commerce Price & Inventory Monitor',
+      id: 'funded-startups',
+      title: 'Recently Funded Startups',
       description:
-        'Track pricing and stock levels for 10,000+ products across Amazon, Walmart, and niche retailers. Detect pricing patterns, stockouts, and MAP violations. Automate dynamic repricing recommendations.',
-      category: 'All',
-      featured: false,
+        'Go on Crunchbase, Dealroom, and TechCrunch, filter by Series A funding rounds in the SaaS Finance Space, and build a report with company data, founders, and contact info for outbound sales.',
+      category: 'finance',
+      featured: true,
       icon: (
         <svg
           width="24"
@@ -3916,99 +1655,15 @@ export const siteConfig = {
       ),
       image:
         'https://images.unsplash.com/photo-1444653614773-995cb1ef9efa?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/ecommerce-monitor',
+      url: 'https://iris.so/share/f04c871c-6bf5-4464-8e9c-5351c9cf5a60',
     },
     {
-      id: 'all-account-scoring',
-      title: 'Enterprise Account Scoring Model',
+      id: 'scrape-forums',
+      title: 'Scrape Forum Discussions',
       description:
-        'Build predictive lead scoring model using firmographic data, technographic signals, web behavior, and intent data from 6sense/Bombora. Prioritize accounts most likely to convert in next 90 days.',
-      category: 'All',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 11.75L10.25 6.25L14.75 10.75L19.25 6.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5.75 19.25H18.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M12 11.25V19.25"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1552581234-26160f608093?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/account-scoring',
-    },
-    {
-      id: 'all-podcast-intelligence',
-      title: 'Podcast Guest & Topic Trend Analyzer',
-      description:
-        'Analyze transcripts from 500+ top business podcasts. Identify trending topics, emerging thought leaders, guest booking patterns, and optimal talking points for thought leadership positioning.',
-      category: 'All',
-      featured: false,
-      icon: (
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4.75 6.75C4.75 5.64543 5.64543 4.75 6.75 4.75H17.25C18.3546 4.75 19.25 5.64543 19.25 6.75V17.25C19.25 18.3546 18.3546 19.25 17.25 19.25H6.75C5.64543 19.25 4.75 18.3546 4.75 17.25V6.75Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.75 8.75V19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5 8.25H19"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      image:
-        'https://images.unsplash.com/photo-1532153975070-2e9ab71f1b14?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/podcast-trends',
-    },
-    {
-      id: 'all-grant-opportunity-finder',
-      title: 'R&D Grant & Funding Opportunity Tracker',
-      description:
-        'Monitor government grants, SBIR/STTR programs, and private foundation funding opportunities matching your research focus. Track deadlines, eligibility criteria, and historical award data to optimize applications.',
-      category: 'All',
-      featured: false,
+        'I need to find the best beauty centers in Rome, but I want to find them by using open forums that speak about this topic. Go on Google, and scrape the forums by looking for beauty center discussions located in Rome.',
+      category: 'research',
+      featured: true,
       icon: (
         <svg
           width="24"
@@ -4042,7 +1697,7 @@ export const siteConfig = {
       ),
       image:
         'https://images.unsplash.com/photo-1523580494863-6f3031224c94?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2400&q=80',
-      url: 'https://iris.so/share/grant-finder',
+      url: 'https://iris.so/share/53bcd4c7-40d6-4293-9f69-e2638ddcfad8',
     },
   ],
 };

@@ -189,9 +189,13 @@ export function NavUserWithTeams({
                 size="lg"
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               >
-                <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">
+                <Avatar className="h-9 w-9 rounded-full relative shadow-[0_4px_12px_rgba(0,0,0,0.15),0_2px_4px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] ring-2 ring-black/10 dark:ring-white/10 hover:ring-black/20 dark:hover:ring-white/20 transition-all duration-300 hover:shadow-[0_6px_16px_rgba(0,0,0,0.2),0_3px_6px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.15)] dark:hover:shadow-[0_6px_16px_rgba(0,0,0,0.5),0_3px_6px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] hover:scale-105">
+                  <AvatarImage 
+                    src={user.avatar} 
+                    alt={user.name}
+                    className="object-cover rounded-full"
+                  />
+                  <AvatarFallback className="rounded-full backdrop-blur-md bg-white/20 dark:bg-white/10 border border-white/30 dark:border-white/20 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.2)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3),inset_0_0_0_1px_rgba(255,255,255,0.15)] text-foreground font-semibold text-xs">
                     {getInitials(user.name)}
                   </AvatarFallback>
                 </Avatar>
@@ -221,9 +225,13 @@ export function NavUserWithTeams({
               <div className="relative">
                 <div className="relative rounded-2xl border border-black/10 bg-black/5 p-3 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)] transition-all duration-300 dark:border-white/10 dark:bg-white/5 dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10 rounded-xl ring-1 ring-black/10 dark:ring-white/10">
-                      <AvatarImage src={user.avatar} alt={user.name} />
-                      <AvatarFallback className="rounded-xl bg-black/10 text-black/80 dark:bg-white/10 dark:text-white/80">
+                    <Avatar className="h-10 w-10 rounded-full relative shadow-[0_4px_12px_rgba(0,0,0,0.15),0_2px_4px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] ring-2 ring-black/10 dark:ring-white/10">
+                      <AvatarImage 
+                        src={user.avatar} 
+                        alt={user.name}
+                        className="object-cover rounded-full"
+                      />
+                      <AvatarFallback className="rounded-full backdrop-blur-md bg-white/20 dark:bg-white/10 border border-white/30 dark:border-white/20 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.2)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3),inset_0_0_0_1px_rgba(255,255,255,0.15)] text-foreground font-semibold">
                         {getInitials(user.name)}
                       </AvatarFallback>
                     </Avatar>
@@ -236,7 +244,7 @@ export function NavUserWithTeams({
               </div>
 
               {/* Teams Section */}
-              {teamAccounts?.length > 0 && (
+              {teamAccounts && teamAccounts.length > 0 && (
                 <div className="mt-4 space-y-2">
                   <div className="rounded-2xl border border-black/10 bg-black/5 p-2 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)] transition-all duration-300 hover:bg-black/8 hover:border-black/15 dark:border-white/10 dark:bg-white/5 dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] dark:hover:bg-white/8 dark:hover:border-white/15">
                     <div className="text-xs text-black/50 mb-2 px-1 dark:text-white/50">Teams</div>
