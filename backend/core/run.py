@@ -503,6 +503,7 @@ Remember: The user sent this message because they want you to respond to it NOW.
 class AgentRunner:
     def __init__(self, config: AgentConfig):
         self.config = config
+        self.iris_context = None  # Iris infrastructure context (optional)
     
     async def setup(self):
         if not self.config.trace:
@@ -534,6 +535,57 @@ class AgentRunner:
         sandbox_info = project_data.get('sandbox', {})
         if not sandbox_info.get('id'):
             logger.debug(f"No sandbox found for project {self.config.project_id}; will create lazily when needed")
+        
+        # Initialize Iris infrastructure if enabled (optional, non-breaking)
+        await self._init_iris_infrastructure()
+    
+    async def _init_iris_infrastructure(self):
+        """
+        Initialize Iris infrastructure if enabled.
+        
+        This is optional and non-breaking - failures are logged but don't stop execution.
+        """
+        try:
+            from core.iris_infra.agent_integration import IrisAgentContext, should_enable_iris_infrastructure
+            
+            # Check if infrastructure should be enabled
+            if not should_enable_iris_infrastructure(self.config.agent_config):
+                logger.debug("Iris infrastructure disabled for this agent run")
+                return
+            
+            # Create context
+            self.iris_context = IrisAgentContext(
+                project_id=self.config.project_id,
+                thread_id=self.config.thread_id
+            )
+            
+            # Try to get sandbox and initialize
+            # Note: This will only work if sandbox already exists or gets created later
+            try:
+                from core.sandbox.tool_base import SandboxToolsBase
+                # Create a temporary tool instance to access sandbox
+                temp_tool = SandboxToolsBase(
+                    project_id=self.config.project_id,
+                    thread_manager=self.thread_manager
+                )
+                sandbox = await temp_tool._ensure_sandbox()
+                
+                # Initialize infrastructure
+                initialized = await self.iris_context.initialize(sandbox)
+                if initialized:
+                    logger.info("✅ Iris infrastructure initialized successfully")
+                else:
+                    logger.debug("Iris infrastructure initialization returned False")
+                    self.iris_context = None
+                    
+            except Exception as e:
+                logger.debug(f"Could not initialize Iris infrastructure (sandbox may not exist yet): {e}")
+                # This is okay - infrastructure will be initialized when sandbox is created
+                self.iris_context = None
+                
+        except Exception as e:
+            logger.debug(f"Iris infrastructure not available or failed to import: {e}")
+            self.iris_context = None
     
     async def setup_tools(self):
         tool_manager = ToolManager(self.thread_manager, self.config.project_id, self.config.thread_id, self.config.agent_config)
@@ -1129,6 +1181,13 @@ class AgentRunner:
                     "message": "Agent run completed"
                 }
 
+        # Cleanup Iris infrastructure if initialized
+        if self.iris_context:
+            try:
+                await self.iris_context.cleanup()
+            except Exception as e:
+                logger.warning(f"Failed to cleanup Iris infrastructure: {e}")
+        
         try:
             asyncio.create_task(asyncio.to_thread(lambda: langfuse.flush()))
         except Exception as e:
