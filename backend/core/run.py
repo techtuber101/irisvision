@@ -670,8 +670,9 @@ class AgentRunner:
             self.config.trace = langfuse.trace(name="run_agent", session_id=self.config.thread_id, metadata={"project_id": self.config.project_id})
         
         self.thread_manager = ThreadManager(
-            trace=self.config.trace,
+            trace=self.config.trace, 
             agent_config=self.config.agent_config,
+            project_id=self.config.project_id
         )
         
         self.client = await self.thread_manager.db.client
