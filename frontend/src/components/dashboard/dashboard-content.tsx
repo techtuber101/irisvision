@@ -40,7 +40,6 @@ import { AgentConfigurationDialog } from '@/components/agents/agent-configuratio
 import { fastGeminiChat } from '@/lib/fast-gemini-chat';
 import { addAssistantMessage } from '@/lib/api';
 import { simpleChat, simpleChatStream, uploadFileForQuickChat } from '@/lib/simple-chat';
-import { toast } from 'sonner';
 import { useTheme } from 'next-themes';
 
 const PENDING_PROMPT_KEY = 'pendingAgentPrompt';
