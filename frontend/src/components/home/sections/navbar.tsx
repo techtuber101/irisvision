@@ -105,8 +105,8 @@ export function Navbar() {
           <div className="flex h-[56px] items-center justify-between px-4 md:px-6">
             {/* Left: Logo */}
             <Link href="/" className="flex items-center gap-3">
-              <Image src="/irislogoblack.png" alt="Iris Logo" width={140} height={22} className="dark:hidden" priority />
-              <Image src="/irislogowhitebig.png" alt="Iris Logo" width={140} height={22} className="hidden dark:block" priority />
+              <Image src="/irislogoblack.png" alt="Iris Logo" width={155} height={25} className="dark:hidden" priority />
+              <Image src="/irislogowhitebig.png" alt="Iris Logo" width={155} height={25} className="hidden dark:block" priority />
             </Link>
 
             {/* Center: Menu */}
@@ -259,8 +259,8 @@ export function Navbar() {
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <Link href="/" className="flex items-center gap-3">
-                    <Image src="/irislogoblack.png" alt="Iris Logo" width={120} height={22} className="dark:hidden" priority />
-                    <Image src="/irislogowhitebig.png" alt="Iris Logo" width={120} height={22} className="hidden dark:block" priority />
+                    <Image src="/irislogoblack.png" alt="Iris Logo" width={135} height={22} className="dark:hidden" priority />
+                    <Image src="/irislogowhitebig.png" alt="Iris Logo" width={135} height={22} className="hidden dark:block" priority />
                     <span className="font-medium text-primary text-sm">Iris</span>
                   </Link>
                   <button onClick={toggleDrawer} className="border border-border rounded-md p-1 cursor-pointer">

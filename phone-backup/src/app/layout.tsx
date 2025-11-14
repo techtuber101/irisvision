@@ -92,14 +92,14 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
       { url: '/favicon-1024x1024.png', sizes: '1024x1024', type: 'image/png' },
       { url: '/favicon-512x512.png', sizes: '512x512', type: 'image/png' },
       { url: '/favicon-256x256.png', sizes: '256x256', type: 'image/png' },
       { url: '/favicon-192x192.png', sizes: '192x192', type: 'image/png' },
       { url: '/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
-      { url: '/favicon.svg', type: 'image/svg+xml' },
     ],
-    shortcut: '/favicon.ico',
+    shortcut: '/favicon.svg',
     apple: [
       { url: '/apple-touch-icon.png', sizes: '180x180' },
     ],
@@ -119,14 +119,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Favicon links - SVG first for better scaling */}
+        {/* Favicon links - SVG first for better scaling and maximum visibility */}
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="shortcut icon" type="image/svg+xml" href="/favicon.svg" />
         <link rel="icon" type="image/png" href="/favicon-1024x1024.png" sizes="1024x1024" />
         <link rel="icon" type="image/png" href="/favicon-512x512.png" sizes="512x512" />
         <link rel="icon" type="image/png" href="/favicon-256x256.png" sizes="256x256" />
         <link rel="icon" type="image/png" href="/favicon-192x192.png" sizes="192x192" />
         <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
-        <link rel="shortcut icon" href="/favicon.ico" />
+        <link rel="alternate icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-title" content="Iris" />
         <link rel="manifest" href="/site.webmanifest" />
