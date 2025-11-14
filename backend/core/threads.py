@@ -335,12 +335,6 @@ async def get_thread_messages(
             query = query.range(offset, offset + batch_size - 1)
             messages_result = await query.execute()
             batch = messages_result.data or []
-            # Ensure cached frontend content (e.g., create_document output) is preserved
-            for message in batch:
-                metadata = message.get("metadata") or {}
-                frontend_content = metadata.get("frontend_content")
-                if frontend_content:
-                    message["content"] = frontend_content
             all_messages.extend(batch)
             logger.debug(f"Fetched batch of {len(batch)} messages (offset {offset})")
             if len(batch) < batch_size:

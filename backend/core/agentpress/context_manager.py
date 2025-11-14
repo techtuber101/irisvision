@@ -14,7 +14,6 @@ from core.services.supabase import DBConnection
 from core.utils.logger import logger
 from core.ai_models import model_manager
 from core.services.llm import make_llm_api_call
-from core.sandbox.kv_store import SandboxKVStore
 
 
 @dataclass
@@ -110,26 +109,20 @@ class CompressionReport:
             f"removed={self.removed_messages}, failures={self.summary_failures}"
         )
 
-DEFAULT_TOKEN_THRESHOLD = 50_000  # Lowered from 70k to trigger compression earlier
-SUMMARIZATION_TOKEN_THRESHOLD = 100_000  # Try to keep raw context comfortably under 100k tokens
+DEFAULT_TOKEN_THRESHOLD = 70_000
+SUMMARIZATION_TOKEN_THRESHOLD = 40_000  # Trigger summarization once context crosses ~40k tokens
 
 class ContextManager:
     """Manages thread context including token counting and summarization."""
     
-    def __init__(self, token_threshold: int = DEFAULT_TOKEN_THRESHOLD, kv_store: Optional[SandboxKVStore] = None):
+    def __init__(self, token_threshold: int = DEFAULT_TOKEN_THRESHOLD):
         """Initialize the ContextManager.
         
         Args:
             token_threshold: Token count threshold to trigger summarization
-            kv_store: Optional KV store for caching summaries (if None, no caching)
         """
         self.db = DBConnection()
         self.token_threshold = token_threshold
-        self.kv_store = kv_store
-        self._cache_enabled = kv_store is not None
-        
-        if self._cache_enabled:
-            logger.info("ContextManager: KV cache enabled for conversation summaries")
 
     def _mark_message(self, msg: Dict[str, Any], marker: str) -> None:
         """Annotate a message with the given compression marker."""
@@ -211,61 +204,12 @@ class ContextManager:
         """Check if message contains any tool-related data (calls or results) that must be preserved."""
         return self.has_tool_calls(msg) or self.is_tool_result_message(msg)
     
-    async def _get_cached_summary(self, message_id: str) -> Optional[str]:
-        """Retrieve cached summary from KV store if available.
-        
-        Args:
-            message_id: Unique identifier for the message
-            
-        Returns:
-            Cached summary string or None if not found
-        """
-        if not self._cache_enabled or not message_id:
-            return None
-        
-        try:
-            result = await self.kv_store.get(scope="task", key=f"summary_{message_id}", as_type="str")
-            if result:
-                logger.debug(f"✓ Retrieved cached summary for message {message_id}")
-            return result
-        except Exception as e:
-            logger.debug(f"Cache miss for message {message_id}: {e}")
-            return None
-    
-    async def _store_summary_cache(self, message_id: str, summary: str) -> None:
-        """Store summary in KV cache for future use.
-        
-        Args:
-            message_id: Unique identifier for the message
-            summary: The generated summary
-        """
-        if not self._cache_enabled or not message_id:
-            return
-        
-        try:
-            import datetime
-            await self.kv_store.put(
-                scope="task",
-                key=f"summary_{message_id}",
-                value=summary,
-                metadata={
-                    "type": "conversation_summary",
-                    "timestamp": datetime.datetime.now().isoformat(),
-                    "version": "1.0"
-                }
-            )
-            logger.debug(f"✓ Stored summary cache for message {message_id}")
-        except Exception as e:
-            logger.warning(f"Failed to cache summary for message {message_id}: {e}")
-    
     async def summarize_message(
         self, 
         message: Dict[str, Any], 
         max_summary_tokens: int = 150
     ) -> str:
         """Summarize a message using Gemini 2.5 Flash Lite, preserving key information.
-        
-        Uses KV cache to store/retrieve summaries for performance.
         
         Args:
             message: The message dict to summarize
@@ -274,13 +218,6 @@ class ContextManager:
         Returns:
             Summary string
         """
-        # Try to get cached summary first
-        message_id = message.get('id') or message.get('message_id')
-        if message_id:
-            cached = await self._get_cached_summary(message_id)
-            if cached:
-                return cached
-        
         content = message.get('content', '')
         role = message.get('role', 'unknown')
         
@@ -348,11 +285,7 @@ Message:
                         if hasattr(first_choice, 'message'):
                             content = first_choice.message.content
                             if content:
-                                summary = content.strip()
-                                # Cache the successful summary
-                                if message_id:
-                                    await self._store_summary_cache(message_id, summary)
-                                return summary
+                                return content.strip()
                         # Try dict-style access
                         elif isinstance(first_choice, dict):
                             content = first_choice.get('message', {}).get('content', '')

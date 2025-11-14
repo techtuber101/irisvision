@@ -4,9 +4,7 @@ ENV ENV_MODE production
 WORKDIR /app
 
 # Install system dependencies in stages to avoid I/O issues
-# Install without --update to avoid permission issues on macOS Docker Desktop
-# The base image should have a recent enough package index
-RUN apk add --no-cache \
+RUN apk update && apk add --no-cache \
     curl \
     git \
     # Basic build tools
