@@ -2,7 +2,6 @@
 Simplified conversation thread management system for AgentPress.
 """
 
-import asyncio
 import json
 import time
 from collections import deque
@@ -21,8 +20,16 @@ from core.services.langfuse import langfuse
 from datetime import datetime, timezone
 from core.billing.billing_integration import billing_integration
 from litellm.utils import token_counter
+from core.agentpress.context_planner import (
+    build_auto_context_section,
+    get_project_context,
+    load_project_summary,
+)
+from core.utils.config import config as app_config
 
 ToolChoice = Literal["auto", "required", "none"]
+
+AGGRESSIVE_CONTEXT_TOKEN_TARGET = 100_000
 
 
 class RollingTokenUsageTracker:
@@ -357,16 +364,20 @@ class ThreadManager:
             config = ProcessorConfig()  # Create new instance as fallback
             
         try:
-            client = await self.db.client
-
             # Get and prepare messages
             messages = await self.get_llm_messages(thread_id)
+            aggressive_context_mode = False
             
             # Handle auto-continue context
             if auto_continue_state['count'] > 0 and auto_continue_state['continuous_state'].get('accumulated_content'):
                 partial_content = auto_continue_state['continuous_state']['accumulated_content']
                 messages.append({"role": "assistant", "content": partial_content})
 
+            raw_messages = list(messages)
+            client = await self.db.client
+            project_context = await get_project_context(thread_id, client)
+            kv_store = project_context.get("kv_store")
+            project_summary_data = await load_project_summary(kv_store)
             # ===== CENTRAL CONFIGURATION =====
             ENABLE_CONTEXT_MANAGER = True   # Set to False to disable context compression
             ENABLE_PROMPT_CACHING = True    # Set to False to disable prompt caching
@@ -392,6 +403,55 @@ class ThreadManager:
                 messages = compressed_messages
             else:
                 logger.debug("Context manager disabled, using raw messages")
+                try:
+                    approx_tokens = token_counter(model=llm_model, messages=[system_prompt] + messages)
+                    aggressive_context_mode = approx_tokens >= AGGRESSIVE_CONTEXT_TOKEN_TARGET
+                    if aggressive_context_mode:
+                        logger.info(
+                            "⚠️ Aggressive context mode enabled (raw token estimate ~%s)",
+                            f"{approx_tokens:,}",
+                        )
+                        try:
+                            self.response_processor.trace.event(
+                                name="context_manager.aggressive_mode",
+                                level="DEFAULT",
+                                status_message="Aggressive context safeguards activated (raw estimate)",
+                                metadata={
+                                    "estimated_tokens": approx_tokens,
+                                    "compressor_enabled": False,
+                                },
+                            )
+                        except Exception as exc:
+                            logger.debug(f"Failed to emit aggressive mode telemetry: {exc}")
+                except Exception as exc:
+                    logger.debug(f"Token estimation failed for aggressive mode check: {exc}")
+
+            raw_messages = list(messages)
+            client = await self.db.client
+            project_context = await get_project_context(thread_id, client)
+            kv_store = project_context.get("kv_store")
+            project_summary_data = await load_project_summary(kv_store)
+
+            system_prompt_for_turn = {
+                "role": system_prompt.get("role", "system"),
+                "content": system_prompt.get("content", ""),
+            }
+
+            planner_section = ""
+            if app_config.USE_KV_CACHE_PROMPT:
+                latest_user_message_text, latest_user_message_id = self._get_latest_user_message_info(raw_messages)
+                latest_trigger_id = latest_user_message_id or self._get_latest_trigger_id(raw_messages) or f"{thread_id}:{auto_continue_state['count']}"
+                planner_section = await self._get_planner_section(
+                    thread_id=thread_id,
+                    trigger_id=latest_trigger_id,
+                    user_message=latest_user_message_text,
+                    kv_store=kv_store,
+                    project_summary=project_summary_data.get("summary"),
+                    turn_label=f"turn_{auto_continue_state['count']}",
+                    aggressive_mode=aggressive_context_mode,
+                )
+            if planner_section:
+                system_prompt_for_turn["content"] += planner_section
 
             # Apply caching
             cache_report = None
