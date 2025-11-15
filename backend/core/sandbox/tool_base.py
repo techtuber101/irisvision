@@ -122,8 +122,42 @@ class SandboxToolsBase(Tool):
             except Exception as e:
                 logger.error(f"Error retrieving/creating sandbox for project {self.project_id}: {str(e)}")
                 raise e
+            
+            # Try to initialize Iris infrastructure now that sandbox is ready
+            await self._try_init_iris_infrastructure()
 
         return self._sandbox
+    
+    async def _try_init_iris_infrastructure(self):
+        """
+        Try to initialize Iris infrastructure now that sandbox is ready.
+        
+        This is called after sandbox is ensured to exist.
+        """
+        logger.info("=" * 70)
+        logger.info("🚀 SANDBOX READY: Attempting Iris infrastructure initialization")
+        logger.info("=" * 70)
+        
+        if not self._sandbox or not self.thread_manager:
+            logger.debug("⏭️  Skipping: No sandbox or thread_manager")
+            return
+        
+        # Check if thread_manager has an agent runner with Iris context
+        if not hasattr(self.thread_manager, 'agent_runner'):
+            logger.debug("⏭️  Skipping: No agent_runner on thread_manager")
+            return
+        
+        runner = self.thread_manager.agent_runner
+        if not runner or not hasattr(runner, 'try_initialize_iris_with_sandbox'):
+            logger.debug("⏭️  Skipping: No runner or missing method")
+            return
+        
+        try:
+            logger.info("📡 Calling runner.try_initialize_iris_with_sandbox()...")
+            await runner.try_initialize_iris_with_sandbox(self._sandbox)
+            logger.info("✅ Iris infrastructure initialization attempt completed")
+        except Exception as e:
+            logger.warning(f"⚠️  Failed to initialize Iris infrastructure: {e}")
 
     @property
     def sandbox(self) -> AsyncSandbox:

@@ -28,6 +28,12 @@ from core.utils.json_helpers import (
 )
 from litellm import token_counter
 
+# Make ContextOffloader optional - import if available
+try:
+    from core.agentpress.context_offloader import ContextOffloader
+except ImportError:
+    ContextOffloader = None  # Type hint will be Optional[Any]
+
 # Type alias for XML result adding strategy
 XmlAddingStrategy = Literal["user_message", "assistant_message", "inline_edit"]
 
@@ -45,6 +51,7 @@ class ToolExecutionContext:
     error: Optional[Exception] = None
     assistant_message_id: Optional[str] = None
     parsing_details: Optional[Dict[str, Any]] = None
+    dynamic_context: Optional[str] = None  # Ephemeral context loaded for this tool (not saved to DB)
 
 @dataclass
 class ProcessorConfig:
@@ -87,7 +94,11 @@ class ProcessorConfig:
 class ResponseProcessor:
     """Processes LLM responses, extracting and executing tool calls."""
     
-    def __init__(self, tool_registry: ToolRegistry, add_message_callback: Callable, trace: Optional[StatefulTraceClient] = None, agent_config: Optional[dict] = None):
+    # Thread-local storage for dynamic contexts (ephemeral, not saved to DB)
+    # Format: {thread_id: {tool_index: context_string}}
+    _dynamic_contexts: Dict[str, Dict[int, str]] = {}
+    
+    def __init__(self, tool_registry: ToolRegistry, add_message_callback: Callable, trace: Optional[StatefulTraceClient] = None, agent_config: Optional[dict] = None, context_offloader = None):
         """Initialize the ResponseProcessor.
         
         Args:
@@ -95,11 +106,13 @@ class ResponseProcessor:
             add_message_callback: Callback function to add messages to the thread.
                 MUST return the full saved message object (dict) or None.
             agent_config: Optional agent configuration with version information
+            context_offloader: Optional ContextOffloader for automatic content caching
         """
         self.tool_registry = tool_registry
         self.add_message = add_message_callback
         
         self.trace = trace
+        self.iris_context = None  # Iris infrastructure context (for fast context selection)
         if not self.trace:
             self.trace = langfuse.trace(name="anonymous:response_processor")
             
@@ -108,6 +121,8 @@ class ResponseProcessor:
         self.is_agent_builder = False  # Deprecated - keeping for compatibility
         self.target_agent_id = None  # Deprecated - keeping for compatibility
         self.agent_config = agent_config
+        self.context_offloader = context_offloader
+        self.iris_context = None  # Iris infrastructure context (set externally)
 
     async def _yield_message(self, message_obj: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """Helper to yield a message with proper formatting.
@@ -410,6 +425,9 @@ class ResponseProcessor:
                                         if started_msg_obj: yield format_for_yield(started_msg_obj)
                                         yielded_tool_indices.add(tool_index) # Mark status as yielded
 
+                                        # Set thread_id and tool_index for dynamic context storage
+                                        self._current_thread_id = thread_id
+                                        self._current_tool_index = tool_index
                                         execution_task = asyncio.create_task(self._execute_tool(tool_call))
                                         pending_tool_executions.append({
                                             "task": execution_task, "tool_call": tool_call,
@@ -480,6 +498,9 @@ class ResponseProcessor:
                                 if started_msg_obj: yield format_for_yield(started_msg_obj)
                                 yielded_tool_indices.add(tool_index) # Mark status as yielded
 
+                                # Set thread_id and tool_index for dynamic context storage
+                                self._current_thread_id = thread_id
+                                self._current_tool_index = tool_index
                                 execution_task = asyncio.create_task(self._execute_tool(tool_call_data))
                                 pending_tool_executions.append({
                                     "task": execution_task, "tool_call": tool_call_data,
@@ -602,8 +623,36 @@ class ResponseProcessor:
                                 })
                             except json.JSONDecodeError: continue
 
+                # NON-BLOCKING: Cache assistant messages in background, use full content immediately
+                # This prevents caching from blocking message streaming
+                assistant_content_for_storage = accumulated_content  # Use full content immediately
+                
+                # Get offloader and cache in background (fire-and-forget) for next time
+                async def get_offloader_and_cache_assistant():
+                    try:
+                        offloader = await self._get_context_offloader(thread_id)
+                        if offloader and accumulated_content:
+                            from litellm.utils import token_counter
+                            assistant_tokens = token_counter(model="gpt-4", text=accumulated_content)
+                            if assistant_tokens > 500:  # Cache if >500 tokens
+                                reference = await offloader.offload_content(
+                                    content=accumulated_content,
+                                    content_type="assistant_message",
+                                    source_id=f"assistant_{thread_id}",
+                                    metadata={"thread_run_id": thread_run_id, "has_tool_calls": bool(complete_native_tool_calls)}
+                                )
+                                if reference:
+                                    logger.debug(f"✅ Background cached assistant message: {assistant_tokens:,} tokens -> {reference.get('artifact_key')}")
+                    except Exception as e:
+                        logger.debug(f"Background assistant caching failed (non-critical): {e}")
+                
+                # Fire-and-forget: get offloader and cache in background without blocking
+                # Task is scheduled but not awaited - execution continues immediately
+                # Errors are handled inside the function, so no need to await
+                asyncio.create_task(get_offloader_and_cache_assistant())
+
                 message_data = { # Dict to be saved in 'content'
-                    "role": "assistant", "content": accumulated_content,
+                    "role": "assistant", "content": assistant_content_for_storage,
                     "tool_calls": complete_native_tool_calls or None
                 }
 
@@ -1418,6 +1467,11 @@ class ResponseProcessor:
             logger.debug(f"📝 RAW ARGUMENTS VALUE: {arguments}")
             self.trace.event(name="executing_tool", level="DEFAULT", status_message=(f"Executing tool: {function_name} with arguments: {arguments}"))
 
+            # ⚡ FAST CONTEXT SELECTION: Load relevant context before tool execution
+            # This runs in parallel and is extremely fast (<50ms typically)
+            # Context will be injected temporarily into messages (not saved to DB)
+            dynamic_context = await self._load_dynamic_context(function_name, arguments)
+
             # Get available functions from tool registry
             logger.debug(f"🔍 Looking up tool function: {function_name}")
             available_functions = self.tool_registry.get_available_functions()
@@ -1481,6 +1535,31 @@ class ResponseProcessor:
                     logger.error(f"❌ Tool returned invalid result type: {type(result)}")
                     result = ToolResult(success=False, output=f"Tool returned invalid result type: {type(result)}")
 
+            # ⚡ Store dynamic context temporarily (will be injected into messages, not saved to DB)
+            # Store in thread-local dict to attach to context after execution
+            if dynamic_context:
+                thread_id = getattr(self, '_current_thread_id', None)
+                tool_index = getattr(self, '_current_tool_index', None)
+                if thread_id is not None and tool_index is not None:
+                    if thread_id not in self._dynamic_contexts:
+                        self._dynamic_contexts[thread_id] = {}
+                    self._dynamic_contexts[thread_id][tool_index] = dynamic_context
+                    logger.debug(f"✅ Stored dynamic context for {function_name} tool_index={tool_index} ({len(dynamic_context)} chars)")
+                else:
+                    logger.warning(f"⚠️ Could not store dynamic context: thread_id={thread_id}, tool_index={tool_index}")
+
+            # Process tool output through Iris infrastructure if available
+            if self.iris_context and self.iris_context.is_ready():
+                try:
+                    processed_output = await self.iris_context.process_tool_output(
+                        function_name, result.output, arguments
+                    )
+                    result.output = processed_output
+                    logger.debug(f"✅ Processed {function_name} output through Iris infrastructure")
+                except Exception as iris_error:
+                    logger.error(f"Failed to process tool output through Iris: {iris_error}")
+                    # Continue with original output on error
+
             span.end(status_message="tool_executed", output=str(result))
             return result
 
@@ -1491,6 +1570,58 @@ class ResponseProcessor:
             logger.error(f"❌ Full traceback:", exc_info=True)
             span.end(status_message="critical_error", output=str(e), level="ERROR")
             return ToolResult(success=False, output=f"Critical error executing tool: {str(e)}")
+
+    async def _load_dynamic_context(
+        self,
+        tool_name: str,
+        tool_args: Dict[str, Any]
+    ) -> str:
+        """
+        Quickly load dynamic context needed for this tool call.
+        
+        This runs BEFORE tool execution to inject relevant files/instructions/artifacts.
+        
+        Args:
+            tool_name: Name of the tool being called
+            tool_args: Tool arguments
+            
+        Returns:
+            Context string to inject (empty if nothing needed or Iris not ready)
+        """
+        if not self.iris_context or not self.iris_context.is_ready():
+            return ""
+        
+        try:
+            from core.iris_infra.fast_context_selector import FastContextSelector
+            
+            # Get fast context selector from Iris infrastructure
+            if not hasattr(self.iris_context, 'infrastructure') or not self.iris_context.infrastructure:
+                return ""
+            
+            infra = self.iris_context.infrastructure
+            if not hasattr(infra, 'fast_context_selector'):
+                # Initialize fast context selector if not exists
+                # Use existing context_builder for selection logic
+                infra.fast_context_selector = FastContextSelector(
+                    iris_fs=infra.iris_fs,
+                    instruction_loader=infra.instruction_loader,
+                    artifact_store=infra.artifact_store,
+                    workspace_indexer=infra.workspace_indexer,
+                    context_builder=infra.context_builder  # Use existing context builder
+                )
+            
+            # Select and load context
+            context = await infra.fast_context_selector.select_context_for_tool(
+                tool_name=tool_name,
+                tool_args=tool_args
+            )
+            
+            return context
+            
+        except Exception as e:
+            logger.debug(f"Fast context selection failed: {e}")
+            return ""
+    
 
     async def _execute_tools(
         self,
@@ -1781,19 +1912,56 @@ class ResponseProcessor:
                 function_name = tool_call.get("function_name", "")
                 
                 # Format the tool result content - tool role needs string content
-                if isinstance(result, str):
-                    content = result
-                elif hasattr(result, 'output'):
-                    # If it's a ToolResult object
-                    if isinstance(result.output, dict) or isinstance(result.output, list):
-                        # If output is already a dict or list, convert to JSON string
-                        content = json.dumps(result.output)
-                    else:
-                        # Otherwise just use the string representation
-                        content = str(result.output)
+                # ⚡ CRITICAL: Strip dynamic context before saving to prevent token accumulation
+                output_to_save = result.output if hasattr(result, 'output') else result
+                
+                if isinstance(output_to_save, dict):
+                    # Remove _dynamic_context if present
+                    output_to_save = output_to_save.copy()
+                    if "_dynamic_context" in output_to_save:
+                        del output_to_save["_dynamic_context"]
+                        logger.debug(f"🧹 Stripped _dynamic_context from {function_name} native tool result")
+                    raw_content = json.dumps(output_to_save)
+                elif isinstance(output_to_save, str):
+                    # Remove dynamic context prefix if present
+                    if "⚡ **Context for this tool:**" in output_to_save:
+                        parts = output_to_save.split("\n\n---\n\n", 1)
+                        output_to_save = parts[1] if len(parts) == 2 else output_to_save
+                        logger.debug(f"🧹 Stripped dynamic context prefix from {function_name} native tool result")
+                    raw_content = output_to_save
+                elif isinstance(output_to_save, list):
+                    raw_content = json.dumps(output_to_save)
                 else:
-                    # Fallback to string representation of the whole result
-                    content = str(result)
+                    raw_content = str(output_to_save)
+                
+                # NON-BLOCKING: Cache in background, yield result immediately for speed
+                # This prevents caching from blocking tool result streaming
+                content = raw_content  # Use full content immediately (no blocking)
+                
+                # Get offloader in background (non-blocking) - don't await if it's slow
+                # Cache in background (fire-and-forget) - doesn't block streaming
+                async def get_offloader_and_cache():
+                    try:
+                        offloader = await self._get_context_offloader(thread_id)
+                        if offloader:
+                            function_name = tool_call.get("function_name", "unknown")
+                            tool_call_id = tool_call.get("id")
+                            
+                            reference = await offloader.offload_tool_output(
+                                tool_output=raw_content,
+                                tool_name=function_name,
+                                tool_call_id=tool_call_id,
+                                metadata={"thread_id": thread_id}
+                            )
+                            if reference:
+                                logger.debug(f"✅ Background cached: {function_name} -> {reference.get('artifact_key')}")
+                    except Exception as e:
+                        logger.debug(f"Background caching failed (non-critical): {e}")
+                
+                # Fire-and-forget: get offloader and cache in background without blocking
+                # Task is scheduled but not awaited - execution continues immediately
+                # Errors are handled inside the function, so no need to await
+                asyncio.create_task(get_offloader_and_cache())
                 
                 logger.debug(f"Formatted tool result content: {content[:100]}...")
                 self.trace.event(name="formatted_tool_result_content", level="DEFAULT", status_message=(f"Formatted tool result content: {content[:100]}..."))
@@ -1823,12 +1991,83 @@ class ResponseProcessor:
             # For XML and other non-native tools, use the new structured format
             # Determine message role based on strategy
             result_role = "user" if strategy == "user_message" else "assistant"
+            function_name = tool_call.get("function_name", "unknown")
+            
+            # NON-BLOCKING: Cache in background, use full output immediately for speed
+            # This prevents caching from blocking tool result streaming
+            output = result.output if hasattr(result, 'output') else str(result)
+            
+            # ⚡ CRITICAL: Strip dynamic context from output before saving to prevent token accumulation
+            # Dynamic context should only be used temporarily, not saved to conversation history
+            if isinstance(output, dict) and "_dynamic_context" in output:
+                output = output.copy()
+                del output["_dynamic_context"]
+                logger.debug(f"🧹 Stripped _dynamic_context from {function_name} result before saving")
+            elif isinstance(output, str) and "⚡ **Context for this tool:**" in output:
+                # Remove the dynamic context prefix if it was added as string
+                parts = output.split("\n\n---\n\n", 1)
+                if len(parts) == 2:
+                    output = parts[1]  # Keep only the actual tool output
+                    logger.debug(f"🧹 Stripped dynamic context prefix from {function_name} result before saving")
+            
+            output_size = len(str(output))
+            artifact_reference_for_llm = None
+            
+            if function_name == "create_document":
+                try:
+                    offloader = await self._get_context_offloader(thread_id)
+                    if offloader:
+                        tool_call_id = tool_call.get("id")
+                        artifact_reference_for_llm = await offloader.offload_tool_output(
+                            tool_output=output,
+                            tool_name=function_name,
+                            tool_call_id=tool_call_id,
+                            metadata={
+                                "thread_id": thread_id,
+                                "forced_for_tool": function_name,
+                            },
+                        )
+                        if artifact_reference_for_llm:
+                            logger.debug(
+                                f"✅ Cached create_document output -> {artifact_reference_for_llm.get('artifact_key')}"
+                            )
+                except Exception as e:
+                    logger.debug(f"Immediate caching failed for create_document: {e}")
+            else:
+                async def get_offloader_and_cache():
+                    try:
+                        offloader = await self._get_context_offloader(thread_id)
+                        if offloader:
+                            tool_call_id = tool_call.get("id")
+                            reference = await offloader.offload_tool_output(
+                                tool_output=output,
+                                tool_name=function_name,
+                                tool_call_id=tool_call_id,
+                                metadata={"thread_id": thread_id}
+                            )
+                            if reference:
+                                logger.debug(f"✅ Background cached: {function_name} -> {reference.get('artifact_key')}")
+                    except Exception as e:
+                        logger.debug(f"Background caching failed (non-critical): {e}")
+                
+                asyncio.create_task(get_offloader_and_cache())
             
             # Create two versions of the structured result
-            # 1. Rich version for the frontend
+            # 1. Rich version for the frontend (always full output)
             structured_result_for_frontend = self._create_structured_tool_result(tool_call, result, parsing_details, for_llm=False)
-            # 2. Concise version for the LLM
-            structured_result_for_llm = self._create_structured_tool_result(tool_call, result, parsing_details, for_llm=True)
+            # 2. Use full output for LLM (caching happens in background, will be used next time)
+            structured_result_for_llm = self._create_structured_tool_result(
+                tool_call,
+                result,
+                parsing_details,
+                for_llm=True,
+                artifact_reference=artifact_reference_for_llm,
+            )
+            if function_name == "create_document" and not artifact_reference_for_llm:
+                structured_result_for_llm["tool_execution"]["result"]["output"] = {
+                    "_cached": False,
+                    "note": "Document HTML omitted to protect context window. Planner will hydrate the saved document automatically whenever richer context is required."
+                }
 
             # Add the message with the appropriate role to the conversation history
             # This allows the LLM to see the tool result in subsequent interactions
@@ -1882,7 +2121,125 @@ class ResponseProcessor:
                 self.trace.event(name="failed_even_with_fallback_message", level="ERROR", status_message=(f"Failed even with fallback message: {str(e2)}"), metadata={"tool_call": tool_call, "result": result, "strategy": strategy, "assistant_message_id": assistant_message_id, "parsing_details": parsing_details})
                 return None # Return None on error
 
-    def _create_structured_tool_result(self, tool_call: Dict[str, Any], result: ToolResult, parsing_details: Optional[Dict[str, Any]] = None, for_llm: bool = False):
+    async def _get_context_offloader(self, thread_id: str):
+        """Get or create ContextOffloader for this thread.
+        
+        Args:
+            thread_id: Thread ID to get project_id
+            
+        Returns:
+            ContextOffloader instance or None if unavailable
+        """
+        # Return None if ContextOffloader not available
+        if ContextOffloader is None:
+            return None
+            
+        # Use cached offloader if available
+        if self.context_offloader:
+            return self.context_offloader
+        
+        try:
+            # Get project_id from thread
+            from core.services.supabase import DBConnection
+            from core.sandbox.sandbox import get_or_start_sandbox
+            from core.sandbox.kv_store import SandboxKVStore
+            
+            db = DBConnection()
+            client = await db.client
+            thread_result = await client.table('threads').select('project_id').eq('thread_id', thread_id).execute()
+            
+            if not thread_result.data or len(thread_result.data) == 0:
+                return None
+            
+            project_id = thread_result.data[0].get('project_id')
+            if not project_id:
+                return None
+            
+            # Get sandbox and KV store
+            project_result = await client.table('projects').select('sandbox').eq('project_id', project_id).execute()
+            if not project_result.data or len(project_result.data) == 0:
+                return None
+            
+            sandbox_info = project_result.data[0].get('sandbox', {})
+            
+            # If sandbox doesn't exist, create it lazily (for context offloading)
+            if not sandbox_info.get('id'):
+                logger.debug(f"No sandbox found for project {project_id}; creating lazily for context offloading")
+                try:
+                    from core.sandbox.sandbox import create_sandbox, get_preview_link_info
+                    import uuid
+                    import asyncio
+                    
+                    sandbox_pass = str(uuid.uuid4())
+                    sandbox_obj = await create_sandbox(sandbox_pass, project_id)
+                    sandbox_id = sandbox_obj.id
+                    
+                    # PERFORMANCE: Reduced wait time for faster startup (was 5s, now 2s)
+                    # Services will be ready enough for KV cache operations
+                    logger.info(f"Waiting 2 seconds for sandbox {sandbox_id} services to initialize...")
+                    await asyncio.sleep(2)
+                    
+                    # Gather preview links and token (best-effort)
+                    try:
+                        vnc_info = await get_preview_link_info(sandbox_obj, 6080)
+                        website_info = await get_preview_link_info(sandbox_obj, 8080)
+                        vnc_url = vnc_info.url
+                        website_url = website_info.url
+                        token = vnc_info.token
+                    except Exception:
+                        logger.warning(f"Failed to extract preview links for sandbox {sandbox_id}")
+                        vnc_url = None
+                        website_url = None
+                        token = None
+                    
+                    # Persist sandbox metadata to project record
+                    update_result = await client.table('projects').update({
+                        'sandbox': {
+                            'id': sandbox_id,
+                            'pass': sandbox_pass,
+                            'vnc_preview': vnc_url,
+                            'sandbox_url': website_url,
+                            'token': token
+                        }
+                    }).eq('project_id', project_id).execute()
+                    
+                    if not update_result.data:
+                        # Cleanup created sandbox if DB update failed
+                        try:
+                            from core.sandbox.sandbox import delete_sandbox
+                            await delete_sandbox(sandbox_id)
+                        except Exception:
+                            logger.error(f"Failed to delete sandbox {sandbox_id} after DB update failure")
+                        raise Exception("Database update failed when storing sandbox metadata")
+                    
+                    logger.info(f"✅ Created sandbox {sandbox_id} lazily for context offloading")
+                    sandbox = await get_or_start_sandbox(sandbox_id)
+                except Exception as e:
+                    logger.warning(f"Failed to create sandbox lazily for context offloading: {e}")
+                    return None
+            else:
+                # Use existing sandbox
+                sandbox = await get_or_start_sandbox(sandbox_info['id'])
+            
+            kv_store = SandboxKVStore(sandbox)
+            
+            # Create and cache offloader
+            self.context_offloader = ContextOffloader(kv_store, trace=self.trace)
+            return self.context_offloader
+            
+        except Exception as e:
+            logger.debug(f"Could not create ContextOffloader: {e}")
+            return None
+    
+    def _create_structured_tool_result(
+        self,
+        tool_call: Dict[str, Any],
+        result: ToolResult,
+        parsing_details: Optional[Dict[str, Any]] = None,
+        for_llm: bool = False,
+        artifact_reference: Optional[Dict[str, Any]] = None,
+        artifact_key: Optional[str] = None,
+    ):
         """Create a structured tool result format that's tool-agnostic and provides rich information.
         
         Args:
@@ -1890,6 +2247,7 @@ class ResponseProcessor:
             result: The result from the tool execution
             parsing_details: Optional parsing details for XML calls
             for_llm: If True, creates a concise version for the LLM context.
+            artifact_key: Optional KV cache artifact key if output was stored
             
         Returns:
             Structured dictionary containing tool execution information
@@ -1902,6 +2260,8 @@ class ResponseProcessor:
         
         # Process the output - if it's a JSON string, parse it back to an object
         output = result.output if hasattr(result, 'output') else str(result)
+        original_output = output
+        
         if isinstance(output, str):
             try:
                 # Try to parse as JSON to provide structured data to frontend
@@ -1913,6 +2273,12 @@ class ResponseProcessor:
             except Exception:
                 # If parsing fails, keep the original string
                 pass
+
+        reference_payload = artifact_reference or ({"artifact_key": artifact_key} if artifact_key else None)
+
+        # For LLM version: if artifact reference exists, replace output with structured stub
+        if for_llm and reference_payload:
+            output = self._build_cached_output_stub(reference_payload, original_output)
 
         structured_result_v1 = {
             "tool_execution": {
@@ -1929,6 +2295,52 @@ class ResponseProcessor:
         } 
             
         return structured_result_v1
+
+    def _build_cached_output_stub(self, reference_payload: Dict[str, Any], original_output: Any, max_chars: int = 500) -> Dict[str, Any]:
+        """Build a consistent lightweight stub for cached artifacts exposed to the LLM."""
+        artifact_key = reference_payload.get("artifact_key")
+        scope = reference_payload.get("scope")
+        preview = reference_payload.get("preview")
+        summary = reference_payload.get("summary")
+
+        if not preview:
+            preview = self._truncate_output(original_output, max_chars)
+        if not summary:
+            summary = self._truncate_output(original_output, max_chars * 2 if max_chars else 1000)
+
+        stub: Dict[str, Any] = {
+            "_cached": True,
+            "artifact_key": artifact_key,
+            "scope": scope,
+            "preview": preview,
+            "summary": summary,
+            "size_tokens": reference_payload.get("size_tokens"),
+            "size_chars": reference_payload.get("size_chars"),
+            "retrieval_hint": reference_payload.get("retrieval_hint")
+            or "Full content stored in KV cache; planner hydrates the required slices automatically.",
+        }
+
+        if "metadata" in reference_payload and reference_payload["metadata"]:
+            stub["metadata"] = reference_payload["metadata"]
+        elif "metadata_snapshot" in reference_payload and reference_payload["metadata_snapshot"]:
+            stub["metadata"] = reference_payload["metadata_snapshot"]
+
+        return stub
+
+    def _truncate_output(self, output: Any, max_chars: int = 500) -> str:
+        """Helper to trim arbitrary tool output for previews."""
+        if max_chars <= 0:
+            return ""
+        if isinstance(output, str):
+            snippet = output[:max_chars]
+            return snippet + ("..." if len(output) > max_chars else "")
+        if isinstance(output, (dict, list)):
+            serialized = json.dumps(output, ensure_ascii=False)
+            snippet = serialized[:max_chars]
+            return snippet + ("..." if len(serialized) > max_chars else "")
+        output_str = str(output)
+        snippet = output_str[:max_chars]
+        return snippet + ("..." if len(output_str) > max_chars else "")
 
     def _create_tool_context(self, tool_call: Dict[str, Any], tool_index: int, assistant_message_id: Optional[str] = None, parsing_details: Optional[Dict[str, Any]] = None) -> ToolExecutionContext:
         """Create a tool execution context with display name and parsing details populated."""

@@ -362,6 +362,28 @@ class ThreadManager:
             # Get and prepare messages
             messages = await self.get_llm_messages(thread_id)
             
+            # ⚡ Inject dynamic contexts temporarily (ephemeral, not saved to DB)
+            # These are loaded per-tool-call and provide relevant context for this turn only
+            if hasattr(self, 'response_processor') and self.response_processor:
+                if thread_id in self.response_processor._dynamic_contexts:
+                    all_contexts = []
+                    for tool_idx in sorted(self.response_processor._dynamic_contexts[thread_id].keys()):
+                        context_str = self.response_processor._dynamic_contexts[thread_id][tool_idx]
+                        if context_str:
+                            all_contexts.append(context_str)
+                    
+                    if all_contexts:
+                        combined_context = "\n\n".join(all_contexts)
+                        # Inject as temporary user message (ephemeral, not saved)
+                        messages.append({
+                            "role": "user",
+                            "content": f"⚡ **Dynamic Context for this turn:**\n{combined_context}"
+                        })
+                        logger.debug(f"✅ Injected {len(all_contexts)} dynamic contexts ({len(combined_context)} chars) into messages")
+                        
+                        # Clear contexts for this thread after injection (prevent accumulation)
+                        del self.response_processor._dynamic_contexts[thread_id]
+            
             # Handle auto-continue context
             if auto_continue_state['count'] > 0 and auto_continue_state['continuous_state'].get('accumulated_content'):
                 partial_content = auto_continue_state['continuous_state']['accumulated_content']

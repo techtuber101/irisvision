@@ -311,7 +311,8 @@ class PromptManager:
                                   mcp_wrapper_instance: Optional[MCPToolWrapper],
                                   client=None,
                                   tool_registry=None,
-                                  xml_tool_calling: bool = True) -> dict:
+                                  xml_tool_calling: bool = True,
+                                  runner=None) -> dict:
         
         default_system_content = get_system_prompt()
         
@@ -330,7 +331,8 @@ class PromptManager:
             system_content = default_system_content
         
         # Check if agent has builder tools enabled - append the full builder prompt
-        if agent_config:
+        # OPTIMIZATION: Skip large builder prompt when KV cache is enabled (tools are defined elsewhere)
+        if agent_config and not config.USE_KV_CACHE_PROMPT:
             agentpress_tools = agent_config.get('agentpress_tools', {})
             has_builder_tools = any(
                 agentpress_tools.get(tool, False) 
@@ -341,6 +343,17 @@ class PromptManager:
                 # Append the full agent builder prompt to the existing system prompt
                 builder_prompt = get_agent_builder_prompt()
                 system_content += f"\n\n{builder_prompt}"
+        elif agent_config and config.USE_KV_CACHE_PROMPT:
+            # Add minimal builder tools mention for KV cache mode
+            agentpress_tools = agent_config.get('agentpress_tools', {})
+            has_builder_tools = any(
+                agentpress_tools.get(tool, False) 
+                for tool in ['agent_config_tool', 'mcp_search_tool', 'credential_profile_tool', 'trigger_tool']
+            )
+            
+            if has_builder_tools:
+                minimal_builder = "\n\n# AGENT BUILDER TOOLS\nYou have access to agent configuration and MCP integration tools. Use them to modify your capabilities or help users build new agents."
+                system_content += minimal_builder
         
         # Add agent knowledge base context if available
         if agent_config and client and 'agent_id' in agent_config:
@@ -422,7 +435,9 @@ class PromptManager:
             system_content += mcp_info
         
         # Add XML tool calling instructions to system prompt if requested
-        if xml_tool_calling and tool_registry:
+        # OPTIMIZATION: When KV cache is enabled, skip full tool schemas to save tokens
+        # The KV cache prompt already includes tool calling instructions
+        if xml_tool_calling and tool_registry and not config.USE_KV_CACHE_PROMPT:
             openapi_schemas = tool_registry.get_openapi_schemas()
             
             if openapi_schemas:
@@ -459,6 +474,21 @@ When using the tools:
                 
                 system_content += examples_content
                 logger.debug("Appended XML tool examples to system prompt")
+        elif config.USE_KV_CACHE_PROMPT:
+            # Add minimal tool calling format reminder for KV cache mode
+            tool_format_reminder = """
+
+# TOOL CALLING FORMAT
+Invoke tools using this XML format:
+<function_calls>
+<invoke name="function_name">
+<parameter name="param_name">param_value</parameter>
+</invoke>
+</function_calls>
+
+Tool schemas are available dynamically - focus on using the right tools for the task."""
+            system_content += tool_format_reminder
+            logger.debug("Using minimal tool format for KV cache mode")
 
         now = datetime.datetime.now(datetime.timezone.utc)
         datetime_info = f"\n\n=== CURRENT DATE/TIME INFORMATION ===\n"
@@ -495,6 +525,11 @@ Remember: The user sent this message because they want you to respond to it NOW.
 """
         system_content += adaptive_input_guidance
 
+        # NOTE: Base prompt is kept minimal. Dynamic context is injected per-tool-call
+        # via FastContextSelector in response_processor, not here in the system prompt.
+        # This keeps the base prompt tiny and allows agent to dynamically load context
+        # only when needed for each tool execution.
+
         system_message = {"role": "system", "content": system_content}
         return system_message
 
@@ -503,6 +538,7 @@ Remember: The user sent this message because they want you to respond to it NOW.
 class AgentRunner:
     def __init__(self, config: AgentConfig):
         self.config = config
+        self.iris_context = None  # Iris infrastructure context (optional)
     
     async def setup(self):
         if not self.config.trace:
@@ -512,6 +548,9 @@ class AgentRunner:
             trace=self.config.trace, 
             agent_config=self.config.agent_config
         )
+        
+        # Connect runner to thread_manager so sandbox tools can access it
+        self.thread_manager.agent_runner = self
         
         self.client = await self.thread_manager.db.client
         
@@ -534,6 +573,65 @@ class AgentRunner:
         sandbox_info = project_data.get('sandbox', {})
         if not sandbox_info.get('id'):
             logger.debug(f"No sandbox found for project {self.config.project_id}; will create lazily when needed")
+        
+        # Create Iris context object (but don't initialize yet - wait for sandbox)
+        await self._create_iris_context()
+        
+        # Connect iris_context to response processor for tool output processing
+        if self.iris_context and self.thread_manager.response_processor:
+            self.thread_manager.response_processor.iris_context = self.iris_context
+            logger.debug("Connected Iris context to response processor")
+    
+    async def _create_iris_context(self):
+        """
+        Create Iris context object (but don't initialize yet - wait for sandbox).
+        
+        This is lightweight and non-blocking. Actual initialization happens lazily.
+        """
+        try:
+            from core.iris_infra.agent_integration import IrisAgentContext, should_enable_iris_infrastructure
+            
+            # Check if infrastructure should be enabled
+            if not should_enable_iris_infrastructure(self.config.agent_config):
+                logger.debug("Iris infrastructure disabled for this agent run")
+                return
+            
+            # Create context (lightweight, no sandbox needed)
+            self.iris_context = IrisAgentContext(
+                project_id=self.config.project_id,
+                thread_id=self.config.thread_id
+            )
+            logger.debug("Created Iris context (will initialize lazily when sandbox is ready)")
+                
+        except Exception as e:
+            logger.debug(f"Iris infrastructure not available or failed to import: {e}")
+            self.iris_context = None
+    
+    async def try_initialize_iris_with_sandbox(self, sandbox):
+        """
+        Try to initialize Iris infrastructure with a sandbox.
+        
+        Called by sandbox tools after sandbox is created/accessed.
+        This is idempotent - safe to call multiple times.
+        
+        Args:
+            sandbox: Daytona sandbox instance
+        """
+        if not self.iris_context:
+            return
+        
+        # Check if already initialized
+        if self.iris_context.is_ready():
+            return
+        
+        try:
+            initialized = await self.iris_context.initialize(sandbox)
+            if initialized:
+                logger.info("✅ Iris infrastructure initialized successfully with sandbox")
+            else:
+                logger.debug("Iris infrastructure initialization returned False")
+        except Exception as e:
+            logger.debug(f"Failed to initialize Iris infrastructure with sandbox: {e}")
     
     async def setup_tools(self):
         tool_manager = ToolManager(self.thread_manager, self.config.project_id, self.config.thread_id, self.config.agent_config)
@@ -708,7 +806,8 @@ class AgentRunner:
             self.config.thread_id, 
             mcp_wrapper_instance, self.client,
             tool_registry=self.thread_manager.tool_registry,
-            xml_tool_calling=True
+            xml_tool_calling=True,
+            runner=self
         )
         system_content_length = len(str(system_message.get('content', '')))
         logger.info(f"📝 System message built once: {system_content_length} chars")
@@ -1092,6 +1191,34 @@ class AgentRunner:
             if generation:
                 generation.end()
 
+            # Record turn summary in Iris infrastructure if available
+            if self.iris_context and self.iris_context.is_ready():
+                try:
+                    # Extract latest user message for summary
+                    if latest_user_message.data and len(latest_user_message.data) > 0:
+                        user_msg_data = latest_user_message.data[0]['content']
+                        if isinstance(user_msg_data, str):
+                            try:
+                                user_msg_data = json.loads(user_msg_data)
+                            except:
+                                pass
+                        user_input = str(user_msg_data)[:200]  # First 200 chars as summary
+                    else:
+                        user_input = "No user message"
+                    
+                    # Record tools used and artifacts (simplified for now)
+                    tools_used = [last_tool_call] if last_tool_call else []
+                    artifacts = []  # Could be extracted from tool results
+                    
+                    await self.iris_context.record_turn_summary(
+                        user_input=user_input,
+                        tools_used=tools_used,
+                        artifacts=artifacts
+                    )
+                    logger.debug("✅ Recorded turn summary in Iris infrastructure")
+                except Exception as iris_error:
+                    logger.error(f"Failed to record turn summary in Iris: {iris_error}")
+
             continue_execution = should_continue
 
         # Yield completion status when loop exits naturally (not via break)
@@ -1129,6 +1256,13 @@ class AgentRunner:
                     "message": "Agent run completed"
                 }
 
+        # Cleanup Iris infrastructure if initialized
+        if self.iris_context:
+            try:
+                await self.iris_context.cleanup()
+            except Exception as e:
+                logger.warning(f"Failed to cleanup Iris infrastructure: {e}")
+        
         try:
             asyncio.create_task(asyncio.to_thread(lambda: langfuse.flush()))
         except Exception as e:
