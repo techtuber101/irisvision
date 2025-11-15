@@ -2,7 +2,6 @@
 Simplified conversation thread management system for AgentPress.
 """
 
-import asyncio
 import json
 import time
 from collections import deque
@@ -374,12 +373,8 @@ class ThreadManager:
             config = ProcessorConfig()  # Create new instance as fallback
             
         try:
-            client = await self.db.client
-            messages_task = asyncio.create_task(self.get_llm_messages(thread_id))
-            project_context_task = asyncio.create_task(get_project_context(thread_id, client))
-
             # Get and prepare messages
-            messages = await messages_task
+            messages = await self.get_llm_messages(thread_id)
             aggressive_context_mode = False
             
             # Handle auto-continue context
@@ -388,9 +383,10 @@ class ThreadManager:
                 messages.append({"role": "assistant", "content": partial_content})
 
             raw_messages = list(messages)
-            project_context = await project_context_task
+            client = await self.db.client
+            project_context = await get_project_context(thread_id, client)
             kv_store = project_context.get("kv_store")
-            project_summary_task = asyncio.create_task(load_project_summary(kv_store))
+            project_summary_data = await load_project_summary(kv_store)
 
             # ===== CENTRAL CONFIGURATION =====
             ENABLE_CONTEXT_MANAGER = True   # Set to False to disable context compression
@@ -500,7 +496,6 @@ class ThreadManager:
             }
 
             planner_section = ""
-            project_summary_data = await project_summary_task
             if app_config.USE_KV_CACHE_PROMPT:
                 latest_user_message_text, latest_user_message_id = self._get_latest_user_message_info(raw_messages)
                 latest_trigger_id = latest_user_message_id or self._get_latest_trigger_id(raw_messages) or f"{thread_id}:{auto_continue_state['count']}"
