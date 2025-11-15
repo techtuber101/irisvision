@@ -525,26 +525,10 @@ Remember: The user sent this message because they want you to respond to it NOW.
 """
         system_content += adaptive_input_guidance
 
-        # Enhance with Iris infrastructure if available
-        if runner and hasattr(runner, 'iris_context') and runner.iris_context:
-            try:
-                if runner.iris_context.is_ready():
-                    logger.info("=" * 70)
-                    logger.info("🎯 INJECTING IRIS CONTEXT INTO SYSTEM PROMPT")
-                    logger.info("=" * 70)
-                    original_length = len(system_content)
-                    system_content = await runner.iris_context.enhance_system_prompt(system_content)
-                    enhanced_length = len(system_content)
-                    logger.info(f"✅ System prompt enhanced with Iris infrastructure context")
-                    logger.info(f"   Original: {original_length} chars")
-                    logger.info(f"   Enhanced: {enhanced_length} chars")
-                    logger.info(f"   Added: +{enhanced_length - original_length} chars")
-                    logger.info("=" * 70)
-                else:
-                    logger.debug("ℹ️  Iris context not ready, skipping enhancement")
-            except Exception as e:
-                logger.error(f"❌ Failed to enhance system prompt with Iris infrastructure: {e}")
-                # Continue with original prompt on error
+        # NOTE: Base prompt is kept minimal. Dynamic context is injected per-tool-call
+        # via FastContextSelector in response_processor, not here in the system prompt.
+        # This keeps the base prompt tiny and allows agent to dynamically load context
+        # only when needed for each tool execution.
 
         system_message = {"role": "system", "content": system_content}
         return system_message

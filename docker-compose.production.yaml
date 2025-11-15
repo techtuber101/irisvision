@@ -42,7 +42,6 @@ services:
       - "8000:8000"
     volumes:
       - ./backend/.env.production:/app/.env
-      - ./backend/core:/app/core:ro
     env_file:
       - ./backend/.env.production
     environment:
@@ -65,7 +64,6 @@ services:
     command: uv run dramatiq --skip-logging --processes 4 --threads 4 run_agent_background
     volumes:
       - ./backend/.env.production:/app/.env:ro
-      - ./backend/core:/app/core:ro
     env_file:
       - ./backend/.env.production
     environment:

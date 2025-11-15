@@ -58,14 +58,14 @@ async def ensure_iris_structure(sandbox: AsyncSandbox) -> bool:
             logger.info(f"Initializing Iris infrastructure at {IRIS_ROOT}")
         
         # Create root directory
-        await sandbox.fs.create_directory(IRIS_ROOT)
+        await sandbox.fs.create_folder(IRIS_ROOT, "755")
         logger.debug(f"Created root directory: {IRIS_ROOT}")
         
         # Create subdirectories
         for dir_name, description in IRIS_STRUCTURE.items():
             dir_path = f"{IRIS_ROOT}/{dir_name}"
             try:
-                await sandbox.fs.create_directory(dir_path)
+                await sandbox.fs.create_folder(dir_path, "755")
                 logger.debug(f"Created directory: {dir_path} ({description})")
             except Exception as e:
                 # Directory might already exist, that's okay
@@ -85,7 +85,7 @@ async def ensure_iris_structure(sandbox: AsyncSandbox) -> bool:
                     pass
                 
                 # Create the file
-                await sandbox.fs.upload_file(file_path, content.encode('utf-8'))
+                await sandbox.fs.upload_file(content.encode('utf-8'), file_path)
                 logger.debug(f"Created runtime file: {file_path}")
             except Exception as e:
                 logger.warning(f"Failed to create runtime file {file_path}: {e}")

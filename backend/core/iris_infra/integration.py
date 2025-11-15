@@ -15,6 +15,7 @@ from core.iris_infra.runtime_state import RuntimeState
 from core.iris_infra.artifact_store import ArtifactStore
 from core.iris_infra.context_builder import IrisContextBuilder
 from core.iris_infra.tool_output_handler import ToolOutputHandler
+from core.iris_infra.workspace_indexer import WorkspaceIndexer
 
 
 class IrisInfrastructure:
@@ -34,6 +35,7 @@ class IrisInfrastructure:
         self.artifact_store: Optional[ArtifactStore] = None
         self.context_builder: Optional[IrisContextBuilder] = None
         self.tool_output_handler: Optional[ToolOutputHandler] = None
+        self.workspace_indexer: Optional[WorkspaceIndexer] = None
         self._initialized = False
     
     async def initialize(self, sandbox: AsyncSandbox) -> bool:
@@ -85,16 +87,37 @@ class IrisInfrastructure:
             self.artifact_store = ArtifactStore(self.iris_fs)
             logger.debug("✅ Artifact store initialized")
             
-            # Step 7: Initialize context builder
+            # Step 7: Initialize workspace indexer
+            logger.info("=" * 70)
+            logger.info("📂 INITIALIZING WORKSPACE INDEXER")
+            logger.info("=" * 70)
+            self.workspace_indexer = WorkspaceIndexer(sandbox)
+            logger.debug("✅ Workspace indexer object created")
+            
+            # Step 8: Scan workspace (async, non-blocking for first files)
+            try:
+                logger.info("🔍 Starting workspace scan...")
+                index_result = await self.workspace_indexer.initialize()
+                if index_result:
+                    logger.info(f"✅ Workspace indexed: {self.workspace_indexer.index.files.__len__()} files found")
+                    logger.info(f"   Agent will see workspace file inventory in context")
+                else:
+                    logger.warning("⚠️  Workspace indexing returned False")
+            except Exception as e:
+                logger.warning(f"⚠️  Workspace indexing failed (non-critical): {e}")
+                logger.debug("   Agent will continue without workspace file context")
+            
+            # Step 9: Initialize context builder (with workspace indexer)
             self.context_builder = IrisContextBuilder(
                 self.iris_fs,
                 self.instruction_loader,
                 self.runtime_state,
-                self.artifact_store
+                self.artifact_store,
+                self.workspace_indexer
             )
             logger.debug("✅ Context builder initialized")
             
-            # Step 8: Initialize tool output handler
+            # Step 10: Initialize tool output handler
             self.tool_output_handler = ToolOutputHandler(self.artifact_store)
             logger.debug("✅ Tool output handler initialized")
             

@@ -67,7 +67,7 @@ class IrisSandboxFS:
             if isinstance(content, str):
                 content = content.encode('utf-8')
             
-            await self.sandbox.fs.upload_file(full_path, content)
+            await self.sandbox.fs.upload_file(content, full_path)
             logger.debug(f"Wrote file: {full_path}")
         except Exception as e:
             logger.error(f"Failed to write file {full_path}: {e}")
@@ -115,7 +115,7 @@ class IrisSandboxFS:
                 await self.sandbox.fs.get_file_info(full_path)
                 logger.debug(f"Directory already exists: {full_path}")
             except Exception:
-                await self.sandbox.fs.create_directory(full_path)
+                await self.sandbox.fs.create_folder(full_path, "755")
                 logger.debug(f"Created directory: {full_path}")
         except Exception as e:
             logger.error(f"Failed to ensure directory {full_path}: {e}")
