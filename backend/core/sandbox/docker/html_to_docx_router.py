@@ -172,9 +172,9 @@ class HTMLToDocxConverter:
         heading_styles = {
             'Heading 1': {
                 'color': RGBColor(0, 0, 0),  # Pure black
-                'size': Pt(26),
-                'space_before': Pt(24),
-                'space_after': Pt(14),
+                'size': Pt(20),  # Reduced from 26 to prevent taking whole page
+                'space_before': Pt(12),  # Reduced from 24
+                'space_after': Pt(8),  # Reduced from 14
                 'bold': True
             },
             'Heading 2': {
@@ -228,10 +228,11 @@ class HTMLToDocxConverter:
     def _add_document_header(self):
         title = self.doc_data.get('title', 'Document')
         
-        # Professional title styling - use proper Heading 1 style
+        # Professional title styling - use proper Heading 1 style with reduced spacing
         title_paragraph = self.document.add_paragraph(title, style='Heading 1')
         title_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        title_paragraph.paragraph_format.space_after = Pt(12)
+        title_paragraph.paragraph_format.space_before = Pt(6)  # Reduced top spacing
+        title_paragraph.paragraph_format.space_after = Pt(8)  # Reduced from 12
 
         # Professional date styling
         date_paragraph = self.document.add_paragraph(

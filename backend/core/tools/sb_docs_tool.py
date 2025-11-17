@@ -777,7 +777,7 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
                 border-bottom: 2px solid #e5e7eb;
             }
             .title {
-                font-size: 3rem;
+                font-size: 1.75rem;  /* Reduced from 3rem to prevent taking whole page */
                 font-weight: 700;
                 color: #111827;
                 margin-bottom: 0.5rem;
