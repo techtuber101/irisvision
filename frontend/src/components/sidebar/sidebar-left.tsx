@@ -183,7 +183,7 @@ export function SidebarLeft({
             {state === 'collapsed' ? (
               <>
                 <Image
-                  src="/irissymbolblack.png"
+                  src="/irissymbolblack.png?v=2"
                   alt="Iris Symbol"
                   width={32}
                   height={32}
@@ -191,7 +191,7 @@ export function SidebarLeft({
                   priority
                 />
                 <Image
-                  src="/irissymbolwhite.png"
+                  src="/irissymbolwhite.png?v=2"
                   alt="Iris Symbol"
                   width={32}
                   height={32}
@@ -202,7 +202,7 @@ export function SidebarLeft({
             ) : (
               <>
                 <Image
-                  src="/irislogoblack.png"
+                  src="/irislogoblack.png?v=2"
                   alt="Iris Logo"
                   width={460}
                   height={81}
@@ -210,7 +210,7 @@ export function SidebarLeft({
                   priority
                 />
                 <Image
-                  src="/irislogowhitebig.png"
+                  src="/irislogowhitebig.png?v=2"
                   alt="Iris Logo"
                   width={330}
                   height={59}

@@ -19,7 +19,7 @@ export function FooterSection() {
           <div className="text-center mb-12">
             <Link href="/" className="inline-block mb-6">
               <Image
-                src="/irislogoblack.png"
+                src="/irislogoblack.png?v=2"
                 alt="Iris Logo"
                 width={140}
                 height={28}
@@ -28,7 +28,7 @@ export function FooterSection() {
                 className="mx-auto dark:hidden"
               />
               <Image
-                src="/irislogowhitebig.png"
+                src="/irislogowhitebig.png?v=2"
                 alt="Iris Logo"
                 width={140}
                 height={28}
