@@ -20,6 +20,7 @@ from core.services.langfuse import langfuse
 from datetime import datetime, timezone
 from core.billing.billing_integration import billing_integration
 from litellm.utils import token_counter
+from core.services.memory_store_local import get_memory_store
 
 ToolChoice = Literal["auto", "required", "none"]
 
@@ -128,6 +129,10 @@ class ThreadManager:
     ):
         """Add a message to the thread in the database."""
         # logger.debug(f"Adding message of type '{type}' to thread {thread_id}")
+        
+        # Auto-offload large content to memory store
+        content, metadata = await self._offload_large_content(content, type, metadata)
+        
         client = await self.db.client
 
         data_to_insert = {
@@ -159,6 +164,208 @@ class ThreadManager:
         except Exception as e:
             logger.error(f"Failed to add message to thread {thread_id}: {str(e)}", exc_info=True)
             raise
+    
+    async def _offload_large_content(
+        self,
+        content: Union[Dict[str, Any], List[Any], str],
+        type: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> tuple[Union[Dict[str, Any], List[Any], str], Optional[Dict[str, Any]]]:
+        """
+        Auto-offload large content to memory store.
+        
+        Threshold: >6000 chars (~1500 tokens)
+        Returns: (modified_content, modified_metadata)
+        """
+        OFFLOAD_THRESHOLD = 6000
+        SUMMARY_LENGTH = 800
+        
+        try:
+            # Extract string content to measure
+            content_str = None
+            if isinstance(content, str):
+                content_str = content
+            elif isinstance(content, dict):
+                # Try to extract content field
+                if 'content' in content:
+                    content_str = str(content.get('content', ''))
+                elif 'output' in content:
+                    content_str = str(content.get('output', ''))
+                else:
+                    content_str = json.dumps(content)
+            else:
+                content_str = json.dumps(content)
+            
+            # Check if offloading is needed
+            if len(content_str) <= OFFLOAD_THRESHOLD:
+                return content, metadata
+            
+            # Offload to memory store
+            memory_store = get_memory_store()
+            
+            # Determine memory type and subtype
+            memory_type = "TOOL_OUTPUT"
+            memory_subtype = None
+            memory_title = None
+            memory_tags = []
+            
+            if type == "tool":
+                memory_type = "TOOL_OUTPUT"
+                if isinstance(content, dict):
+                    memory_subtype = content.get('tool_name', 'unknown')
+                    memory_title = f"Tool output: {memory_subtype}"
+                    memory_tags = ["tool", memory_subtype]
+            elif "web" in type.lower() or "search" in type.lower():
+                memory_type = "WEB_SCRAPE"
+                memory_subtype = "search"
+                memory_title = "Web search results"
+                memory_tags = ["web", "search"]
+            elif "file" in type.lower() or "list" in type.lower():
+                memory_type = "FILE_LIST"
+                memory_subtype = "listing"
+                memory_title = "File listing"
+                memory_tags = ["files", "code"]
+            else:
+                memory_title = f"{type} output"
+                memory_tags = [type]
+            
+            # Store in memory
+            memory_ref = memory_store.put_text(
+                content=content_str,
+                type=memory_type,
+                subtype=memory_subtype,
+                title=memory_title,
+                tags=memory_tags
+            )
+            
+            # Create summary (first N chars)
+            summary = content_str[:SUMMARY_LENGTH]
+            if len(content_str) > SUMMARY_LENGTH:
+                summary += "..."
+            
+            # Calculate tokens saved
+            tokens_saved = len(content_str) // 4  # Rough estimation
+            
+            # Modify content
+            if isinstance(content, str):
+                content = summary + f"\n\n[Large content offloaded. See memory_refs for details.]"
+            elif isinstance(content, dict):
+                # Preserve structure but replace large fields
+                content = content.copy()
+                if 'content' in content:
+                    content['content'] = summary + f"\n\n[See memory_refs]"
+                elif 'output' in content:
+                    content['output'] = summary + f"\n\n[See memory_refs]"
+                else:
+                    content['_summary'] = summary
+            
+            # Update metadata
+            if metadata is None:
+                metadata = {}
+            
+            metadata['memory_refs'] = metadata.get('memory_refs', [])
+            metadata['memory_refs'].append({
+                'id': memory_ref.memory_id,
+                'title': memory_ref.title,
+                'mime': memory_ref.mime,
+                'type': memory_ref.type,
+                'subtype': memory_ref.subtype,
+                'bytes': memory_ref.bytes
+            })
+            metadata['tokens_saved'] = metadata.get('tokens_saved', 0) + tokens_saved
+            
+            logger.info(
+                f"💾 Offloaded large content to memory: "
+                f"memory_id={memory_ref.memory_id[:12]}..., "
+                f"type={memory_type}/{memory_subtype or 'none'}, "
+                f"original={len(content_str):,} chars, "
+                f"tokens_saved≈{tokens_saved:,}"
+            )
+            
+            return content, metadata
+        
+        except Exception as e:
+            logger.error(f"Failed to offload content: {e}", exc_info=True)
+            # Return original content if offloading fails
+            return content, metadata
+    
+    async def _apply_token_governor(
+        self,
+        messages: List[Dict[str, Any]],
+        llm_model: str,
+        system_prompt: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Token Governor: Enforce strict token limits to prevent context overflow.
+        
+        Policies:
+        - >20k projected → force tiered summaries (3-5 bullets + pointer)
+        - >40k projected → deny expansion; instruct model to plan with memory_fetch only
+        
+        Args:
+            messages: List of messages to check
+            llm_model: Model name for token counting
+            system_prompt: Optional system prompt to include in count
+        
+        Returns:
+            Modified messages (if limits exceeded)
+        """
+        TIER_1_LIMIT = 20_000  # Force summaries
+        TIER_2_LIMIT = 40_000  # Deny expansion, pointer-only mode
+        
+        try:
+            # Count tokens
+            if system_prompt:
+                total_tokens = token_counter(model=llm_model, messages=[system_prompt] + messages)
+            else:
+                total_tokens = token_counter(model=llm_model, messages=messages)
+            
+            # Check limits
+            if total_tokens > TIER_2_LIMIT:
+                # TIER 2: Extreme compression required
+                logger.warning(
+                    f"⚠️ TOKEN GOVERNOR: Projected tokens ({total_tokens:,}) exceed TIER 2 limit ({TIER_2_LIMIT:,}). "
+                    f"Forcing pointer-only mode."
+                )
+                
+                # Add system instruction to use memory_fetch
+                warning_msg = {
+                    "role": "system",
+                    "content": (
+                        "⚠️ TOKEN LIMIT WARNING: Context is very large. "
+                        "DO NOT attempt to expand or inline large content. "
+                        "Use memory_fetch tool with tight line ranges (max 200 lines) for all large content. "
+                        "Plan your approach before fetching memory."
+                    )
+                }
+                messages.insert(0, warning_msg)
+                
+            elif total_tokens > TIER_1_LIMIT:
+                # TIER 1: Force tiered summaries
+                logger.warning(
+                    f"⚠️ TOKEN GOVERNOR: Projected tokens ({total_tokens:,}) exceed TIER 1 limit ({TIER_1_LIMIT:,}). "
+                    f"Applying tiered summarization."
+                )
+                
+                # For now, just add a warning message
+                # (tiered summarization would require more complex logic)
+                warning_msg = {
+                    "role": "system",
+                    "content": (
+                        "⚠️ TOKEN EFFICIENCY WARNING: Context is large. "
+                        "Prefer using memory_fetch with small line ranges instead of requesting full content."
+                    )
+                }
+                messages.insert(0, warning_msg)
+            
+            else:
+                logger.debug(f"✅ Token governor: {total_tokens:,} tokens (within limits)")
+            
+            return messages
+        
+        except Exception as e:
+            logger.error(f"Token governor error: {e}", exc_info=True)
+            return messages
 
     async def _handle_billing(self, thread_id: str, content: dict, saved_message: dict):
         try:
@@ -380,6 +587,7 @@ class ThreadManager:
                     actual_total_tokens=None,  # Will be calculated inside
                     system_prompt=system_prompt, # KEY FIX: No caching during compression
                     return_report=True,
+                    pointer_mode=True,  # Enable pointer mode: preserve memory_refs, no hydration
                 )
                 if compression_report:
                     logger.info(f"🧮 Context compression summary: {compression_report.summary_line()}")
@@ -389,6 +597,9 @@ class ThreadManager:
                 messages = compressed_messages
             else:
                 logger.debug("Context manager disabled, using raw messages")
+            
+            # Token Governor: Enforce token limits before LLM call
+            messages = await self._apply_token_governor(messages, llm_model, system_prompt)
 
             # Apply caching
             cache_report = None

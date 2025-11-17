@@ -20,6 +20,7 @@ from core.tools.sb_files_tool import SandboxFilesTool
 from core.tools.sb_kb_tool import SandboxKbTool
 from core.tools.data_providers_tool import DataProvidersTool
 from core.tools.expand_msg_tool import ExpandMessageTool
+from core.tools.memory_fetch_tool import MemoryFetchTool
 from core.prompts.prompt import get_system_prompt
 
 from core.utils.logger import logger
@@ -103,6 +104,7 @@ class ToolManager:
         self.thread_manager.add_tool(ExpandMessageTool, thread_id=self.thread_id, thread_manager=self.thread_manager)
         self.thread_manager.add_tool(MessageTool)
         self.thread_manager.add_tool(TaskListTool, project_id=self.project_id, thread_manager=self.thread_manager, thread_id=self.thread_id)
+        self.thread_manager.add_tool(MemoryFetchTool)  # Memory offloading tool
     
     def _register_sandbox_tools(self, disabled_tools: List[str]):
         """Register sandbox-related tools with granular control."""
