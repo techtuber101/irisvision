@@ -309,6 +309,12 @@ class HTMLToDocxConverter:
             
         soup = BeautifulSoup(html_content, 'html.parser')
         
+        # Remove the first h1 tag if it exists to avoid duplicate heading
+        # (we already have the title in the document header)
+        first_h1 = soup.find('h1')
+        if first_h1:
+            first_h1.decompose()  # Remove it completely
+        
         for element in soup.contents:
             if getattr(element, 'name', None) is None and not str(element).strip():
                 continue

@@ -4,6 +4,8 @@ import mimetypes
 import os
 from typing import Optional, Dict, Any, List
 from urllib.parse import unquote
+from io import BytesIO
+from uuid import uuid4
 
 from bs4 import BeautifulSoup
 from core.agentpress.thread_manager import ThreadManager
@@ -1225,13 +1227,13 @@ if __name__ == "__main__":
         "type": "function",
         "function": {
             "name": "convert_to_docx",
-            "description": "Convert a document to DOCX (Microsoft Word) format with professional formatting. Images will be embedded when possible.",
+            "description": "Convert a document to DOCX (Microsoft Word) format with professional formatting. Images will be embedded when possible. IMPORTANT: If you don't know the doc_id, first use 'list_documents' to find the document. The doc_id is typically returned when a document is created, or you can find it by listing all documents. If the user says 'convert this document' or 'convert the document', use list_documents to find the most recent document or match by title.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "doc_id": {
                         "type": "string",
-                        "description": "ID of the document to convert to DOCX"
+                        "description": "ID of the document to convert to DOCX. If you don't know the doc_id, use 'list_documents' first to find it. The doc_id is usually in the format 'doc_xxxxxx' and is returned when documents are created."
                     },
                     "download": {
                         "type": "boolean",
@@ -1257,70 +1259,104 @@ if __name__ == "__main__":
             # Get the document path
             doc_path = doc_info["path"]
             
-            # Make API call to sandbox server to convert to DOCX
-            sandbox_url = getattr(self, '_sandbox_url', None)
-            if not sandbox_url:
-                return self.fail_response("Sandbox URL not available for DOCX conversion")
-            
-            convert_url = f"{sandbox_url}/document/convert-to-docx"
-            
-            import httpx
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    convert_url,
-                    json={
-                        "doc_path": doc_path,
-                        "download": True  # Always get the file content
-                    }
-                )
+            # Read the document content (HTML) from the file
+            # This ensures we use the exact same content as the button export
+            try:
+                file_content = await self.sandbox.fs.download_file(doc_path)
+                file_content_str = file_content.decode('utf-8')
                 
-                if response.status_code != 200:
-                    error_detail = response.text
-                    logger.error(f"DOCX conversion failed: {error_detail}")
-                    return self.fail_response(f"Failed to convert to DOCX: {error_detail}")
-                
-                docx_content = response.content
-                
-                # Extract filename from Content-Disposition header or create one
-                content_disposition = response.headers.get('Content-Disposition', '')
-                if 'filename=' in content_disposition:
-                    filename_match = re.search(r'filename="(.+?)"', content_disposition)
-                    if filename_match:
-                        docx_filename = filename_match.group(1)
+                # Parse the document if it's a TipTap JSON document
+                try:
+                    doc_json = json.loads(file_content_str)
+                    if doc_json.get('type') == 'tiptap_document':
+                        html_content = doc_json.get('content', '')
+                        doc_title = doc_json.get('title', doc_info.get('title', 'Document'))
                     else:
-                        docx_filename = f"{self._sanitize_filename(doc_info['title'])}_{doc_id}.docx"
-                else:
-                    docx_filename = f"{self._sanitize_filename(doc_info['title'])}_{doc_id}.docx"
-                
-                # Save DOCX file to docs directory
-                docx_path = f"/workspace/docs/{docx_filename}"
-                await self.sandbox.fs.upload_file(docx_content, docx_path)
-                
-                # Update metadata
-                all_metadata["documents"][doc_id]["last_docx_export"] = {
-                    "filename": docx_filename,
-                    "path": docx_path,
-                    "exported_at": datetime.now().isoformat()
+                        # Not a TipTap document, use as-is
+                        html_content = file_content_str
+                        doc_title = doc_info.get('title', 'Document')
+                except (json.JSONDecodeError, KeyError):
+                    # Not JSON, treat as HTML
+                    html_content = file_content_str
+                    doc_title = doc_info.get('title', 'Document')
+            except Exception as e:
+                logger.error(f"Failed to read document file: {e}")
+                return self.fail_response(
+                    f"Failed to read document file at path: {doc_path}. "
+                    f"Error: {str(e)}. Document ID: {doc_id}"
+                )
+            
+            # Use the same conversion method as the button export
+            # This ensures identical formatting and look-and-feel
+            from core.sandbox.docker.html_to_docx_router import HTMLToDocxConverter
+            
+            # Polish HTML content (same as button export)
+            def _polish_content(raw: str) -> str:
+                if not raw:
+                    return ""
+                return (
+                    raw.replace("<hr>", "<hr />")
+                    .replace("<hr/>", "<hr />")
+                    .replace("<br>", "<br />")
+                    .replace("<br/>", "<br />")
+                )
+            
+            polished_html = _polish_content(html_content)
+            
+            # Create converter with the same approach as button export
+            converter = HTMLToDocxConverter(doc_path=f"/tmp/{uuid4().hex}.json")
+            converter.doc_data = {
+                "title": doc_title.strip() or "Document",
+                "content": polished_html,
+                "metadata": {},
+            }
+            
+            # Generate DOCX document
+            document = converter.create_docx()
+            buffer = BytesIO()
+            document.save(buffer)
+            buffer.seek(0)
+            docx_content = buffer.getvalue()
+            
+            # Create filename (same format as button export)
+            def _safe_filename(name: str) -> str:
+                normalized = name.strip() or "document"
+                normalized = re.sub(r"[^\w\s-]", "", normalized)
+                normalized = re.sub(r"[-\s]+", "-", normalized)
+                normalized = normalized[:80] or "document"
+                return f"{normalized}.docx" if not normalized.endswith(".docx") else normalized
+            
+            docx_filename = _safe_filename(doc_title)
+            
+            # Save DOCX file to docs directory
+            docx_path = f"/workspace/docs/{docx_filename}"
+            await self.sandbox.fs.upload_file(docx_content, docx_path)
+            
+            # Update metadata
+            all_metadata["documents"][doc_id]["last_docx_export"] = {
+                "filename": docx_filename,
+                "path": docx_path,
+                "exported_at": datetime.now().isoformat()
+            }
+            await self._save_metadata(all_metadata)
+            
+            preview_url = None
+            download_url = None
+            if hasattr(self, '_sandbox_url') and self._sandbox_url:
+                preview_url = f"{self._sandbox_url}/docs/{docx_filename}"
+                download_url = preview_url
+            
+            return self.success_response({
+                "message": f"DOCX Conversion Complete - Document converted with the same professional formatting as the export button",
+                "docx_filename": docx_filename,
+                "docx_path": docx_path,
+                "title": doc_title,
+                "_internal": {
+                    "preview_url": preview_url,
+                    "download_url": download_url,
+                    "sandbox_id": self.sandbox_id
                 }
-                await self._save_metadata(all_metadata)
-                
-                preview_url = None
-                download_url = None
-                if hasattr(self, '_sandbox_url') and self._sandbox_url:
-                    preview_url = f"{self._sandbox_url}/docs/{docx_filename}"
-                    download_url = preview_url
-                
-                return self.success_response({
-                    "message": f"DOCX Conversion Complete",
-                    "docx_filename": docx_filename,
-                    "docx_path": docx_path,
-                    "title": doc_info["title"],
-                    "_internal": {
-                        "preview_url": preview_url,
-                        "download_url": download_url,
-                        "sandbox_id": self.sandbox_id
-                    }
-                })
+            })
                 
         except Exception as e:
             logger.error(f"Error converting document to DOCX: {str(e)}")
