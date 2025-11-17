@@ -187,7 +187,7 @@ export function SidebarLeft({
                   alt="Iris Symbol"
                   width={32}
                   height={32}
-                  className="w-8 h-8 dark:hidden"
+                  className="w-8 h-8 dark:hidden -ml-0.32"
                   priority
                 />
                 <Image
@@ -204,17 +204,17 @@ export function SidebarLeft({
                 <Image
                   src="/irislogoblack.png"
                   alt="Iris Logo"
-                  width={260}
-                  height={46}
-                  className="h-8 w-auto dark:hidden"
+                  width={460}
+                  height={81}
+                  className="h-12 w-auto dark:hidden -ml-1"
                   priority
                 />
                 <Image
                   src="/irislogowhitebig.png"
                   alt="Iris Logo"
-                  width={180}
-                  height={32}
-                  className="h-6 w-auto hidden dark:block"
+                  width={330}
+                  height={59}
+                  className="h-14 w-auto hidden dark:block -ml-1"
                   priority
                 />
               </>

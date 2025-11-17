@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { SectionHeader } from "@/components/home/section-header";
 import { motion } from "motion/react";
 import { Shield, Server, Lock, Flag } from "lucide-react";
@@ -56,12 +56,81 @@ function GlassCard({
 // Section
 // ==============================
 export function MadeInIndiaSection() {
+  const [scrollY, setScrollY] = useState(0);
+  const sectionRef = useRef<HTMLElement>(null);
+  const [sectionTop, setSectionTop] = useState(0);
+
+  useEffect(() => {
+    // Get section position
+    const updateSectionPosition = () => {
+      if (sectionRef.current) {
+        setSectionTop(sectionRef.current.offsetTop);
+      }
+    };
+
+    updateSectionPosition();
+
+    // Track scroll
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+    };
+
+    // Update position on resize
+    window.addEventListener('resize', updateSectionPosition);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      window.removeEventListener('resize', updateSectionPosition);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  // Calculate spotlight opacity based on scroll position
+  // Traveling beam from hero starts at ~400px and moves with scroll
+  // It hits Made in India section when: 400 + scrollY ≈ sectionTop
+  // We want spotlight to appear when beam arrives and fade out as we continue scrolling
+  const beamPosition = 400 + scrollY; // Position of traveling beam
+  const distanceToSection = beamPosition - sectionTop;
+  
+  // Spotlight appears when beam is within 300px of section top
+  // Fades in from -300 to 0, stays visible from 0 to +200, then fades out from +200 to +500
+  let spotlightOpacity = 0;
+  if (distanceToSection >= -300 && distanceToSection <= 0) {
+    // Fade in as beam approaches
+    spotlightOpacity = (distanceToSection + 300) / 300;
+  } else if (distanceToSection > 0 && distanceToSection <= 200) {
+    // Full brightness when beam hits
+    spotlightOpacity = 1;
+  } else if (distanceToSection > 200 && distanceToSection <= 500) {
+    // Fade out as we scroll past
+    spotlightOpacity = 1 - ((distanceToSection - 200) / 300);
+  }
+
   return (
     <section
+      ref={sectionRef}
       id="made-in-india"
       className="relative flex flex-col items-center justify-center w-full pb-24 overflow-hidden"
     >
-      {/* Spotlight effect emanating from "Made in India" */}
+      {/* Dynamic spotlight that appears when traveling beam hits and fades out */}
+      {spotlightOpacity > 0 && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10"
+          style={{ opacity: spotlightOpacity }}
+        >
+          <div
+            className="absolute left-1/2 -top-[10%] -translate-x-1/2 w-full h-[60vh]"
+            style={{
+              background: "radial-gradient(ellipse 25% 35% at 50% 15%, rgba(120,160,255,0.35) 0%, rgba(120,160,255,0.25) 15%, rgba(120,160,255,0.18) 30%, rgba(120,160,255,0.12) 45%, rgba(120,160,255,0.08) 60%, rgba(120,160,255,0.04) 75%, transparent 100%)",
+              mixBlendMode: "screen",
+              filter: "blur(100px)",
+            }}
+          />
+        </div>
+      )}
+
+      {/* Original static spotlight effect emanating from "Made in India" */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 -z-10"

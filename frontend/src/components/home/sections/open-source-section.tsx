@@ -4,6 +4,7 @@ import React from "react";
 import { SectionHeader } from "@/components/home/section-header";
 import { motion } from "motion/react";
 import { Eye, Brain, Rocket, LineChart, ArrowRight } from "lucide-react";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 // ==============================
 // Glass primitives
@@ -55,6 +56,8 @@ function GlassCard({
 // Section
 // ==============================
 export function OpenSourceSection() {
+  const prefersReducedMotion = useReducedMotion();
+  
   return (
     <section
       id="vision"
@@ -75,7 +78,8 @@ export function OpenSourceSection() {
         {/* Vision pipeline */}
         <div className="mt-12 grid grid-cols-1 md:grid-cols-4 gap-6">
           <motion.div
-            whileHover={{ y: -3 }}
+            whileHover={prefersReducedMotion ? {} : { y: -3 }}
+            transition={{ type: "spring", stiffness: 400, damping: 17 }}
             className="relative flex flex-col items-center text-center"
           >
             <GlassCard className="p-6 flex flex-col items-center gap-3">
@@ -89,7 +93,8 @@ export function OpenSourceSection() {
           </motion.div>
 
           <motion.div
-            whileHover={{ y: -3 }}
+            whileHover={prefersReducedMotion ? {} : { y: -3 }}
+            transition={{ type: "spring", stiffness: 400, damping: 17 }}
             className="relative flex flex-col items-center text-center"
           >
             <GlassCard className="p-6 flex flex-col items-center gap-3">
@@ -103,7 +108,8 @@ export function OpenSourceSection() {
           </motion.div>
 
           <motion.div
-            whileHover={{ y: -3 }}
+            whileHover={prefersReducedMotion ? {} : { y: -3 }}
+            transition={{ type: "spring", stiffness: 400, damping: 17 }}
             className="relative flex flex-col items-center text-center"
           >
             <GlassCard className="p-6 flex flex-col items-center gap-3">
@@ -117,7 +123,8 @@ export function OpenSourceSection() {
           </motion.div>
 
           <motion.div
-            whileHover={{ y: -3 }}
+            whileHover={prefersReducedMotion ? {} : { y: -3 }}
+            transition={{ type: "spring", stiffness: 400, damping: 17 }}
             className="relative flex flex-col items-center text-center"
           >
             <GlassCard className="p-6 flex flex-col items-center gap-3">

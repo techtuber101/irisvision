@@ -4,8 +4,8 @@ import React, { useMemo, useState } from "react";
 import { SectionHeader } from "@/components/home/section-header";
 import { siteConfig } from "@/lib/home";
 import { cn } from "@/lib/utils";
-import { motion } from "motion/react";
 import { ArrowRight } from "lucide-react";
+import Image from "next/image";
 
 interface UseCase {
   id: string;
@@ -188,24 +188,10 @@ export function UseCasesSection() {
 
       {/* Grid */}
       <div className="relative w-full">
-        <motion.div
-          initial="hidden"
-          animate="show"
-          variants={{
-            hidden: { opacity: 0, y: 8 },
-            show: {
-              opacity: 1,
-              y: 0,
-              transition: { staggerChildren: 0.06, duration: 0.35, ease: "easeOut" },
-            },
-          }}
-          className="grid min-[650px]:grid-cols-2 min-[1000px]:grid-cols-3 min-[1320px]:grid-cols-4 gap-5 w-full max-w-6xl mx-auto px-6"
-        >
+        <div className="grid min-[650px]:grid-cols-2 min-[1000px]:grid-cols-3 min-[1320px]:grid-cols-4 gap-5 w-full max-w-6xl mx-auto px-6">
           {filtered.map((useCase) => (
-            <motion.div
+            <div
               key={useCase.id}
-              variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
-              whileHover={{ y: -2 }}
               className="relative"
             >
               {useCase.featured && <FeaturedHalo />}
@@ -244,7 +230,7 @@ export function UseCasesSection() {
                   <div className="relative aspect-[16/9] w-full overflow-hidden">
                     {/* LQIP blur layer */}
                     <div className="absolute inset-0 bg-white/5 blur-xl opacity-60 transition-opacity duration-500 group-hover:opacity-40" />
-                    <img
+                    <Image
                       src={
                         useCase.image ||
                         `https://placehold.co/800x450/0b1220/9aa4b2?text=Iris+${encodeURIComponent(
@@ -252,11 +238,13 @@ export function UseCasesSection() {
                         )}`
                       }
                       alt={`Iris ${useCase.title}`}
-                      loading="lazy"
+                      fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       className={cn(
-                        "relative z-10 h-full w-full object-cover",
+                        "relative z-10 object-cover",
                         "scale-[1.01] transition-transform duration-500 group-hover:scale-[1.03]"
                       )}
+                      loading="lazy"
                     />
                     {/* Gradient overlay + CTA */}
                     <a
@@ -283,9 +271,9 @@ export function UseCasesSection() {
                   <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent" />
                 </div>
               </GlassCard>
-            </motion.div>
+            </div>
           ))}
-        </motion.div>
+        </div>
 
         {filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">

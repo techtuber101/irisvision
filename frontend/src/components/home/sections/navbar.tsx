@@ -35,21 +35,35 @@ export function Navbar() {
 
   // Highlight current section
   useEffect(() => {
+    let ticking = false;
+    let rafId: number | null = null;
+
     const handleScroll = () => {
-      const sections = siteConfig.nav.links.map((item) => item.href.substring(1));
-      for (const section of sections) {
-        const el = document.getElementById(section);
-        if (!el) continue;
-        const rect = el.getBoundingClientRect();
-        if (rect.top <= 150 && rect.bottom >= 150) {
-          setActiveSection(section);
-          break;
-        }
+      if (!ticking) {
+        rafId = requestAnimationFrame(() => {
+          const sections = siteConfig.nav.links.map((item) => item.href.substring(1));
+          for (const section of sections) {
+            const el = document.getElementById(section);
+            if (!el) continue;
+            const rect = el.getBoundingClientRect();
+            if (rect.top <= 150 && rect.bottom >= 150) {
+              setActiveSection(section);
+              break;
+            }
+          }
+          ticking = false;
+        });
+        ticking = true;
       }
     };
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
   }, []);
 
   // Toggle glass on scroll

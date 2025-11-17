@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
+import { WandSparkles } from "lucide-react";
 
 // ==============================
 // Glass primitives (match Hero)
@@ -253,13 +254,15 @@ function getTierBenefits(tierName: string) {
   const name = tierName.toLowerCase();
   if (name.includes("free")) {
     return {
-      dailyCoins: "1,000",
+      dailyCoins: "500",
       monthlyReserve: "0",
       chatsTasks: "Unlimited",
       integrations: "2",
-      personalities: "1",
+      enhanceYourVision: "0",
+      personalities: "0",
       quickChatMode: "Limited",
-      autoScheduleTasks: "1",
+      autoScheduleTasks: "0",
+      oneClickRecap: "0",
       support: "Community",
       earlyAccess: false,
     };
@@ -270,9 +273,11 @@ function getTierBenefits(tierName: string) {
       monthlyReserve: "10,000",
       chatsTasks: "Unlimited",
       integrations: "10",
+      enhanceYourVision: "5",
       personalities: "10",
       quickChatMode: "Unlimited",
       autoScheduleTasks: "5",
+      oneClickRecap: "0",
       support: "Priority",
       earlyAccess: false,
     };
@@ -283,9 +288,11 @@ function getTierBenefits(tierName: string) {
       monthlyReserve: "30,000",
       chatsTasks: "Unlimited",
       integrations: "Unlimited",
+      enhanceYourVision: "30",
       personalities: "35",
       quickChatMode: "Unlimited",
       autoScheduleTasks: "25",
+      oneClickRecap: "30",
       support: "24/7",
       earlyAccess: true,
     };
@@ -296,9 +303,11 @@ function getTierBenefits(tierName: string) {
       monthlyReserve: "60,000",
       chatsTasks: "Unlimited",
       integrations: "Unlimited",
+      enhanceYourVision: "Unlimited",
       personalities: "Unlimited",
       quickChatMode: "Unlimited",
       autoScheduleTasks: "Unlimited",
+      oneClickRecap: "Unlimited",
       support: "24/7 Priority",
       earlyAccess: true,
     };
@@ -308,9 +317,11 @@ function getTierBenefits(tierName: string) {
     monthlyReserve: "-",
     chatsTasks: "-",
     integrations: "-",
+    enhanceYourVision: "-",
     personalities: "-",
     quickChatMode: "-",
     autoScheduleTasks: "-",
+    oneClickRecap: "-",
     support: "-",
     earlyAccess: false,
   };
@@ -320,6 +331,7 @@ const PriceDisplay = ({ price }: { price: string }) => (
   <motion.span
     key={price}
     className="text-4xl font-semibold bg-gradient-to-b from-white to-white/70 bg-clip-text text-transparent"
+    style={{ lineHeight: '1.2' }}
     initial={{ opacity: 0, x: 10, filter: "blur(5px)" }}
     animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
     transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
@@ -333,8 +345,8 @@ const PriceDisplay = ({ price }: { price: string }) => (
 // ==============================
 function ComparisonTable() {
   const features = [
-    { name: "Pricing", free: "₹0", air: "₹1,000", pro: "₹2,500", ultra: "₹3,000", enterprise: "Custom", hasInfo: false },
-    { name: "Daily Coins", free: "1,000", air: "1,200", pro: "1,500", ultra: "2,000", enterprise: "Unlimited", hasInfo: true },
+    { name: "Pricing", free: "₹0", air: "₹1,000", pro: "₹3,000", ultra: "₹3,599", enterprise: "Custom", hasInfo: false },
+    { name: "Daily Coins", free: "500", air: "1,200", pro: "1,500", ultra: "2,000", enterprise: "Unlimited", hasInfo: true },
     { name: "Monthly Coin Reserve", free: "0", air: "10,000", pro: "25,000", ultra: "50,000", enterprise: "Unlimited", hasInfo: true },
     { name: "Chats/Tasks", free: "Unlimited", air: "Unlimited", pro: "Unlimited", ultra: "Unlimited", enterprise: "Unlimited", hasInfo: false },
     { name: "Iris Integrations", free: "3", air: "25", pro: "Unlimited", ultra: "Unlimited", enterprise: "Unlimited", hasInfo: true },
@@ -592,15 +604,53 @@ export function PricingSection({
                       Popular
                     </span>
                   )}
+                  {tier.name.toLowerCase().includes('ultra') && (
+                    <span className="ml-2 inline-flex items-center h-6 px-2 rounded-full text-xs font-medium text-white bg-white/10 ring-1 ring-white/20">
+                      Highest Value
+                    </span>
+                  )}
                 </p>
 
-                <div className="flex items-baseline mt-1 flex-wrap gap-1">
+                <div className="flex items-baseline mt-1 flex-wrap gap-1 min-h-[3rem]">
                   <AnimatePresence mode="wait">
-                    <PriceDisplay key={displayPrice} price={displayPrice || tier.price} />
+                    {!isYearly && tier.name.toLowerCase().includes('ultra') ? (
+                      <motion.span
+                        key={displayPrice}
+                        className="text-4xl font-semibold relative inline-block"
+                        style={{ lineHeight: '1.2' }}
+                        initial={{ opacity: 0, x: 10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                      >
+                        {/* Glow layer */}
+                        <span 
+                          className="absolute inset-0 text-white blur-sm opacity-35 pointer-events-none"
+                          aria-hidden="true"
+                          style={{
+                            textShadow: '0 0 8px rgba(255,255,255,0.4), 0 0 16px rgba(255,255,255,0.25), 0 0 24px rgba(255,255,255,0.15)',
+                            lineHeight: '1.2',
+                          }}
+                        >
+                          {displayPrice || tier.price}
+                        </span>
+                        {/* Main text */}
+                        <span className="relative z-10 bg-gradient-to-b from-white to-white/70 bg-clip-text text-transparent" style={{ lineHeight: '1.2' }}>
+                          {displayPrice || tier.price}
+                        </span>
+                      </motion.span>
+                    ) : (
+                      <PriceDisplay key={displayPrice} price={displayPrice || tier.price} />
+                    )}
                   </AnimatePresence>
                   {originalPrice && (
                     <span className="text-sm text-white/50 line-through">
                       {originalPrice}
+                    </span>
+                  )}
+                  {/* Show crossed-off price for Ultra in monthly view */}
+                  {!isYearly && tier.name.toLowerCase().includes('ultra') && (
+                    <span className="text-xs text-white/40 line-through ml-1">
+                      ₹12,000
                     </span>
                   )}
                   <span className="text-white/70 text-sm">
@@ -608,18 +658,21 @@ export function PricingSection({
                   </span>
                 </div>
 
-                <p className="text-sm text-white/70">{tier.description}</p>
-
-                {/* Coins / Enterprise badge - Always show a badge for consistent spacing */}
-                <div className="h-6 flex items-center">
-                  {meta.showCoins && (
-                    <div className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-white w-fit">
-                      {meta.coins}
-                    </div>
-                  )}
-                  {isEnterprise && (
-                    <div className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-white/80 w-fit">
-                      Contact sales
+                {/* Description and Coins badge */}
+                <div className="mt-1">
+                  <p className="text-sm text-white/70 leading-relaxed">{tier.description}</p>
+                  {(meta.showCoins || isEnterprise) && (
+                    <div className="mt-2">
+                      {meta.showCoins && (
+                        <div className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-white">
+                          {meta.coins}
+                        </div>
+                      )}
+                      {isEnterprise && (
+                        <div className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-white/80">
+                          Contact sales
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -665,19 +718,6 @@ export function PricingSection({
                       </span>
                     </li>
 
-                    {/* Personalities */}
-                    <li className="flex items-start gap-2">
-                      <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
-                        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </span>
-                      <span className="text-white/80">
-                        <HoverTooltip label="Personalities">Personalities are bold, customized modes of operation that combine different agent tools and behaviors to tailor Iris to your workflow. Build sharp, savvy profiles for research, sales, coding and more—switch contexts in one click.</HoverTooltip>
-                        {`: ${benefits.personalities}`}
-                      </span>
-                    </li>
-
                     {/* Quick Chat Mode */}
                     <li className="flex items-start gap-2">
                       <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
@@ -685,21 +725,134 @@ export function PricingSection({
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
                       </span>
-                      <span className="text-white/80">{`Quick Chat Mode: ${benefits.quickChatMode}`}</span>
+                      <span className="text-white/80">
+                        {tier.name.toLowerCase().includes('free') || tier.name.toLowerCase().includes('air')
+                          ? 'Quick Chat Mode' 
+                          : 'Unlimited Quick Chat Mode'}
+                      </span>
+                    </li>
+
+                    {/* Enhance Your Vision */}
+                    <li className="flex items-start gap-2">
+                      {tier.name.toLowerCase().includes('free') ? (
+                        <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500/20">
+                          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-red-400" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      ) : (
+                        <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
+                          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      )}
+                      <span className="text-white/80">
+                        <HoverTooltip label="Enhance Your Vision">
+                          State your goal and activate <WandSparkles className="inline w-3.5 h-3.5 mx-0.5" /> while typing. Iris transforms your raw vision into a precision-engineered prompt, leveraging best-in-class practices to deliver breakthrough results.
+                        </HoverTooltip>
+                        {`: ${benefits.enhanceYourVision}`}
+                      </span>
+                    </li>
+
+                    {/* Personalities */}
+                    <li className="flex items-start gap-2">
+                      {tier.name.toLowerCase().includes('free') ? (
+                        <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500/20">
+                          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-red-400" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      ) : (
+                        <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
+                          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      )}
+                      <span className="text-white/80">
+                        <HoverTooltip label="Personalities">Personalities are bold, customized modes of operation that combine different agent tools and behaviors to tailor Iris to your workflow. Build sharp, savvy profiles for research, sales, coding and more—switch contexts in one click.</HoverTooltip>
+                        {`: ${benefits.personalities}`}
+                      </span>
                     </li>
 
                     {/* Auto Schedule Tasks */}
                     <li className="flex items-start gap-2">
-                      <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
-                        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </span>
+                      {tier.name.toLowerCase().includes('free') ? (
+                        <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500/20">
+                          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-red-400" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      ) : (
+                        <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
+                          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      )}
                       <span className="text-white/80">
                         <HoverTooltip label="Auto Schedule Tasks">Automatically run tasks on a schedule—hourly, daily, weekly, or with custom CRON. Set it once; Iris executes reliably in the background so progress never stalls.</HoverTooltip>
                         {`: ${benefits.autoScheduleTasks}`}
                       </span>
                     </li>
+
+                    {/* One Click Recap */}
+                    <li className="flex items-start gap-2">
+                      {tier.name.toLowerCase().includes('free') || tier.name.toLowerCase().includes('air') ? (
+                        <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500/20">
+                          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-red-400" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      ) : (
+                        <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
+                          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      )}
+                      <span className="text-white/80">
+                        <HoverTooltip label="One Click Recap">
+                          Chat titles often fall short when conversations take unexpected turns. One Click Recap instantly summarizes the entire thread from start to finish, providing crystal-clear visibility into what happened, the files generated, solutions delivered, and ideas explored—all at a glance.
+                        </HoverTooltip>
+                        {`: ${benefits.oneClickRecap}`}
+                      </span>
+                    </li>
+
+                    {/* Early Access: New Features (All cards, crossed out in Free and Air) */}
+                    <li className="flex items-start gap-2">
+                      {tier.name.toLowerCase().includes('free') || tier.name.toLowerCase().includes('air') ? (
+                        <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500/20">
+                          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-red-400" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      ) : (
+                        <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
+                          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      )}
+                      <span className="text-white/80">
+                        {tier.name.toLowerCase().includes('ultra') 
+                          ? 'Earliest Access: New Features' 
+                          : 'Early Access: New Features'}
+                      </span>
+                    </li>
+
+                    {/* Support (Free plan) */}
+                    {tier.name.toLowerCase().includes('free') && (
+                      <li className="flex items-start gap-2">
+                        <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
+                          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                        <span className="text-white/80">Support</span>
+                      </li>
+                    )}
 
                     {/* 24/7 Priority Support (Air, Pro, Ultra) */}
                     {/(air|pro|ultra)/i.test(tier.name) && (
@@ -710,18 +863,6 @@ export function PricingSection({
                           </svg>
                         </span>
                         <span className="text-white/80">{tier.name.toLowerCase().includes('ultra') ? '24/7 Exclusive Support' : '24/7 Priority Support'}</span>
-                      </li>
-                    )}
-
-                    {/* Early Access (Pro, Ultra) */}
-                    {/(pro|ultra)/i.test(tier.name) && (
-                      <li className="flex items-start gap-2">
-                        <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-green-500/20">
-                          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-green-400" fill="currentColor">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        </span>
-                        <span className="text-white/80">Early Access: New Features</span>
                       </li>
                     )}
 

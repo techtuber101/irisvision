@@ -7,10 +7,10 @@ export function HeroVideoSection() {
         {/* Section Header */}
         <div className="text-center mb-8">
           <h2 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-            See Iris in Action
+            The Future We're Building
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Watch and see how Iris transforms your workflow with intelligent automation and seamless AI-powered assistance.
+            A personal message from our founder on what Iris is, why it matters, and where we're headed.
           </p>
         </div>
 

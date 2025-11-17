@@ -115,8 +115,8 @@ export function HeroVideoDialog({
         )}
         {/* Gradient overlay for better contrast */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-        {/* Play button with enhanced styling */}
-        <div className="absolute isolate inset-0 flex scale-[0.9] items-center justify-center rounded-2xl transition-all duration-300 ease-out group-hover:scale-100">
+        {/* Play button with enhanced styling - only appears on hover */}
+        <div className="absolute isolate inset-0 flex scale-[0.9] items-center justify-center rounded-2xl transition-all duration-300 ease-out opacity-0 group-hover:opacity-100 group-hover:scale-100">
           <div className="flex size-28 items-center justify-center rounded-full bg-gradient-to-t from-secondary/30 to-[#ACC3F7/20] backdrop-blur-md ring-2 ring-white/10 group-hover:ring-white/20 transition-all duration-300 shadow-2xl">
             <div
               className={`relative flex size-20 scale-100 items-center justify-center rounded-full bg-gradient-to-t from-secondary to-white/10 shadow-lg transition-all duration-300 ease-out group-hover:scale-[1.2] group-hover:shadow-xl`}
