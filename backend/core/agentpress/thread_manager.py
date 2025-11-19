@@ -386,7 +386,10 @@ class ThreadManager:
             )
         
         # Build context text for summarization
+        # Also extract task IDs from create_tasks tool results to preserve them
         context_parts = []
+        extracted_task_ids = []  # Preserve task IDs separately
+        
         for msg in old_messages:
             role = msg.get('role', 'unknown')
             content = msg.get('content', '')
@@ -397,12 +400,56 @@ class ThreadManager:
                     content_dict = json.loads(content)
                     if isinstance(content_dict, dict):
                         text = content_dict.get('content', '') or str(content_dict)
+                        # Check if this is a create_tasks tool result
+                        tool_exec = content_dict.get('tool_execution', {})
+                        if tool_exec.get('function_name') == 'create_tasks':
+                            result_output = tool_exec.get('result', {}).get('output', {})
+                            if isinstance(result_output, str):
+                                try:
+                                    result_output = json.loads(result_output)
+                                except:
+                                    pass
+                            if isinstance(result_output, dict):
+                                # Extract task IDs from all sections
+                                sections = result_output.get('sections', [])
+                                for section in sections:
+                                    tasks = section.get('tasks', [])
+                                    for task in tasks:
+                                        task_id = task.get('id')
+                                        if task_id:
+                                            extracted_task_ids.append({
+                                                'id': task_id,
+                                                'content': task.get('content', ''),
+                                                'status': task.get('status', 'pending')
+                                            })
                     else:
                         text = content
                 except (json.JSONDecodeError, TypeError):
                     text = content
             elif isinstance(content, dict):
                 text = content.get('content', '') or str(content)
+                # Check if this is a create_tasks tool result
+                tool_exec = content.get('tool_execution', {})
+                if tool_exec.get('function_name') == 'create_tasks':
+                    result_output = tool_exec.get('result', {}).get('output', {})
+                    if isinstance(result_output, str):
+                        try:
+                            result_output = json.loads(result_output)
+                        except:
+                            pass
+                    if isinstance(result_output, dict):
+                        # Extract task IDs from all sections
+                        sections = result_output.get('sections', [])
+                        for section in sections:
+                            tasks = section.get('tasks', [])
+                            for task in tasks:
+                                task_id = task.get('id')
+                                if task_id:
+                                    extracted_task_ids.append({
+                                        'id': task_id,
+                                        'content': task.get('content', ''),
+                                        'status': task.get('status', 'pending')
+                                    })
             else:
                 text = str(content)
             
@@ -419,7 +466,17 @@ class ThreadManager:
         if len(context_text) > 50000:
             context_text = context_text[:50000] + "\n\n... [truncated for summarization]"
         
-        # Create summarization prompt
+        # Create summarization prompt with task IDs preservation
+        task_ids_section = ""
+        if extracted_task_ids:
+            task_ids_list = [f"- {t['id']}: {t['content'][:100]}... (status: {t['status']})" 
+                           for t in extracted_task_ids[:20]]  # Limit to first 20 to avoid token bloat
+            task_ids_section = f"""
+
+CRITICAL: The following task IDs were created and MUST be preserved exactly as shown. Include these in your summary:
+{chr(10).join(task_ids_list)}
+"""
+        
         summarization_prompt = f"""Summarize the following conversation context into a concise paragraph (4-5 sentences maximum, ~150-200 words). 
 
 Preserve:
@@ -427,8 +484,10 @@ Preserve:
 - Key decisions and outcomes  
 - Important context that might be needed later
 - Critical information from tool results
+{task_ids_section}
 
 Be extremely concise - aim for a single paragraph that captures the essence of what happened. Do not include tool call details, just summarize the outcomes and context.
+{task_ids_section and 'IMPORTANT: After your summary paragraph, add a section listing all task IDs that were created (format: "Task IDs: [id1, id2, id3, ...]")' or ''}
 
 Conversation context to summarize:
 {context_text}
@@ -469,10 +528,17 @@ Conversation context to summarize:
                 logger.warning("Summary too short, keeping original messages")
                 return None
             
+            # Append task IDs explicitly to the summary to ensure they're preserved
+            task_ids_append = ""
+            if extracted_task_ids:
+                task_id_list = [t['id'] for t in extracted_task_ids]
+                task_ids_append = f"\n\n[PRESERVED TASK IDs]: {json.dumps(task_id_list)}"
+                logger.info(f"Preserving {len(task_id_list)} task IDs in summary")
+            
             # Create a summary message
             summary_message = {
                 "role": "system",
-                "content": f"[Previous conversation summary]: {summary_text}"
+                "content": f"[Previous conversation summary]: {summary_text}{task_ids_append}"
             }
             
             logger.info(

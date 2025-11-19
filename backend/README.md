@@ -141,6 +141,10 @@ REDIS_PASSWORD=
 
 ---
 
+### Updating Task Lists
+
+When you trigger a task update, the system expects the payload to look exactly like the UI screenshot with an array of task IDs: `["1e6413e2-f3b1-438f-9fdd-f48b6a6f66f9","f8be957f-fcae-409b-8246-99d171058fd5","233e937a-d008-4002-b65b-47d178975abc","bb359392-aec2-41"]`. This is the only format that reliably works, so wait for the spinner to render that array of IDs and edit/update tasks using that same style of explicit UUID list.
+
 ## Production Setup
 
 For production deployments, use the following command to set resource limits
