@@ -82,10 +82,22 @@ class ThreadManager:
             trace=self.trace,
             agent_config=self.agent_config
         )
+        
+        # Cumulative token tracking for context summarization
+        self.cumulative_tokens = 0
+        self.summarization_triggered = False
+        self.summarization_boundary_index = -1  # Index of last message before summarization (messages before this are summarized)
+        self.current_summary = None  # Store the current summary in memory (not in DB)
 
     def add_tool(self, tool_class: Type[Tool], function_names: Optional[List[str]] = None, **kwargs):
         """Add a tool to the ThreadManager."""
         self.tool_registry.register_tool(tool_class, function_names, **kwargs)
+    
+    def set_cumulative_tokens(self, cumulative_tokens: int, summarization_triggered: bool):
+        """Set cumulative token state from AgentRunner for context summarization."""
+        self.cumulative_tokens = cumulative_tokens
+        self.summarization_triggered = summarization_triggered
+        # Note: summarization_boundary_index is set when summarization occurs
 
     async def create_thread(
         self,
@@ -284,6 +296,196 @@ class ThreadManager:
             logger.error(f"Failed to get messages for thread {thread_id}: {str(e)}", exc_info=True)
             return []
     
+    def _is_summary_message(self, msg: Dict[str, Any]) -> bool:
+        """Check if a message is a context summary message."""
+        role = msg.get('role', '')
+        content = msg.get('content', '')
+        
+        if role == 'system':
+            if isinstance(content, str):
+                return content.startswith('[Previous conversation summary]:')
+            elif isinstance(content, dict):
+                text = content.get('content', '')
+                return isinstance(text, str) and text.startswith('[Previous conversation summary]:')
+        
+        return False
+    
+    def _filter_summarized_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Filter messages to exclude old messages that have been summarized.
+        Uses summarization_boundary_index to determine which messages to exclude.
+        Returns the stored summary + messages after the boundary.
+        """
+        if not messages:
+            return messages
+        
+        # If no summarization has occurred, return all messages
+        if self.summarization_boundary_index == -1 or self.current_summary is None:
+            return messages
+        
+        # If boundary is beyond message count, return all messages
+        if self.summarization_boundary_index >= len(messages):
+            return messages
+        
+        # Return stored summary + messages after the boundary (last 3 fresh ones)
+        KEEP_FRESH_MESSAGES = 3
+        if len(messages) > self.summarization_boundary_index + KEEP_FRESH_MESSAGES:
+            # Return summary + last 3 fresh messages
+            return [self.current_summary] + messages[-KEEP_FRESH_MESSAGES:]
+        else:
+            # Return summary + all messages after boundary
+            return [self.current_summary] + messages[self.summarization_boundary_index:]
+    
+    async def _generate_context_summary(
+        self,
+        messages: List[Dict[str, Any]],
+        llm_model: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Generate a summary of old context messages using flash lite model.
+        If a previous summary exists, it will be included in what gets summarized.
+        
+        Args:
+            messages: List of all messages (will keep last 2-3 fresh)
+            llm_model: The model being used for the run
+            
+        Returns:
+            Summary message dict or None if summarization fails
+        """
+        if not messages or len(messages) < 5:
+            logger.debug("Not enough messages to summarize (need at least 5)")
+            return None
+        
+        # Keep the last 2-3 messages fresh (not summarized)
+        KEEP_FRESH_MESSAGES = 3
+        
+        if len(messages) <= KEEP_FRESH_MESSAGES:
+            logger.debug(f"Only {len(messages)} messages, skipping summarization")
+            return None
+        
+        # Separate old messages (to summarize) from fresh messages (to keep)
+        # This includes any previous summary in the old messages
+        old_messages = messages[:-KEEP_FRESH_MESSAGES]
+        fresh_messages = messages[-KEEP_FRESH_MESSAGES:]
+        
+        if not old_messages or len(old_messages) < 2:
+            logger.debug("Not enough old messages to summarize")
+            return None
+        
+        # Check if there's a previous summary in old_messages
+        has_previous_summary = any(self._is_summary_message(msg) for msg in old_messages)
+        if has_previous_summary:
+            logger.info(
+                f"Generating new context summary: {len(old_messages)} old messages (including previous summary), "
+                f"keeping {len(fresh_messages)} fresh messages. Previous summary will be included in new summary."
+            )
+        else:
+            logger.info(
+                f"Generating context summary: {len(old_messages)} old messages, "
+                f"keeping {len(fresh_messages)} fresh messages"
+            )
+        
+        # Build context text for summarization
+        context_parts = []
+        for msg in old_messages:
+            role = msg.get('role', 'unknown')
+            content = msg.get('content', '')
+            
+            # Extract text content
+            if isinstance(content, str):
+                try:
+                    content_dict = json.loads(content)
+                    if isinstance(content_dict, dict):
+                        text = content_dict.get('content', '') or str(content_dict)
+                    else:
+                        text = content
+                except (json.JSONDecodeError, TypeError):
+                    text = content
+            elif isinstance(content, dict):
+                text = content.get('content', '') or str(content)
+            else:
+                text = str(content)
+            
+            # Truncate very long messages to avoid token limits
+            if len(text) > 2000:
+                text = text[:2000] + "... [truncated]"
+            
+            if text.strip():
+                context_parts.append(f"[{role}]: {text}")
+        
+        context_text = "\n\n".join(context_parts)
+        
+        # Limit total input to avoid token limits (roughly 50k chars ≈ 12.5k tokens)
+        if len(context_text) > 50000:
+            context_text = context_text[:50000] + "\n\n... [truncated for summarization]"
+        
+        # Create summarization prompt
+        summarization_prompt = f"""Summarize the following conversation context into a concise paragraph (4-5 sentences maximum, ~150-200 words). 
+
+Preserve:
+- Main goals and objectives
+- Key decisions and outcomes  
+- Important context that might be needed later
+- Critical information from tool results
+
+Be extremely concise - aim for a single paragraph that captures the essence of what happened. Do not include tool call details, just summarize the outcomes and context.
+
+Conversation context to summarize:
+{context_text}
+"""
+        
+        try:
+            # Use flash lite model for fast, cheap summarization
+            logger.info("Calling gemini/gemini-2.5-flash-lite for context summarization...")
+            summary_response = await make_llm_api_call(
+                messages=[{"role": "user", "content": summarization_prompt}],
+                model_name="gemini/gemini-2.5-flash-lite",
+                temperature=0.1,
+                max_tokens=500,  # Limit summary to ~500 tokens (paragraph length)
+                stream=False
+            )
+            
+            # Extract summary text
+            summary_text = ""
+            if isinstance(summary_response, str):
+                summary_text = summary_response.strip()
+            elif isinstance(summary_response, dict):
+                if 'choices' in summary_response and summary_response['choices']:
+                    summary_text = summary_response['choices'][0].get('message', {}).get('content', '').strip()
+                else:
+                    summary_text = summary_response.get('content', '').strip()
+            else:
+                # Handle LiteLLM ModelResponse object
+                if hasattr(summary_response, 'choices') and summary_response.choices:
+                    first_choice = summary_response.choices[0]
+                    if hasattr(first_choice, 'message'):
+                        summary_text = first_choice.message.content.strip()
+                    elif isinstance(first_choice, dict):
+                        summary_text = first_choice.get('message', {}).get('content', '').strip()
+                elif hasattr(summary_response, 'content'):
+                    summary_text = str(summary_response.content).strip()
+            
+            if not summary_text or len(summary_text) < 20:
+                logger.warning("Summary too short, keeping original messages")
+                return None
+            
+            # Create a summary message
+            summary_message = {
+                "role": "system",
+                "content": f"[Previous conversation summary]: {summary_text}"
+            }
+            
+            logger.info(
+                f"Context summary generated: {len(old_messages)} messages -> 1 summary "
+                f"({len(summary_text)} chars)"
+            )
+            
+            return summary_message
+            
+        except Exception as e:
+            logger.error(f"Failed to generate context summary: {e}", exc_info=True)
+            return None
+    
     async def run_thread(
         self,
         thread_id: str,
@@ -357,7 +559,49 @@ class ThreadManager:
             
         try:
             # Get and prepare messages
-            messages = await self.get_llm_messages(thread_id)
+            all_messages = await self.get_llm_messages(thread_id)
+            
+            # Check if we need to summarize context (80k token threshold)
+            # Allow re-triggering if tokens hit 80k again (even if previously summarized)
+            if self.cumulative_tokens >= 80000:
+                logger.info(
+                    f"Cumulative tokens ({self.cumulative_tokens:,}) crossed 80k threshold. "
+                    f"Triggering context summarization..."
+                )
+                
+                # Generate summary of old messages (includes previous summary if it exists)
+                summary_message = await self._generate_context_summary(all_messages, llm_model)
+                
+                if summary_message:
+                    # Replace old messages with summary, keep last 3 fresh
+                    KEEP_FRESH_MESSAGES = 3
+                    if len(all_messages) > KEEP_FRESH_MESSAGES:
+                        # Track the boundary: messages before this index were summarized
+                        # The boundary is the index of the first message we're keeping fresh
+                        self.summarization_boundary_index = len(all_messages) - KEEP_FRESH_MESSAGES
+                        
+                        # Store the summary in memory for reuse when below 80k
+                        self.current_summary = summary_message
+                        
+                        # Replace all old messages with new summary, keep only last 3 fresh
+                        messages = [summary_message] + all_messages[-KEEP_FRESH_MESSAGES:]
+                        self.summarization_triggered = True
+                        logger.info(
+                            f"Context summarization complete: replaced {self.summarization_boundary_index} "
+                            f"old messages with summary, keeping {KEEP_FRESH_MESSAGES} fresh messages "
+                            f"(boundary index: {self.summarization_boundary_index})"
+                        )
+                    else:
+                        logger.warning("Not enough messages to replace, keeping all messages")
+                        messages = all_messages
+                        self.summarization_boundary_index = -1
+                else:
+                    logger.warning("Context summarization failed, continuing with all messages")
+                    messages = all_messages
+                    self.summarization_boundary_index = -1
+            else:
+                # Below 80k threshold - filter out messages that were summarized
+                messages = self._filter_summarized_messages(all_messages)
             
             # Handle auto-continue context
             if auto_continue_state['count'] > 0 and auto_continue_state['continuous_state'].get('accumulated_content'):
