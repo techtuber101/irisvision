@@ -55,6 +55,7 @@ import { useProjectRealtime } from '@/hooks/useProjectRealtime';
 import { fastGeminiChatStream } from '@/lib/fast-gemini-chat';
 import { continueSimpleChatStream } from '@/lib/simple-chat';
 import { handleGoogleSlidesUpload } from './tool-views/utils/presentation-utils';
+import { FloatingToolPreview, ToolCallInput } from '@/components/thread/chat-input/floating-tool-preview';
 
 
 interface ThreadComponentProps {
@@ -1043,11 +1044,19 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     }
   }, [setLeftSidebarOpen]);
 
+  // Helper function to check if a tool call is create_document
+  const isCreateDocumentTool = useCallback((toolCall: ToolCallInput | undefined): boolean => {
+    if (!toolCall) return false;
+    const toolName = toolCall.assistantCall?.name || '';
+    return toolName === 'create-document' || toolName === 'create_document';
+  }, []);
+
   useEffect(() => {
     if (initialLoadCompleted && !initialPanelOpenAttempted) {
       setInitialPanelOpenAttempted(true);
 
       // Only auto-open when there are tool calls (desktop only, not compact)
+      // This is the first tool call in a new chat, so always auto-open
       if (!isMobile && !compact && toolCalls.length > 0) {
         setIsSidePanelOpen(true);
         setCurrentToolIndex(toolCalls.length - 1);
@@ -1067,12 +1076,36 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   useEffect(() => {
     const prev = previousToolCallCountRef.current;
     const curr = toolCalls.length;
-    if (!isMobile && !compact && !isSidePanelOpen && curr > prev) {
-      setIsSidePanelOpen(true);
-      setCurrentToolIndex(curr - 1);
+    
+    // Reset userClosedPanelRef when a new chat starts (toolCalls goes from 0 to 1)
+    if (prev === 0 && curr === 1) {
+      userClosedPanelRef.current = false;
     }
+    
+    // Update the ref for next comparison
     previousToolCallCountRef.current = curr;
-  }, [toolCalls.length, isSidePanelOpen, isMobile, compact, setIsSidePanelOpen, setCurrentToolIndex]);
+    
+    if (!isMobile && !compact && !isSidePanelOpen && curr > prev) {
+      // Check if user manually closed the panel
+      const userClosed = userClosedPanelRef.current;
+      
+      // Get the latest tool call to check if it's create_document
+      const latestToolCall = toolCalls[curr - 1];
+      const isCreateDocument = isCreateDocumentTool(latestToolCall);
+      
+      // Auto-open if:
+      // 1. User hasn't manually closed it, OR
+      // 2. It's a create_document tool call (exception to the rule)
+      if (!userClosed || isCreateDocument) {
+        setIsSidePanelOpen(true);
+        setCurrentToolIndex(curr - 1);
+        // Reset the flag if we auto-opened for create_document
+        if (isCreateDocument && userClosed) {
+          userClosedPanelRef.current = false;
+        }
+      }
+    }
+  }, [toolCalls, isSidePanelOpen, isMobile, compact, setIsSidePanelOpen, setCurrentToolIndex, isCreateDocumentTool]);
 
   useEffect(() => {
     // Prevent duplicate streaming calls for the same runId
@@ -1555,6 +1588,23 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
           isSimpleChatLoading={isSimpleChatLoading}
         />
 
+        {/* Floating Tool Preview - Right Side Square */}
+        {!isMobile && toolCalls.length > 0 && (
+          <FloatingToolPreview
+            toolCalls={toolCalls}
+            currentIndex={currentToolIndex}
+            onExpand={() => {
+              setIsSidePanelOpen(true);
+              userClosedPanelRef.current = false;
+            }}
+            agentName={agent && agent.name}
+            isVisible={!isSidePanelOpen}
+            agentStatus={agentStatus}
+            agentRunId={agentRunId || undefined}
+            threadId={threadId}
+          />
+        )}
+
         <div
           className={cn(
             'fixed bottom-0 z-10 bg-gradient-to-t from-background via-background/90 to-transparent px-4 pt-8 pb-5',
@@ -1599,7 +1649,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
               hideAgentSelection={!!configuredAgentId}
               toolCalls={toolCalls}
               toolCallIndex={currentToolIndex}
-              showToolPreview={!isSidePanelOpen && toolCalls.length > 0}
+              showToolPreview={false}
               onExpandToolPreview={() => {
                 setIsSidePanelOpen(true);
                 userClosedPanelRef.current = false;

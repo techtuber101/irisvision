@@ -3,11 +3,13 @@ import { View } from 'react-native';
 import { AskToolView } from './AskToolView';
 import { BrowserToolView } from './BrowserToolView';
 import { CommandToolView } from './CommandToolView';
+import { CheckCommandOutputToolView } from './CheckCommandOutputToolView';
 import { CompleteToolView } from './CompleteToolView';
 import { DataProviderEndpointsToolView } from './DataProviderEndpointsToolView';
 import { ExecuteDataProviderCallToolView } from './ExecuteDataProviderCallToolView';
 import { ExposePortToolView } from './ExposePortToolView';
 import { FileOperationToolView } from './FileOperationToolView';
+import { FileEditToolView } from './FileEditToolView';
 import { GenericToolView } from './GenericToolView';
 import { SeeImageToolView } from './SeeImageToolView';
 import { StrReplaceToolView } from './StrReplaceToolView';
@@ -21,12 +23,17 @@ import { WebSearchToolView } from './WebSearchToolView';
 export interface ToolViewProps {
     name?: string;
     toolCall?: any;
+    toolContent?: string;
+    assistantContent?: string;
+    assistantTimestamp?: string;
+    toolTimestamp?: string;
     isStreaming?: boolean;
     isSuccess?: boolean;
     onFilePress?: (filePath: string) => void;
     sandboxId?: string;
     messages?: any[]; // Add messages prop for complete tool
     browserState?: any; // Browser state data for browser tools
+    project?: any; // Project data for file operations
     // Future props can be added here
     [key: string]: any;
 }
@@ -34,6 +41,7 @@ export interface ToolViewProps {
 export type ToolViewComponent = React.ComponentType<ToolViewProps>;
 
 const defaultRegistry: Record<string, ToolViewComponent> = {
+    // Browser tools
     'browser-navigate-to': BrowserToolView,
     'browser-go-back': BrowserToolView,
     'browser-wait': BrowserToolView,
@@ -49,32 +57,58 @@ const defaultRegistry: Record<string, ToolViewComponent> = {
     'browser-select-dropdown-option': BrowserToolView,
     'browser-drag-drop': BrowserToolView,
     'browser-click-coordinates': BrowserToolView,
+    'browser-act': BrowserToolView,
+    'browser-extract-content': BrowserToolView,
+    'browser-screenshot': BrowserToolView,
 
-    'ask': AskToolView,
-    'complete': CompleteToolView,
-    'default': GenericToolView,
+    // Command tools
+    'execute-command': CommandToolView,
+    'check-command-output': CheckCommandOutputToolView,
+    'terminate-command': TerminateCommandToolView,
+    'list-commands': GenericToolView,
 
+    // File operations
     'create-file': FileOperationToolView,
     'delete-file': FileOperationToolView,
     'full-file-rewrite': FileOperationToolView,
     'read-file': FileOperationToolView,
+    'edit-file': FileEditToolView,
     'str-replace': StrReplaceToolView,
-    'execute-command': CommandToolView,
-    'terminate-command': TerminateCommandToolView,
 
-
-    'load-image': SeeImageToolView,
-
-    'expose-port': ExposePortToolView,
-    'get-data-provider-endpoints': DataProviderEndpointsToolView,
-    'execute-data-provider-call': ExecuteDataProviderCallToolView,
-
-
-
+    // Search tools
     'web-search': WebSearchToolView,
+    'people-search': GenericToolView, // Will be enhanced later
+    'company-search': GenericToolView, // Will be enhanced later
+    'paper-search': GenericToolView, // Will be enhanced later
+    'image-search': WebSearchToolView,
     'crawl-webpage': WebCrawlToolView,
     'scrape-webpage': WebScrapeToolView,
 
+    // Document tools
+    'parse-document': GenericToolView, // Will be enhanced later
+
+    // Image tools
+    'load-image': SeeImageToolView,
+    'clear-images-from-context': SeeImageToolView,
+    'image-edit-or-generate': GenericToolView, // Will be enhanced later
+    'designer-create-or-edit': GenericToolView, // Will be enhanced later
+
+    // Communication tools
+    'ask': AskToolView,
+    'complete': CompleteToolView,
+    'wait': GenericToolView, // Will be enhanced later
+    'expand-message': GenericToolView, // Will be enhanced later
+    'expand_message': GenericToolView,
+
+    // Network tools
+    'expose-port': ExposePortToolView,
+
+    // Data provider tools
+    'get-data-provider-endpoints': DataProviderEndpointsToolView,
+    'execute-data-provider-call': ExecuteDataProviderCallToolView,
+
+    // Default fallback
+    'default': GenericToolView,
 };
 
 class ToolViewRegistry {

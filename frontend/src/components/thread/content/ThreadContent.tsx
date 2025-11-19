@@ -379,7 +379,7 @@ export function renderMarkdownContent(
                                 <div className='border border-white/20 bg-white/10 backdrop-blur-sm flex items-center justify-center p-0.75 rounded-lg relative z-10 light:border-black/10 light:bg-black/5'>
                                     <IconComponent className="h-3.5 w-3.5 text-white/90 light:text-zinc-700 flex-shrink-0" />
                                 </div>
-                                <span className="font-mono text-white/90 light:text-zinc-800 relative z-10" style={{ fontSize: '12px' }}>{getUserFriendlyToolName(toolName)}</span>
+                                <span className="font-mono text-white/90 light:text-zinc-800 relative z-10" style={{ fontSize: '12px' }}>{getUserFriendlyToolName(toolName, true)}</span>
                                 {paramDisplay && <span className="ml-1 text-white/70 light:text-zinc-600 truncate max-w-[200px] relative z-10" title={paramDisplay}>{paramDisplay}</span>}
                             </button>
                         </div>
@@ -533,7 +533,7 @@ export function renderMarkdownContent(
                         <div className='border border-white/20 bg-white/10 backdrop-blur-sm flex items-center justify-center p-0.75 rounded-lg relative z-10'>
                             <IconComponent className="h-3.5 w-3.5 text-white/90 flex-shrink-0" />
                         </div>
-                        <span className="font-mono text-white/90 relative z-10" style={{ fontSize: '12px' }}>{getUserFriendlyToolName(toolName)}</span>
+                        <span className="font-mono text-white/90 relative z-10" style={{ fontSize: '12px' }}>{getUserFriendlyToolName(toolName, true)}</span>
                         {paramDisplay && <span className="ml-1 text-white/70 truncate max-w-[200px] relative z-10" title={paramDisplay}>{paramDisplay}</span>}
                     </button>
                     {toolTimestamp && (

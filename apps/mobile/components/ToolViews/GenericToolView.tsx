@@ -1,9 +1,11 @@
 import { useTheme } from '@/hooks/useThemeColor';
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { StyleSheet, View, ScrollView } from 'react-native';
 import { Body, Caption } from '../Typography';
 import { Card, CardContent } from '../ui/Card';
 import { ToolViewProps } from './ToolViewRegistry';
+import { extractToolData, getToolTitle, formatTimestamp } from '@/utils/tool-utils';
+import { Wrench, CheckCircle, AlertTriangle, Clock } from 'lucide-react-native';
 
 interface GenericToolViewProps extends ToolViewProps {
     toolContent?: string;
@@ -12,72 +14,15 @@ interface GenericToolViewProps extends ToolViewProps {
     toolTimestamp?: string;
 }
 
-const extractGenericToolData = (toolCall?: any, toolContent?: string) => {
-    let functionName = '';
-    let parameters: any = {};
-    let result: any = null;
-    let isSuccess = true;
-    let errorMessage = '';
-
-    // Extract from tool call parameters
-    if (toolCall?.parameters) {
-        parameters = toolCall.parameters;
-        functionName = toolCall.functionName || toolCall.name || '';
-    }
-
-    // Parse tool content if available
-    if (toolContent) {
-        try {
-            const parsed = JSON.parse(toolContent);
-
-            if (parsed.tool_execution) {
-                const toolExecution = parsed.tool_execution;
-
-                // Extract function name
-                functionName = toolExecution.function_name ||
-                    toolExecution.xml_tag_name ||
-                    functionName;
-
-                // Extract arguments
-                if (toolExecution.arguments) {
-                    parameters = { ...parameters, ...toolExecution.arguments };
-                }
-
-                // Extract result
-                if (toolExecution.result) {
-                    result = toolExecution.result;
-
-                    if (result.success !== undefined) {
-                        isSuccess = result.success;
-                    }
-
-                    if (result.error) {
-                        errorMessage = result.error;
-                    }
-                }
-            }
-        } catch (e) {
-            // If parsing fails, treat as raw result
-            result = toolContent;
-            isSuccess = false;
-            errorMessage = 'Failed to parse tool content';
-        }
-    }
-
-    return {
-        functionName,
-        parameters,
-        result,
-        isSuccess,
-        errorMessage
-    };
-};
-
 export const GenericToolView: React.FC<GenericToolViewProps> = ({
     toolCall,
     toolContent,
+    assistantContent,
+    assistantTimestamp,
+    toolTimestamp,
     isStreaming = false,
     isSuccess = true,
+    name,
     ...props
 }) => {
     const theme = useTheme();
@@ -85,35 +30,117 @@ export const GenericToolView: React.FC<GenericToolViewProps> = ({
     // Convert color-mix(in oklab, var(--muted) 20%, transparent) to hex
     const mutedBg = theme.muted === '#e8e8e8' ? '#e8e8e833' : '#30303033';
 
+    const formatContent = useMemo(() => {
+        const content = toolContent || assistantContent;
+        if (!content) return null;
+
+        // Use the new parser for backwards compatibility
+        const { toolResult } = extractToolData(content);
+
+        if (toolResult) {
+            // Format the structured content nicely
+            const formatted: any = {
+                tool: toolResult.xmlTagName || toolResult.functionName,
+            };
+
+            if (toolResult.arguments && Object.keys(toolResult.arguments).length > 0) {
+                formatted.parameters = toolResult.arguments;
+            }
+
+            if (toolResult.toolOutput) {
+                formatted.output = toolResult.toolOutput;
+            }
+
+            if (toolResult.isSuccess !== undefined) {
+                formatted.success = toolResult.isSuccess;
+            }
+
+            return JSON.stringify(formatted, null, 2);
+        }
+
+        // Fallback to legacy format handling
+        if (typeof content === 'object') {
+            // Check for direct structured format (legacy)
+            if ('tool_name' in content || 'xml_tag_name' in content) {
+                const formatted: any = {
+                    tool: content.tool_name || content.xml_tag_name || 'unknown',
+                };
+
+                if (content.parameters && Object.keys(content.parameters).length > 0) {
+                    formatted.parameters = content.parameters;
+                }
+
+                if (content.result) {
+                    formatted.result = content.result;
+                }
+
+                return JSON.stringify(formatted, null, 2);
+            }
+
+            // Check if it has a content field that might contain the structured data (legacy)
+            if ('content' in content && typeof content.content === 'object') {
+                const innerContent = content.content;
+                if ('tool_name' in innerContent || 'xml_tag_name' in innerContent) {
+                    const formatted: any = {
+                        tool: innerContent.tool_name || innerContent.xml_tag_name || 'unknown',
+                    };
+
+                    if (innerContent.parameters && Object.keys(innerContent.parameters).length > 0) {
+                        formatted.parameters = innerContent.parameters;
+                    }
+
+                    if (innerContent.result) {
+                        formatted.result = innerContent.result;
+                    }
+
+                    return JSON.stringify(formatted, null, 2);
+                }
+            }
+
+            // Fall back to old format handling
+            if (content.content && typeof content.content === 'string') {
+                return content.content;
+            }
+            return JSON.stringify(content, null, 2);
+        }
+
+        if (typeof content === 'string') {
+            try {
+                const parsedJson = JSON.parse(content);
+                return JSON.stringify(parsedJson, null, 2);
+            } catch (e) {
+                return content;
+            }
+        }
+
+        return String(content);
+    }, [toolContent, assistantContent]);
+
+    const toolTitle = getToolTitle(name || 'generic-tool');
+    const actualIsSuccess = useMemo(() => {
+        const { toolResult } = extractToolData(toolContent || assistantContent);
+        return toolResult ? toolResult.isSuccess : isSuccess;
+    }, [toolContent, assistantContent, isSuccess]);
+
     const styles = StyleSheet.create({
         container: {
             flex: 1,
-            padding: 16,
+            backgroundColor: theme.background,
         },
         emptyState: {
             flex: 1,
             justifyContent: 'center',
             alignItems: 'center',
+            padding: 32,
         },
         emptyText: {
             fontSize: 16,
+            color: theme.mutedForeground,
+            textAlign: 'center',
         },
-        header: {
-            marginBottom: 16,
-        },
-        toolName: {
-            color: theme.foreground,
-            marginBottom: 8,
-        },
-        statusBadge: {
-            paddingHorizontal: 8,
-            paddingVertical: 4,
-            borderRadius: 4,
-            alignSelf: 'flex-start',
-        },
-        statusText: {
-            fontSize: 12,
-            fontWeight: '600' as const,
+        content: {
+            flex: 1,
+            padding: 16,
         },
         section: {
             marginBottom: 16,
@@ -122,37 +149,43 @@ export const GenericToolView: React.FC<GenericToolViewProps> = ({
             color: theme.foreground,
             marginBottom: 8,
             fontWeight: '600' as const,
+            fontSize: 14,
         },
-        parameterKey: {
-            color: theme.mutedForeground,
+        codeBlock: {
+            backgroundColor: mutedBg,
+            borderColor: theme.muted,
+            borderWidth: 1,
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 8,
+        },
+        codeText: {
+            color: theme.foreground,
+            fontFamily: 'monospace',
             fontSize: 12,
-            marginBottom: 4,
         },
-        parameterValue: {
-            color: theme.foreground,
-            fontFamily: 'monospace',
-            fontSize: 13,
+        footer: {
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderTopWidth: 1,
+            borderTopColor: theme.border,
+            backgroundColor: theme.sidebar,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
         },
-        resultText: {
-            color: theme.foreground,
-            fontFamily: 'monospace',
-            fontSize: 13,
-        },
-        errorText: {
-            color: theme.destructive,
-            fontFamily: 'monospace',
-            fontSize: 13,
+        timestamp: {
+            fontSize: 11,
+            color: theme.mutedForeground,
         },
     });
 
-    console.log('🔧 GENERIC TOOL RECEIVED:', !!toolContent, toolContent?.length || 0);
-
-    if (!toolContent && !isStreaming && !toolCall) {
-        console.log('❌ GENERIC TOOL: NO CONTENT');
+    if (!formatContent && !isStreaming) {
         return (
-            <View style={[styles.container, { backgroundColor: theme.background }]}>
+            <View style={styles.container}>
                 <View style={styles.emptyState}>
-                    <Body style={[styles.emptyText, { color: theme.mutedForeground }]}>
+                    <Wrench size={32} color={theme.mutedForeground} />
+                    <Body style={styles.emptyText}>
                         No tool data available
                     </Body>
                 </View>
@@ -160,83 +193,49 @@ export const GenericToolView: React.FC<GenericToolViewProps> = ({
         );
     }
 
-    const {
-        functionName,
-        parameters,
-        result,
-        isSuccess: actualIsSuccess,
-        errorMessage
-    } = extractGenericToolData(toolCall, toolContent);
-
-    const displayName = functionName || 'Unknown Tool';
-
     return (
-        <View style={[styles.container, { backgroundColor: theme.background }]}>
-            {parameters && Object.keys(parameters).length > 0 && (
-                <View style={styles.section}>
-                    <Body style={styles.sectionTitle}>Parameters</Body>
-                    {Object.entries(parameters).map(([key, value]) => (
-                        <Card
-                            key={key}
-                            style={{
-                                backgroundColor: mutedBg,
-                                borderColor: theme.muted,
-                                marginBottom: 8,
-                                padding: 12,
-                            }}
-                            bordered
-                            elevated={false}
-                        >
-                            <CardContent style={{ padding: 0 }}>
-                                <Caption style={styles.parameterKey}>{key}</Caption>
-                                <Body style={styles.parameterValue}>
-                                    {typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
-                                </Body>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </View>
-            )}
-
-            {result && (
-                <View style={styles.section}>
-                    <Body style={styles.sectionTitle}>Result</Body>
-                    <Card
-                        style={{
-                            backgroundColor: mutedBg,
-                            borderColor: theme.muted,
-                        }}
-                        bordered
-                        elevated={false}
-                    >
-                        <CardContent style={{ padding: 0 }}>
-                            <Body style={styles.resultText}>
-                                {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
+        <View style={styles.container}>
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                {formatContent && (
+                    <View style={styles.section}>
+                        <Body style={styles.sectionTitle}>
+                            {toolContent ? 'Output' : 'Input'}
+                        </Body>
+                        <View style={styles.codeBlock}>
+                            <Body style={styles.codeText}>
+                                {formatContent}
                             </Body>
-                        </CardContent>
-                    </Card>
-                </View>
-            )}
+                        </View>
+                    </View>
+                )}
+            </ScrollView>
 
-            {errorMessage && (
-                <View style={styles.section}>
-                    <Body style={[styles.sectionTitle, { color: theme.destructive }]}>Error</Body>
-                    <Card
-                        style={{
-                            backgroundColor: mutedBg,
-                            borderColor: theme.destructive,
-                        }}
-                        bordered
-                        elevated={false}
-                    >
-                        <CardContent style={{ padding: 0 }}>
-                            <Body style={styles.errorText}>
-                                {errorMessage}
-                            </Body>
-                        </CardContent>
-                    </Card>
+            <View style={styles.footer}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    {!isStreaming && (
+                        <>
+                            {actualIsSuccess ? (
+                                <CheckCircle size={14} color={theme.accent} />
+                            ) : (
+                                <AlertTriangle size={14} color={theme.destructive} />
+                            )}
+                            <Caption style={styles.timestamp}>
+                                {actualIsSuccess ? 'Success' : 'Failed'}
+                            </Caption>
+                        </>
+                    )}
                 </View>
-            )}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Clock size={12} color={theme.mutedForeground} />
+                    <Caption style={styles.timestamp}>
+                        {toolTimestamp && !isStreaming
+                            ? formatTimestamp(toolTimestamp)
+                            : assistantTimestamp
+                                ? formatTimestamp(assistantTimestamp)
+                                : ''}
+                    </Caption>
+                </View>
+            </View>
         </View>
     );
 }; 

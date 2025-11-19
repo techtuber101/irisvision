@@ -35,7 +35,7 @@ import { AgentRunLimitDialog } from '@/components/thread/agent-run-limit-dialog'
 import { CustomAgentsSection } from './custom-agents-section';
 import { toast } from 'sonner';
 import { ReleaseBadge } from '../auth/release-badge';
-import { Calendar, MessageSquare, Plus, Sparkles, Zap, Circle, Settings, Home, Bell, Sun, Moon, Lightbulb } from 'lucide-react';
+import { Calendar, MessageSquare, Plus, Sparkles, Zap, Shapes, Settings, Home, Bell, Sun, Moon, Lightbulb } from 'lucide-react';
 import { AgentConfigurationDialog } from '@/components/agents/agent-configuration-dialog';
 import { fastGeminiChat } from '@/lib/fast-gemini-chat';
 import { addAssistantMessage } from '@/lib/api';
@@ -374,7 +374,7 @@ export function DashboardContent() {
                                 }
                               }}
                             >
-                              <Circle className="h-4 w-4" />
+                              <Shapes className="h-4 w-4" />
                             </Button>
                           </div>
                         </TooltipTrigger>

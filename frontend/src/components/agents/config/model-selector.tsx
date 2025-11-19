@@ -398,25 +398,25 @@ export function AgentModelSelector({
                 {variant === 'menu-item' ? (
                   <div
                     className={cn(
-                      "flex items-center justify-between cursor-pointer rounded-lg px-3 py-2 mx-0 my-0.5 text-sm hover:bg-accent",
+                      "flex items-center justify-between cursor-pointer rounded-lg px-2.5 py-2 mx-0 my-0 text-xs hover:bg-accent",
                       disabled && "opacity-50 cursor-not-allowed",
                       className
                     )}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
                       <ModelProviderIcon 
                         modelId={selectedModel} 
-                        size={24}
+                        size={12}
                       />
-                      <span className="truncate">{selectedModelDisplay}</span>
+                      <span className="truncate text-xs font-medium">{selectedModelDisplay}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       {allModels.find(m => m.id === selectedModel)?.recommended && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 font-medium">
+                        <span className="text-[8px] px-0.5 py-0 rounded-sm bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 font-medium">
                           Recommended
                         </span>
                       )}
-                      <Check className="h-4 w-4 text-blue-500" />
+                      <Check className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
                     </div>
                   </div>
                 ) : (

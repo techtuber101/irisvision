@@ -366,6 +366,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ isVisible, onClose, mess
                             toolContent={currentSnapshot?.toolResult}
                             browserState={currentSnapshot?.browserState}
                             toolTimestamp={currentSnapshot?.timestamp ? new Date(currentSnapshot.timestamp).toISOString() : undefined}
+                            assistantTimestamp={currentSnapshot?.timestamp ? new Date(currentSnapshot.timestamp).toISOString() : undefined}
                         />
                     );
                 })()}

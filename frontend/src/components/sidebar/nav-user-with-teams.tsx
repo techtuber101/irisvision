@@ -53,6 +53,11 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -65,6 +70,7 @@ import { useTheme } from 'next-themes';
 import { isLocalMode } from '@/lib/config';
 import { clearUserLocalStorage } from '@/lib/utils/clear-local-storage';
 import { BillingModal } from '@/components/billing/billing-modal';
+import { cn } from '@/lib/utils';
 
 export function NavUserWithTeams({
   user,
@@ -77,7 +83,7 @@ export function NavUserWithTeams({
   };
 }) {
   const router = useRouter();
-  const { isMobile } = useSidebar();
+  const { isMobile, state } = useSidebar();
   const { data: accounts } = useAccounts();
   const [showNewTeamDialog, setShowNewTeamDialog] = React.useState(false);
   const [showBillingModal, setShowBillingModal] = React.useState(false);
@@ -179,33 +185,55 @@ export function NavUserWithTeams({
     return null;
   }
 
+  const isCollapsed = state === 'collapsed';
+
   return (
     <Dialog open={showNewTeamDialog} onOpenChange={setShowNewTeamDialog}>
       <SidebarMenu>
         <SidebarMenuItem>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <SidebarMenuButton
-                size="lg"
-                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-              >
-                <Avatar className="h-9 w-9 rounded-full relative shadow-[0_4px_12px_rgba(0,0,0,0.15),0_2px_4px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] ring-2 ring-black/10 dark:ring-white/10 hover:ring-black/20 dark:hover:ring-white/20 transition-all duration-300 hover:shadow-[0_6px_16px_rgba(0,0,0,0.2),0_3px_6px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.15)] dark:hover:shadow-[0_6px_16px_rgba(0,0,0,0.5),0_3px_6px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] hover:scale-105">
-                  <AvatarImage 
-                    src={user.avatar} 
-                    alt={user.name}
-                    className="object-cover rounded-full"
-                  />
-                  <AvatarFallback className="rounded-full backdrop-blur-md bg-white/20 dark:bg-white/10 border border-white/30 dark:border-white/20 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.2)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3),inset_0_0_0_1px_rgba(255,255,255,0.15)] text-foreground font-semibold text-xs">
-                    {getInitials(user.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user.name}</span>
-                  <span className="truncate text-xs">{user.email}</span>
-                </div>
-                <ChevronsUpDown className="ml-auto size-4" />
-              </SidebarMenuButton>
-            </DropdownMenuTrigger>
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton
+                    size="lg"
+                    className={cn(
+                      "data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground",
+                      isCollapsed && "justify-center p-0 rounded-full h-7 w-7 aspect-square"
+                    )}
+                  >
+                    <Avatar className={cn(
+                      "rounded-full relative shadow-[0_4px_12px_rgba(0,0,0,0.15),0_2px_4px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] ring-2 ring-black/10 dark:ring-white/10 hover:ring-black/20 dark:hover:ring-white/20 transition-all duration-300 hover:shadow-[0_6px_16px_rgba(0,0,0,0.2),0_3px_6px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.15)] dark:hover:shadow-[0_6px_16px_rgba(0,0,0,0.5),0_3px_6px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] hover:scale-105",
+                      isCollapsed ? "h-7 w-7" : "h-9 w-9"
+                    )}>
+                      <AvatarImage 
+                        src={user.avatar} 
+                        alt={user.name}
+                        className="object-cover rounded-full"
+                      />
+                      <AvatarFallback className="rounded-full backdrop-blur-md bg-white/20 dark:bg-white/10 border border-white/30 dark:border-white/20 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.2)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3),inset_0_0_0_1px_rgba(255,255,255,0.15)] text-foreground font-semibold text-xs">
+                        {getInitials(user.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    {!isCollapsed && (
+                      <>
+                        <div className="grid flex-1 text-left text-sm leading-tight">
+                          <span className="truncate font-medium">{user.name}</span>
+                          <span className="truncate text-xs">{user.email}</span>
+                        </div>
+                        <ChevronsUpDown className="ml-auto size-4" />
+                      </>
+                    )}
+                  </SidebarMenuButton>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              {isCollapsed && (
+                <TooltipContent side="right" sideOffset={8}>
+                  <div className="text-sm font-medium">{user.name}</div>
+                  <div className="text-xs text-muted-foreground">{user.email}</div>
+                </TooltipContent>
+              )}
+            </Tooltip>
             <DropdownMenuContent
               className="w-56 p-5 rounded-2xl border border-black/10 bg-white/95 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 shadow-[0_10px_20px_-10px_rgba(0,0,0,0.1)] dark:border-white/10 dark:bg-[rgba(7,10,17,0.95)] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] dark:shadow-[0_10px_20px_-10px_rgba(0,0,0,0.6)]"
               side={isMobile ? 'bottom' : 'top'}
@@ -215,7 +243,7 @@ export function NavUserWithTeams({
               {/* Iris Header */}
               <header className="mb-4 flex items-center gap-2">
                 <div className="h-6 w-6 rounded-full bg-black/10 ring-1 ring-black/20 flex items-center justify-center dark:bg-white/10 dark:ring-white/20">
-                  <img src="/irislogoblack.png?v=2" alt="Iris Logo" className="h-4 w-4 dark:hidden" />
+                  <img src="/irissymbolblack.png?v=2" alt="Iris Logo" className="h-4 w-4 dark:hidden" />
                   <img src="/irissymbolwhite.png?v=2" alt="Iris Logo" className="h-4 w-4 hidden dark:block" />
                 </div>
                 <h3 className="text-sm font-medium text-black/80 dark:text-white/80">Iris</h3>

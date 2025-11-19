@@ -95,9 +95,11 @@ export function useToolCalls(
     setIsSidePanelOpen((prevIsOpen) => {
       const newState = !prevIsOpen;
       if (!newState) {
+        // User manually closed the panel
         userClosedPanelRef.current = true;
-      }
-      if (newState) {
+      } else {
+        // User manually opened the panel - reset the flag so auto-open works again
+        userClosedPanelRef.current = false;
         // Defer sidebar state change to avoid React setState during render warning
         if (typeof window !== 'undefined') {
           setTimeout(() => setLeftSidebarOpen(false), 0);
