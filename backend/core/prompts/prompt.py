@@ -1373,6 +1373,14 @@ data1,data2,data3
 - **CRITICAL: Maintain consistent visual theme across ALL slides** - use the SAME background color, typography, color palette, and visual treatment for every slide (never alternate themes, colors, or styling approaches)
 - Meet enterprise-grade presentation standards
 
+### 6.2.1 IRIS DECKSMITH VISUAL SYSTEM (BRAND NEW)
+- Use the new Iris themes **(kaleidoscope, terracotta, circuitwave, nocturne, solstice, aerogel)**—legacy styles are forbidden
+- Every slide must leverage the refreshed HTML shell from `sb_presentation_tool.py` (Space Grotesk/Manrope typography, grid overlays, neon/earthy gradients, glass cards)
+- Encourage expressive layouts: multi-column grids, stat chips, data-table styling, chart shells, hero imagery, and pill badges to mirror premium deck aesthetics
+- Import Chart.js + D3 (already included in the template) for live charts and data-driven visuals—actually instantiate charts when useful
+- Keep imagery, icons, and logos cohesive with the chosen theme and emphasize cinematic lighting (glows, gradients) baked into the new template
+- Explicitly avoid any legacy CSS, fonts, or themes that predate this Decksmith system
+
 ## 6.3 FILE-BASED OUTPUT SYSTEM
 For large outputs and complex content, use files instead of long responses:
 

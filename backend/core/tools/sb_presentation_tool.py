@@ -22,10 +22,11 @@ from core.agentpress.thread_manager import ThreadManager
 from core.agentpress.tool import ToolResult, openapi_schema, tool_metadata
 from core.sandbox.tool_base import SandboxToolsBase
 from core.utils.logger import logger
+from .presentation_themes import DEFAULT_THEME_KEY, PRESENTATION_THEMES, get_theme
 
 ISO_SUFFIX = "Z"
 METADATA_VERSION = 1
-DEFAULT_THEME = "modern"
+DEFAULT_THEME = DEFAULT_THEME_KEY
 
 
 # ---------------------------------------------------------------------------
@@ -51,64 +52,6 @@ def sanitize_presentation_id(raw: str) -> str:
     ascii_str = ascii_str[:64]
 
     return ascii_str or f"presentation_{uuid.uuid4().hex[:8]}"
-
-
-THEME_CATALOG: Dict[str, Dict[str, str]] = {
-    "modern": {
-        "background": "linear-gradient(135deg, #2b5876 0%, #4e4376 100%)",
-        "title_color": "#ffffff",
-        "text_color": "#f5f5f5",
-        "accent_color": "#ffd166",
-        "font_family": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        "panel_color": "rgba(255, 255, 255, 0.1)",
-        "border_color": "rgba(255, 255, 255, 0.25)",
-    },
-    "minimal": {
-        "background": "#ffffff",
-        "title_color": "#0f172a",
-        "text_color": "#1f2937",
-        "accent_color": "#6366f1",
-        "font_family": "'Helvetica Neue', Arial, sans-serif",
-        "panel_color": "#f8fafc",
-        "border_color": "#e2e8f0",
-    },
-    "dark": {
-        "background": "linear-gradient(135deg, #101828 0%, #1d2939 50%, #111827 100%)",
-        "title_color": "#f8fafc",
-        "text_color": "#e2e8f0",
-        "accent_color": "#38bdf8",
-        "font_family": "'IBM Plex Sans', 'Segoe UI', sans-serif",
-        "panel_color": "rgba(255, 255, 255, 0.08)",
-        "border_color": "rgba(148, 163, 184, 0.45)",
-    },
-    "corporate": {
-        "background": "#0f172a",
-        "title_color": "#f8fafc",
-        "text_color": "#e2e8f0",
-        "accent_color": "#f97316",
-        "font_family": "'Open Sans', 'Segoe UI', sans-serif",
-        "panel_color": "rgba(15, 23, 42, 0.65)",
-        "border_color": "rgba(100, 116, 139, 0.4)",
-    },
-    "vibrant": {
-        "background": "linear-gradient(135deg, #ff6cab 0%, #7366ff 100%)",
-        "title_color": "#ffffff",
-        "text_color": "#f8fafc",
-        "accent_color": "#ffe066",
-        "font_family": "'Poppins', 'Segoe UI', sans-serif",
-        "panel_color": "rgba(255, 255, 255, 0.12)",
-        "border_color": "rgba(255, 255, 255, 0.25)",
-    },
-    "slate": {
-        "background": "linear-gradient(135deg, #334155 0%, #1e293b 100%)",
-        "title_color": "#f8fafc",
-        "text_color": "#e2e8f0",
-        "accent_color": "#22d3ee",
-        "font_family": "'Nunito Sans', 'Segoe UI', sans-serif",
-        "panel_color": "rgba(15, 23, 42, 0.55)",
-        "border_color": "rgba(148, 163, 184, 0.35)",
-    },
-}
 
 
 # ---------------------------------------------------------------------------
@@ -372,9 +315,7 @@ class PresentationStorage:
 
 
 def resolve_theme(theme: Optional[str]) -> Dict[str, str]:
-    if not theme:
-        return THEME_CATALOG[DEFAULT_THEME]
-    return THEME_CATALOG.get(theme, THEME_CATALOG[DEFAULT_THEME])
+    return get_theme(theme)
 
 
 def render_slide_html(
@@ -385,6 +326,8 @@ def render_slide_html(
     total_slides: int,
 ) -> str:
     theme = resolve_theme(presentation.theme)
+    background = " ".join(theme["background"]) if isinstance(theme.get("background"), (tuple, list)) else theme.get("background")
+    grid = " ".join(theme["grid"]) if isinstance(theme.get("grid"), (tuple, list)) else theme.get("grid")
     title = html.escape(slide.title or presentation.title)
     presentation_title = html.escape(presentation.title)
 
@@ -393,127 +336,288 @@ def render_slide_html(
 <head>
   <meta charset=\"UTF-8\" />
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />
-  <meta name=\"generator\" content=\"ProfessionalPresentationTool\" />
+  <meta name=\"generator\" content=\"Iris Decksmith\" />
   <meta name=\"presentation\" content=\"{presentation.presentation_name}\" />
   <meta name=\"slide-number\" content=\"{slide_index}\" />
   <meta name=\"slide-count\" content=\"{total_slides}\" />
   <meta http-equiv=\"X-Daytona-Skip-Preview-Warning\" content=\"true\" />
-  <title>{title} − {presentation_title}</title>
+  <title>{title} · {presentation_title}</title>
   <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\" />
   <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin />
-  <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Poppins:wght@400;600&display=swap\" rel=\"stylesheet\" />
+  <link href=\"https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600&family=DM+Sans:wght@400;600&display=swap\" rel=\"stylesheet\" />
+  <script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\"></script>
+  <script src=\"https://d3js.org/d3.v7.min.js\"></script>
   <style>
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
     :root {{
-      color-scheme: light dark;
-    }}
-    * {{
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
+      --bg: {background};
+      --grid: {grid};
+      --surface: {theme['surface']};
+      --muted: {theme['muted']};
+      --text: {theme['text']};
+      --accent: {theme['accent']};
+      --accent-2: {theme['accent_secondary']};
+      --stroke: {theme['stroke']};
+      --glow: {theme['glow']};
+      --heading-font: {theme['heading_font']};
+      --body-font: {theme['body_font']};
     }}
     body {{
       width: 1920px;
       height: 1080px;
-      margin: 0;
-      background: {theme['background']};
-      color: {theme['text_color']};
-      font-family: {theme['font_family']};
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--body-font);
+      position: relative;
+      overflow: hidden;
       display: flex;
-      align-items: stretch;
-      justify-content: stretch;
-    }}
-    .slide-wrapper {{
-      flex: 1;
-      padding: 72px 96px;
-      display: flex;
-      flex-direction: column;
-      gap: 48px;
-    }}
-    .slide-header {{
-      display: flex;
-      justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid {theme['border_color']};
-      padding-bottom: 32px;
+      justify-content: center;
     }}
-    .slide-header h1 {{
-      font-size: 64px;
-      font-weight: 700;
-      color: {theme['title_color']};
-      letter-spacing: -0.01em;
+    .grid-overlay {{
+      position: absolute;
+      inset: 0;
+      background-image: var(--grid);
+      background-size: 140px 140px, 140px 140px;
+      opacity: 0.35;
+      mix-blend-mode: screen;
+      pointer-events: none;
     }}
-    .badge {{
-      font-size: 20px;
-      font-weight: 600;
-      color: {theme['accent_color']};
-      border: 1px solid {theme['border_color']};
-      padding: 8px 18px;
-      border-radius: 999px;
-      background: {theme['panel_color']};
-      backdrop-filter: blur(6px);
+    .glow {{
+      position: absolute;
+      inset: -20%;
+      filter: blur(80px);
+      background: radial-gradient(circle at 35% 20%, var(--accent) 0%, transparent 35%),
+                  radial-gradient(circle at 75% 80%, var(--accent-2) 0%, transparent 32%);
+      opacity: 0.5;
+      pointer-events: none;
     }}
-    .slide-body {{
-      flex: 1;
-      overflow: auto;
-      font-size: 34px;
-      line-height: 1.5;
+    .frame {{
+      position: relative;
+      z-index: 2;
+      width: 1720px;
+      height: 940px;
+      padding: 52px 60px;
+      border: 1px solid var(--stroke);
+      border-radius: 28px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+      box-shadow: var(--glow), 0 30px 120px rgba(0,0,0,0.35);
       display: flex;
       flex-direction: column;
+      gap: 28px;
+      backdrop-filter: blur(14px);
+    }}
+    .masthead {{
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 24px;
+      align-items: center;
+      border-bottom: 1px solid var(--stroke);
+      padding-bottom: 18px;
+    }}
+    .eyebrow {{
+      font-size: 16px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }}
+    h1 {{
+      font-family: var(--heading-font);
+      font-size: 66px;
+      font-weight: 700;
+      line-height: 1.02;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }}
+    .subtitle {{
+      font-size: 22px;
+      color: var(--muted);
+      max-width: 1100px;
+      line-height: 1.5;
+    }}
+    .pill {{
+      justify-self: end;
+      padding: 10px 20px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid var(--stroke);
+      color: var(--accent);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      font-size: 15px;
+      text-transform: uppercase;
+    }}
+    .content-rail {{
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
       gap: 24px;
     }}
-    .slide-body p {{
-      margin-bottom: 18px;
-    }}
-    .slide-body ul,
-    .slide-body ol {{
-      margin-left: 40px;
-      display: grid;
-      gap: 12px;
-    }}
-    .slide-body li {{
-      margin-left: 8px;
-    }}
-    .slide-body .card {{
-      background: {theme['panel_color']};
-      border: 1px solid {theme['border_color']};
+    .content-panel {{
+      grid-column: span 12;
+      background: var(--surface);
+      border: 1px solid var(--stroke);
       border-radius: 18px;
-      padding: 32px;
-      backdrop-filter: blur(10px);
+      padding: 30px 36px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
     }}
-    .slide-body pre {{
-      background: rgba(15, 23, 42, 0.65);
-      padding: 24px;
-      border-radius: 16px;
-      overflow-x: auto;
+    .content-panel h2 {{
+      font-family: var(--heading-font);
+      font-size: 38px;
+      margin-bottom: 8px;
+      color: #fff;
+      letter-spacing: -0.01em;
+    }}
+    .content-panel h3 {{
+      font-family: var(--heading-font);
       font-size: 26px;
+      margin: 14px 0 6px;
+      color: var(--accent);
     }}
-    .slide-footer {{
+    .content-panel p {{
+      font-size: 22px;
+      line-height: 1.6;
+      color: var(--text);
+    }}
+    .content-panel ul, .content-panel ol {{
+      display: grid;
+      gap: 10px;
+      padding-left: 26px;
+      color: var(--text);
+      font-size: 21px;
+    }}
+    .two-col {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 18px;
+    }}
+    .card {{
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      padding: 18px 20px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }}
+    .statline {{
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }}
+    .statline .value {{
+      font-size: 42px;
+      font-weight: 700;
+      color: var(--accent);
+      font-family: var(--heading-font);
+    }}
+    .statline .label {{
+      font-size: 18px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }}
+    .data-table {{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 18px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+      overflow: hidden;
+    }}
+    .data-table th, .data-table td {{
+      padding: 12px 14px;
+      text-align: left;
+    }}
+    .data-table th {{
+      background: linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+      font-size: 16px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--stroke);
+    }}
+    .data-table tr + tr td {{
+      border-top: 1px solid var(--stroke);
+    }}
+    .chip {{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }}
+    .chart-shell {{
+      background: rgba(0,0,0,0.2);
+      border: 1px dashed var(--stroke);
+      border-radius: 14px;
+      padding: 14px;
+      min-height: 260px;
+    }}
+    .hero-image {{
+      width: 100%;
+      border-radius: 18px;
+      border: 1px solid var(--stroke);
+      box-shadow: 0 18px 60px rgba(0,0,0,0.35);
+      object-fit: cover;
+    }}
+    pre, code {{
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 18px;
+      color: #e1e7ff;
+      overflow-x: auto;
+    }}
+    .status {{
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-top: 1px solid {theme['border_color']};
-      padding-top: 24px;
-      font-size: 24px;
-      letter-spacing: 0.02em;
+      padding-top: 12px;
+      border-top: 1px solid var(--stroke);
+      color: var(--muted);
+      font-size: 18px;
     }}
-    .footer-title {{
-      font-weight: 600;
-      opacity: 0.8;
+    .tag {{
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,0.08);
+      color: var(--accent);
+      font-weight: 700;
     }}
   </style>
 </head>
 <body>
-  <div class=\"slide-wrapper\">
-    <header class=\"slide-header\">
-      <h1>{title}</h1>
-      <div class=\"badge\">Slide {slide_index} of {total_slides}</div>
+  <div class=\"glow\"></div>
+  <div class=\"grid-overlay\"></div>
+  <div class=\"frame\">
+    <header class=\"masthead\">
+      <div>
+        <div class=\"eyebrow\">Iris Decksmith · {presentation.presentation_name}</div>
+        <h1>{title}</h1>
+        <p class=\"subtitle\">{presentation_title}</p>
+      </div>
+      <div class=\"pill\">Slide {slide_index}/{total_slides}</div>
     </header>
-    <section class=\"slide-body\">
-      {slide.content}
-    </section>
-    <footer class=\"slide-footer\">
-      <div class=\"footer-title\">{presentation_title}</div>
-      <div>Slide {slide_index}/{total_slides}</div>
+    <main class=\"content-rail\">
+      <article class=\"content-panel\">
+        {slide.content}
+      </article>
+    </main>
+    <footer class=\"status\">
+      <span>{presentation_title}</span>
+      <span class=\"tag\">Live visualization ready</span>
     </footer>
   </div>
 </body>
@@ -583,7 +687,8 @@ class ProfessionalPresentationTool(SandboxToolsBase):
                     },
                     "theme": {
                         "type": "string",
-                        "description": "Optional theme key (modern, minimal, dark, corporate, vibrant, slate).",
+                        "description": "Optional theme key (kaleidoscope, terracotta, circuitwave, nocturne, solstice, aerogel).",
+                        "enum": list(PRESENTATION_THEMES.keys()),
                         "default": DEFAULT_THEME,
                     },
                 },
