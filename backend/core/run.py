@@ -501,6 +501,8 @@ Remember: The user sent this message because they want you to respond to it NOW.
 class AgentRunner:
     def __init__(self, config: AgentConfig):
         self.config = config
+        self.cumulative_tokens = 0  # Track cumulative tokens across the run
+        self.summarization_triggered = False  # Track if summarization has occurred
     
     async def setup(self):
         if not self.config.trace:
@@ -775,6 +777,21 @@ class AgentRunner:
             
             try:
                 logger.debug(f"Starting thread execution for {self.config.thread_id} with model: {self.config.model_name}")
+                
+                # Pass cumulative token state to ThreadManager before execution
+                self.thread_manager.set_cumulative_tokens(
+                    self.cumulative_tokens,
+                    self.summarization_triggered
+                )
+                
+                # Check if summarization will be triggered (allow re-triggering)
+                if self.cumulative_tokens >= 80000:
+                    yield {
+                        "type": "status",
+                        "status": "summarizing",
+                        "message": "Context has reached 80k tokens. Summarizing previous context..."
+                    }
+                
                 response = await self.thread_manager.run_thread(
                     thread_id=self.config.thread_id,
                     system_prompt=system_message,
@@ -1019,6 +1036,49 @@ class AgentRunner:
                     
                     # Log final decision for debugging
                     logger.debug(f"Continuation decision for iteration {iteration_count}: should_continue={should_continue}, tool_activity_detected={tool_activity_detected}, finish_reason={finish_reason}, saw_thread_run_end={saw_thread_run_end}, agent_should_terminate={agent_should_terminate} (thread {self.config.thread_id})")
+                    
+                    # Extract and accumulate token usage from this iteration
+                    try:
+                        # Get the latest llm_response_end message to extract token usage
+                        latest_response = await self.client.table('messages').select('content').eq('thread_id', self.config.thread_id).eq('type', 'llm_response_end').order('created_at', desc=True).limit(1).execute()
+                        
+                        if latest_response.data and len(latest_response.data) > 0:
+                            content = latest_response.data[0].get('content', {})
+                            if isinstance(content, str):
+                                try:
+                                    content = json.loads(content)
+                                except json.JSONDecodeError:
+                                    pass
+                            
+                            if isinstance(content, dict):
+                                usage = content.get("usage", {})
+                                prompt_tokens = int(usage.get("prompt_tokens", 0) or 0)
+                                completion_tokens = int(usage.get("completion_tokens", 0) or 0)
+                                iteration_tokens = prompt_tokens + completion_tokens
+                                
+                                if iteration_tokens > 0:
+                                    self.cumulative_tokens += iteration_tokens
+                                    logger.debug(f"Cumulative tokens: {self.cumulative_tokens:,} (added {iteration_tokens:,} this iteration)")
+                    except Exception as e:
+                        logger.debug(f"Could not extract token usage: {e}")
+                    
+                    # Check if summarization was triggered and update state
+                    # Note: summarization_triggered in ThreadManager is set when summary is created
+                    # We track it here but allow re-triggering if tokens hit 80k again
+                    if self.thread_manager.summarization_triggered:
+                        # If tokens drop below 80k, we can allow re-triggering
+                        if self.cumulative_tokens < 80000:
+                            # Reset flag to allow re-triggering when tokens hit 80k again
+                            self.thread_manager.summarization_triggered = False
+                            self.summarization_triggered = False
+                        
+                        if not self.summarization_triggered:
+                            self.summarization_triggered = True
+                            yield {
+                                "type": "status",
+                                "status": "summarization_complete",
+                                "message": "Context summarization complete. Resuming execution..."
+                            }
 
                 except Exception as e:
                     # Use ErrorProcessor for safe error handling
