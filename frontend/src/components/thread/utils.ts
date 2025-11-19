@@ -463,24 +463,88 @@ function formatMCPToolName(serverName: string, toolName: string): string {
   return `${formattedServerName}: ${formattedToolName}`;
 }
 
-export function getUserFriendlyToolName(toolName: string): string {
+// Helper function to convert present continuous tense to past tense
+function convertToPastTense(text: string): string {
+  // Common patterns for present continuous to past tense conversion
+  const replacements: [RegExp, string][] = [
+    [/^Creating\s+/i, 'Created '],
+    [/^Executing\s+/i, 'Executed '],
+    [/^Checking\s+/i, 'Checked '],
+    [/^Terminating\s+/i, 'Terminated '],
+    [/^Listing\s+/i, 'Listed '],
+    [/^Deleting\s+/i, 'Deleted '],
+    [/^Rewriting\s+/i, 'Rewrote '],
+    [/^Editing\s+/i, 'Edited '],
+    [/^Uploading\s+/i, 'Uploaded '],
+    [/^Updating\s+/i, 'Updated '],
+    [/^Reading\s+/i, 'Read '],
+    [/^Navigating\s+/i, 'Navigated '],
+    [/^Performing\s+/i, 'Performed '],
+    [/^Extracting\s+/i, 'Extracted '],
+    [/^Taking\s+/i, 'Took '],
+    [/^Calling\s+/i, 'Called '],
+    [/^Getting\s+/i, 'Got '],
+    [/^Completing\s+/i, 'Completed '],
+    [/^Crawling\s+/i, 'Crawled '],
+    [/^Exposing\s+/i, 'Exposed '],
+    [/^Scraping\s+/i, 'Scraped '],
+    [/^Searching\s+/i, 'Searched '],
+    [/^Loading\s+/i, 'Loaded '],
+    [/^Clearing\s+/i, 'Cleared '],
+    [/^Viewing\s+/i, 'Viewed '],
+    [/^Analyzing\s+/i, 'Analyzed '],
+    [/^Visualizing\s+/i, 'Visualized '],
+    [/^Formatting\s+/i, 'Formatted '],
+    [/^Configuring\s+/i, 'Configured '],
+    [/^Testing\s+/i, 'Tested '],
+    [/^Building\s+/i, 'Built '],
+    [/^Discovering\s+/i, 'Discovered '],
+    [/^Presenting\s+/i, 'Presented '],
+    [/^Adding\s+/i, 'Added '],
+  ];
+  
+  let result = text;
+  for (const [pattern, replacement] of replacements) {
+    if (pattern.test(result)) {
+      result = result.replace(pattern, replacement);
+      break;
+    }
+  }
+  
+  return result;
+}
+
+export function getUserFriendlyToolName(toolName: string, isCompleted: boolean = false): string {
+  let displayName: string;
+  
   if (toolName.startsWith('mcp_')) {
     const parts = toolName.split('_');
     if (parts.length >= 3) {
       const serverName = parts[1];
       const toolNamePart = parts.slice(2).join('_');
-      return formatMCPToolName(serverName, toolNamePart);
+      displayName = formatMCPToolName(serverName, toolNamePart);
+    } else {
+      displayName = toolName;
     }
-  }
-  if (toolName.includes('-') && !TOOL_DISPLAY_NAMES.has(toolName)) {
+  } else if (toolName.includes('-') && !TOOL_DISPLAY_NAMES.has(toolName)) {
     const parts = toolName.split('-');
     if (parts.length >= 2) {
       const serverName = parts[0];
       const toolNamePart = parts.slice(1).join('-');
-      return formatMCPToolName(serverName, toolNamePart);
+      displayName = formatMCPToolName(serverName, toolNamePart);
+    } else {
+      displayName = TOOL_DISPLAY_NAMES.get(toolName) || toolName;
     }
+  } else {
+    displayName = TOOL_DISPLAY_NAMES.get(toolName) || toolName;
   }
-  return TOOL_DISPLAY_NAMES.get(toolName) || toolName;
+  
+  // Convert to past tense if completed
+  if (isCompleted) {
+    return convertToPastTense(displayName);
+  }
+  
+  return displayName;
 }
 
 export const HIDE_STREAMING_XML_TAGS = new Set([

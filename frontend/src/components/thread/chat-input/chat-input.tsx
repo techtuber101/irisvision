@@ -18,7 +18,7 @@ import { handleFiles, FileUploadHandler } from './file-upload-handler';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Loader2, ArrowUp, X, Image as ImageIcon, Presentation, BarChart3, FileText, Search, Users, Code2, Sparkles, Sparkle, Brain as BrainIcon, MessageSquare, Zap as ZapIcon, WandSparkles } from 'lucide-react';
+import { Loader2, ArrowUp, X, Image as ImageIcon, Presentation, BarChart3, FileText, Search, Users, Code2, Sparkles, Sparkle, Brain as BrainIcon, MessageSquare, Zap as ZapIcon, WandSparkles, AlertTriangle, Pencil } from 'lucide-react';
 import { VoiceRecorder } from './voice-recorder';
 import { UnifiedConfigMenu } from './unified-config-menu';
 import { AttachmentGroup } from '../attachment-group';
@@ -690,7 +690,7 @@ Now enhance this prompt:\n\n${value}`;
             subscriptionData={subscriptionData}
             onCloseUsage={() => { setShowSnackbar(false); setUserDismissedUsage(true); }}
             onOpenUpgrade={() => setBillingModalOpen(true)}
-            isVisible={showToolPreview || !!showSnackbar}
+            isVisible={!!showSnackbar}
           />
 
           {/* Scroll controls: top and bottom */}
@@ -1081,7 +1081,7 @@ Now enhance this prompt:\n\n${value}`;
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="top">
-                            <div className="space-y-1">
+                            <div className="space-y-2">
                               <p className="font-medium flex items-center gap-1.5">
                                 {isEnhancing ? (
                                   <span className="animate-spin">⏳</span>
@@ -1090,8 +1090,8 @@ Now enhance this prompt:\n\n${value}`;
                                 )}
                                 Enhance the vision
                               </p>
-                              <p className="text-xs text-muted-foreground light:text-white/80">
-                                {isEnhancing ? (
+                              {isEnhancing ? (
+                                <p className="text-xs text-muted-foreground light:text-white/80">
                                   <AnimatedLoadingText
                                     messages={[
                                       "Reading your prompt",
@@ -1101,12 +1101,20 @@ Now enhance this prompt:\n\n${value}`;
                                     ]}
                                     interval={1500}
                                   />
-                                ) : !value.trim() ? (
-                                  "Enter a task in the input field!"
-                                ) : (
-                                  "Improve your prompt with AI assistance"
-                                )}
-                              </p>
+                                </p>
+                              ) : (
+                                <>
+                                  <p className="text-xs text-muted-foreground light:text-white/80">
+                                    Improve your prompt with AI assistance
+                                  </p>
+                                  {!value.trim() && (
+                                    <p className="text-xs text-yellow-500 dark:text-yellow-400 flex items-center gap-1.5">
+                                      <Pencil className="w-3 h-3" />
+                                      Enter a task in the input field!
+                                    </p>
+                                  )}
+                                </>
+                              )}
                             </div>
                           </TooltipContent>
                         </Tooltip>

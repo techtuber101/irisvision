@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from "@/components/ui/button"
-import { FolderOpen, ExternalLink, Monitor, Copy, Check, Circle } from "lucide-react"
+import { FolderOpen, ExternalLink, Monitor, Copy, Check, Shapes } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -244,21 +244,21 @@ export function SiteHeader({
               </Button>
             )}
 
-            {/* Control Center */}
-            <Tooltip>
+            {/* Control Center - Temporarily hidden */}
+            {/* <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-9 w-9 cursor-pointer"
                 >
-                  <Circle className="h-4 w-4" />
+                  <Shapes className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side={isMobile ? "bottom" : "bottom"}>
                 <p>control center</p>
               </TooltipContent>
-            </Tooltip>
+            </Tooltip> */}
 
             <Tooltip>
               <TooltipTrigger asChild>
