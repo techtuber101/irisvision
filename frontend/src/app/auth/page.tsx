@@ -21,6 +21,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { useAuthMethodTracking } from '@/lib/stores/auth-tracking';
 import { toast } from 'sonner';
 import { useTheme } from 'next-themes';
+import { createClient } from '@/lib/supabase/client';
 
 import {
   Dialog,
@@ -39,10 +40,10 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const { user, isLoading } = useAuth();
   const { setTheme } = useTheme();
-  const mode = searchParams.get('mode');
-  const returnUrl = searchParams.get('returnUrl') || searchParams.get('redirect');
-  const message = searchParams.get('message');
-  const errorFromUrl = searchParams.get('error');
+  const mode = searchParams?.get('mode');
+  const returnUrl = searchParams?.get('returnUrl') || searchParams?.get('redirect');
+  const message = searchParams?.get('message');
+  const errorFromUrl = searchParams?.get('error');
 
   const isSignUp = mode === 'signup';
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -50,14 +51,21 @@ function LoginContent() {
   const [showModal, setShowModal] = useState(false);
 
   const { wasLastMethod: wasEmailLastMethod, markAsUsed: markEmailAsUsed } = useAuthMethodTracking('email');
+  const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
 
-  // Handle redirect when user is already logged in
+  // Handle redirect when user is already logged in or becomes available after login
   useEffect(() => {
-    if (!isLoading && user) {
+    if (!isLoading && user && pendingRedirect) {
+      // User is available and we have a pending redirect
+      const redirectPath = pendingRedirect;
+      setPendingRedirect(null); // Clear pending redirect
+      router.push(redirectPath);
+    } else if (!isLoading && user && !pendingRedirect) {
+      // User is logged in but no pending redirect (e.g., page refresh)
       const redirectPath = returnUrl || '/dashboard';
       router.push(redirectPath);
     }
-  }, [user, isLoading, router, returnUrl]);
+  }, [user, isLoading, router, returnUrl, pendingRedirect]);
 
   useEffect(() => {
     setMounted(true);
@@ -69,12 +77,42 @@ function LoginContent() {
   // Handle successful authentication
   const handleAuthSuccess = useCallback((result: any) => {
     if (result?.success && result?.redirectTo) {
-      // Refresh router to ensure auth state is updated, then redirect
-      router.refresh();
-      // Small delay to ensure session cookie is set
+      const redirectTo = result.redirectTo;
+      // Store the redirect path
+      setPendingRedirect(redirectTo);
+      
+      // Small delay to ensure cookies are set, then check session
       setTimeout(() => {
-        router.push(result.redirectTo);
-      }, 50);
+        const supabase = createClient();
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) {
+            // Session is available, refresh router to update server components
+            router.refresh();
+            // The useEffect above will handle the redirect when user becomes available in state
+          } else {
+            // Session not available yet, try redirect anyway (middleware will handle auth)
+            router.push(redirectTo);
+            setPendingRedirect(null);
+          }
+        }).catch(() => {
+          // Error checking session, try redirect anyway
+          router.push(redirectTo);
+          setPendingRedirect(null);
+        });
+      }, 200);
+      
+      // Fallback: redirect after a longer delay if user doesn't become available
+      // This handles cases where auth state doesn't update immediately
+      setTimeout(() => {
+        setPendingRedirect((current) => {
+          // If still pending, redirect anyway (middleware will handle auth if needed)
+          if (current === redirectTo) {
+            router.push(redirectTo);
+            return null;
+          }
+          return current;
+        });
+      }, 2000);
     }
   }, [router]);
 
