@@ -17,6 +17,27 @@ export interface FastGeminiChatResponse {
   time_ms: number;
 }
 
+export type AdaptiveDecisionState = 'agent_needed' | 'agent_not_needed' | 'ask_user';
+
+export interface AdaptiveAskUserPrompt {
+  prompt: string;
+  yes_label: string;
+  no_label: string;
+}
+
+export interface AdaptiveDecision {
+  state: AdaptiveDecisionState;
+  confidence: number;
+  reason: string;
+  agent_preface?: string;
+  ask_user?: AdaptiveAskUserPrompt;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AdaptiveChatResponse extends FastGeminiChatResponse {
+  decision: AdaptiveDecision;
+}
+
 export interface FastGeminiStreamChunk {
   type: 'start' | 'chunk' | 'done' | 'error';
   content?: string;
@@ -62,6 +83,38 @@ export async function fastGeminiChat(
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.detail || 'Failed to send message');
+  }
+
+  return response.json();
+}
+
+export async function adaptiveChat(
+  message: string,
+  model: string = 'gemini-2.5-flash',
+  systemInstructions?: string,
+  chatContext?: Array<{ role: string; content: string }>
+): Promise<AdaptiveChatResponse> {
+  const requestBody: FastGeminiChatRequest = { message, model };
+
+  if (systemInstructions) {
+    requestBody.system_instructions = systemInstructions;
+  }
+
+  if (chatContext && chatContext.length > 0) {
+    requestBody.chat_context = chatContext;
+  }
+
+  const response = await fetch(`${API_URL}/chat/adaptive`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to send adaptive message');
   }
 
   return response.json();

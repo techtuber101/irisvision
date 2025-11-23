@@ -2,7 +2,7 @@ import { AttachmentGroup } from '@/components/AttachmentGroup';
 import { useTheme } from '@/hooks/useThemeColor';
 import { useSelectedProject } from '@/stores/ui-store';
 import { handleLocalFiles, pickFiles, UploadedFile, uploadFilesToSandbox } from '@/utils/file-upload';
-import { QuickChatAttachment, sendQuickChat } from '@/api/quick-chat-api';
+import { AdaptiveChatResponse, AdaptiveDecision, QuickChatAttachment, sendAdaptiveChat, sendQuickChat } from '@/api/quick-chat-api';
 import { ChevronUp, Mic, Paperclip, Square } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Keyboard, KeyboardEvent, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -19,6 +19,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system';
 
+export type IrisChatMode = 'intelligence' | 'adaptive' | 'quick';
+
+export interface FastResponsePayload {
+    mode: 'quick' | 'adaptive';
+    answer: string;
+    userMessage: string;
+    decision?: AdaptiveDecision;
+    autoEscalate?: boolean;
+}
+
 interface ChatInputProps {
     onSendMessage: (message: string, files?: UploadedFile[]) => Promise<void> | void;
     onAttachPress?: () => void;
@@ -29,7 +39,7 @@ interface ChatInputProps {
     isGenerating?: boolean;
     isSending?: boolean;
     onTabChange?: (tab: 'workspace' | 'quick') => void;
-    onQuickChatResponse?: (response: string) => void; // New callback for quick chat responses
+    onQuickChatResponse?: (payload: FastResponsePayload) => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -47,7 +57,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     const [message, setMessage] = useState('');
     const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([]);
     const [isMenuVisible, setIsMenuVisible] = useState(false);
-    const [irisMode, setIrisMode] = useState<'intelligence' | 'quick'>('intelligence'); // Iris Intelligence is default
+    const [irisMode, setIrisMode] = useState<IrisChatMode>('intelligence'); // Iris Intelligence is default
+    const modeOptions: { key: IrisChatMode; label: string }[] = [
+        { key: 'intelligence', label: 'Iris Intelligence' },
+        { key: 'adaptive', label: 'Adaptive' },
+        { key: 'quick', label: 'Quick Chat' },
+    ];
     const selectedProject = useSelectedProject();
     const theme = useTheme();
     const insets = useSafeAreaInsets();
@@ -112,25 +127,39 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                         model: 'gemini-2.5-flash',
                         attachments: attachmentsPayload,
                     });
-                    
-                    console.log('Quick chat response:', response.response);
-                    
-                    const quickChatMessage = {
-                        message_id: `quick-${Date.now()}`,
-                        thread_id: 'quick-chat',
-                        type: 'assistant',
-                        is_llm_message: true,
-                        content: { role: 'assistant', content: response.response },
-                        metadata: {},
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString(),
-                    };
-                    
-                    onQuickChatResponse?.(response.response);
+
+                    onQuickChatResponse?.({
+                        mode: 'quick',
+                        answer: response.response,
+                        userMessage: finalMessage,
+                        autoEscalate: false,
+                    });
                 } catch (error) {
                     console.error('Quick chat error:', error);
                     const description = error instanceof Error ? error.message : 'Unable to send quick chat message.';
                     Alert.alert('Quick chat failed', description);
+                    return;
+                }
+            } else if (irisMode === 'adaptive') {
+                try {
+                    const attachmentsPayload = await prepareQuickChatAttachments();
+                    const response: AdaptiveChatResponse = await sendAdaptiveChat({
+                        message: finalMessage,
+                        model: 'gemini-2.5-flash',
+                        attachments: attachmentsPayload,
+                    });
+
+                    onQuickChatResponse?.({
+                        mode: 'adaptive',
+                        answer: response.response,
+                        userMessage: finalMessage,
+                        decision: response.decision,
+                        autoEscalate: response.decision.state === 'agent_needed',
+                    });
+                } catch (error) {
+                    console.error('Adaptive chat error:', error);
+                    const description = error instanceof Error ? error.message : 'Unable to send adaptive chat message.';
+                    Alert.alert('Adaptive mode failed', description);
                     return;
                 }
             } else {
@@ -218,7 +247,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         transform: [{ translateY: menuTranslateY.value }],
     }));
 
-    const handleModeChange = (mode: 'intelligence' | 'quick') => {
+    const handleModeChange = (mode: IrisChatMode) => {
         setIrisMode(mode);
         Haptics.selectionAsync(); // Light haptic feedback for selection
     };
@@ -400,41 +429,30 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                         {/* Mode Bubble Selector - Single bubble with separator */}
                         <View style={styles.modeSelectorContainer}>
                             <View style={styles.modeBubble}>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.modeBubbleHalf,
-                                        styles.modeBubbleLeft,
-                                        irisMode === 'intelligence' && styles.modeBubbleHalfActive
-                                    ]}
-                                    onPress={() => handleModeChange('intelligence')}
-                                    activeOpacity={0.7}
-                                >
-                                    <Text style={[
-                                        styles.modeBubbleText,
-                                        irisMode === 'intelligence' && styles.modeBubbleTextActive
-                                    ]}>
-                                        Iris Intelligence
-                                    </Text>
-                                </TouchableOpacity>
-                                
-                                <View style={styles.modeBubbleSeparator} />
-                                
-                                <TouchableOpacity
-                                    style={[
-                                        styles.modeBubbleHalf,
-                                        styles.modeBubbleRight,
-                                        irisMode === 'quick' && styles.modeBubbleHalfActive
-                                    ]}
-                                    onPress={() => handleModeChange('quick')}
-                                    activeOpacity={0.7}
-                                >
-                                    <Text style={[
-                                        styles.modeBubbleText,
-                                        irisMode === 'quick' && styles.modeBubbleTextActive
-                                    ]}>
-                                        Quick Chat
-                                    </Text>
-                                </TouchableOpacity>
+                                {modeOptions.map((option, index) => (
+                                    <React.Fragment key={option.key}>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.modeBubbleSegment,
+                                                index === 0 && styles.modeBubbleLeft,
+                                                index === modeOptions.length - 1 && styles.modeBubbleRight,
+                                                irisMode === option.key && styles.modeBubbleSegmentActive,
+                                            ]}
+                                            onPress={() => handleModeChange(option.key)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={[
+                                                styles.modeBubbleText,
+                                                irisMode === option.key && styles.modeBubbleTextActive
+                                            ]}>
+                                                {option.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                        {index < modeOptions.length - 1 && (
+                                            <View style={styles.modeBubbleSeparator} />
+                                        )}
+                                    </React.Fragment>
+                                ))}
                             </View>
                         </View>
                         
@@ -603,10 +621,10 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         minWidth: 280,
     },
-    modeBubbleHalf: {
+    modeBubbleSegment: {
         flex: 1,
         paddingVertical: 12,
-        paddingHorizontal: 16,
+        paddingHorizontal: 12,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -618,7 +636,7 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 20,
         borderBottomRightRadius: 20,
     },
-    modeBubbleHalfActive: {
+    modeBubbleSegmentActive: {
         backgroundColor: 'rgba(255,255,255,0.2)',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },

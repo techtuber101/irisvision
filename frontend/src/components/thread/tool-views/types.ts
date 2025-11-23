@@ -15,12 +15,12 @@ export interface ToolViewProps {
   totalCalls?: number;
   onFileClick?: (filePath: string) => void;
   viewToggle?: React.ReactNode;
-  onSubmit?: (message: string, options?: { model_name?: string; agent_id?: string; chat_mode?: 'chat' | 'execute'; hidden?: boolean }) => void;
+  onSubmit?: (message: string, options?: { model_name?: string; agent_id?: string; chat_mode?: 'chat' | 'execute' | 'adaptive'; hidden?: boolean }) => void;
   isAgentRunning?: boolean;
   selectedModel?: string;
   getActualModelId?: (modelId: string) => string;
   selectedAgentId?: string;
-  chatMode?: 'chat' | 'execute';
+  chatMode?: 'chat' | 'execute' | 'adaptive';
   onPopulateChatInput?: (message: string) => void;
 }
 

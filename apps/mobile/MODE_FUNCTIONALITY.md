@@ -14,25 +14,39 @@
 - **Features**: Fast responses, simple chat interface
 - **Response Handling**: Uses `onQuickChatResponse` callback
 
+### **3. Adaptive Mode (New)**
+- **Endpoint**: Uses `sendAdaptiveChat` API (`/chat/adaptive`)
+- **Behavior**: Sends the message to the adaptive router which (a) returns an instant answer and (b) decides whether to stay lightweight, auto-run Iris Intelligence, or ask the user.
+- **Features**: Hybrid UX with instant responses, auto-escalation, and confirmation bubbles.
+- **Response Handling**: `onQuickChatResponse` receives structured payloads with decision metadata.
+
 ## **🔧 Technical Implementation:**
 
 ### **Mode Routing Logic:**
 ```typescript
 if (irisMode === 'quick') {
-    // Quick Chat API
-    const response = await sendQuickChat({
-        message: finalMessage,
-        model: 'gemini-2.5-flash',
+    const response = await sendQuickChat({...});
+    onQuickChatResponse?.({
+        mode: 'quick',
+        answer: response.response,
+        userMessage: finalMessage,
     });
-    onQuickChatResponse?.(response.response);
+} else if (irisMode === 'adaptive') {
+    const response = await sendAdaptiveChat({...});
+    onQuickChatResponse?.({
+        mode: 'adaptive',
+        answer: response.response,
+        decision: response.decision,
+        autoEscalate: response.decision.state === 'agent_needed',
+        userMessage: finalMessage,
+    });
 } else {
-    // Iris Intelligence (default agent)
     void onSendMessage(finalMessage, attachedFiles);
 }
 ```
 
 ### **New Props Added:**
-- `onQuickChatResponse?: (response: string) => void` - Callback for quick chat responses
+- `onQuickChatResponse?: (payload: FastResponsePayload) => void` - Callback for rich quick/adaptive responses
 
 ### **API Integration:**
 - **Quick Chat**: `sendQuickChat()` from `@/api/quick-chat-api`
@@ -45,6 +59,7 @@ if (irisMode === 'quick') {
 3. **Message Routing**: Messages automatically route to correct endpoint
 4. **Haptic Feedback**: Selection feedback when switching modes
 5. **Visual Feedback**: Active mode highlighted in bubble selector
+6. **Adaptive CTA**: When the router is uncertain, a hovering bubble prompts the user: “Would you like me to continue in Iris Intelligence mode?” with green (Yes) and red (I’m fine) buttons.
 
 ## **🚀 Next Steps:**
 

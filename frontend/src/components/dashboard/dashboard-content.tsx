@@ -58,7 +58,7 @@ export function DashboardContent() {
   const [selectedCharts, setSelectedCharts] = useState<string[]>([]);
   const [selectedOutputFormat, setSelectedOutputFormat] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [chatMode, setChatMode] = useState<'chat' | 'execute'>('execute');
+  const [chatMode, setChatMode] = useState<'chat' | 'execute' | 'adaptive'>('execute');
   const [showControlMenu, setShowControlMenu] = useState(false);
   const [menuAnimate, setMenuAnimate] = useState(false);
   const controlMenuRef = useRef<HTMLDivElement>(null);
@@ -188,7 +188,7 @@ export function DashboardContent() {
     options?: {
       model_name?: string;
       enable_context_manager?: boolean;
-      chat_mode?: 'chat' | 'execute';
+      chat_mode?: 'chat' | 'execute' | 'adaptive';
     },
   ) => {
     if (
@@ -253,6 +253,9 @@ export function DashboardContent() {
       if (options?.model_name) formData.append('model_name', options.model_name);
       formData.append('stream', 'true'); // Always stream for better UX
       formData.append('enable_context_manager', String(options?.enable_context_manager ?? false));
+      if (options?.chat_mode && options.chat_mode !== 'chat') {
+        formData.append('chat_mode', options.chat_mode);
+      }
 
       const result = await initiateAgentMutation.mutateAsync(formData);
 

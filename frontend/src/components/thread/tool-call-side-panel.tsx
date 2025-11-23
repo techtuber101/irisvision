@@ -61,12 +61,12 @@ interface ToolCallSidePanelProps {
   onFileClick?: (filePath: string) => void;
   disableInitialAnimation?: boolean;
   compact?: boolean;
-  onSubmit?: (message: string, options?: { model_name?: string; agent_id?: string; chat_mode?: 'chat' | 'execute' }) => void;
+  onSubmit?: (message: string, options?: { model_name?: string; agent_id?: string; chat_mode?: 'chat' | 'execute' | 'adaptive' }) => void;
   isAgentRunning?: boolean;
   selectedModel?: string;
   getActualModelId?: (modelId: string) => string;
   selectedAgentId?: string;
-  chatMode?: 'chat' | 'execute';
+  chatMode?: 'chat' | 'execute' | 'adaptive';
   onPopulateChatInput?: (message: string) => void;
 }
 

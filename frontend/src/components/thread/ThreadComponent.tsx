@@ -10,6 +10,7 @@ import { useSearchParams } from 'next/navigation';
 import { BillingError, AgentRunLimitError, ProjectLimitError } from '@/lib/api';
 import { toast } from 'sonner';
 import { ChatInput } from '@/components/thread/chat-input/chat-input';
+import type { ChatMode } from '@/components/thread/chat-input/chat-input';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useAgentStream } from '@/hooks/useAgentStream';
 import { cn } from '@/lib/utils';
@@ -52,10 +53,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { threadKeys } from '@/hooks/react-query/threads/keys';
 import { threadKeys as sidebarThreadKeys } from '@/hooks/react-query/sidebar/keys';
 import { useProjectRealtime } from '@/hooks/useProjectRealtime';
-import { fastGeminiChatStream } from '@/lib/fast-gemini-chat';
-import { continueSimpleChatStream } from '@/lib/simple-chat';
+import { fastGeminiChatStream, fastGeminiChat, adaptiveChat, type AdaptiveDecision, type AdaptiveChatResponse } from '@/lib/fast-gemini-chat';
 import { handleGoogleSlidesUpload } from './tool-views/utils/presentation-utils';
 import { FloatingToolPreview, ToolCallInput } from '@/components/thread/chat-input/floating-tool-preview';
+import { Check, X } from 'lucide-react';
 
 
 interface ThreadComponentProps {
@@ -75,6 +76,14 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isSimpleChatLoading, setIsSimpleChatLoading] = useState(false);
+  const [adaptivePrompt, setAdaptivePrompt] = useState<{
+    prompt: string;
+    yesLabel: string;
+    noLabel: string;
+    message: string;
+    reason?: string;
+    options?: { model_name?: string; hidden?: boolean };
+  } | null>(null);
   const [fileViewerOpen, setFileViewerOpen] = useState(false);
   const [fileToView, setFileToView] = useState<string | null>(null);
   const [filePathList, setFilePathList] = useState<string[] | undefined>(
@@ -114,10 +123,12 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   } | null>(null);
   
   // Track initial chat mode from localStorage
-  const [initialChatMode, setInitialChatMode] = useState<'chat' | 'execute'>('execute');
+  const [initialChatMode, setInitialChatMode] = useState<ChatMode>('execute');
+  const userSelectedModeRef = useRef<ChatMode | null>(null);
   
   // Handle chat mode changes from user interaction
-  const handleChatModeChange = useCallback((mode: 'chat' | 'execute') => {
+  const handleChatModeChange = useCallback((mode: ChatMode) => {
+    userSelectedModeRef.current = mode;
     setInitialChatMode(mode);
   }, []);
 
@@ -133,6 +144,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const lastStreamStartedRef = useRef<string | null>(null); // Track last runId we started streaming for
   const titleGenerationTriggeredRef = useRef<boolean>(false); // Track if title generation has been triggered
   const previousToolCallCountRef = useRef<number>(0);
+  const processedServerAdaptiveMessagesRef = useRef<Set<string>>(new Set());
 
   // Sidebar
   const { state: leftSidebarState, setOpen: setLeftSidebarOpen } = useSidebar();
@@ -157,12 +169,55 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     agentRunsQuery,
   } = useThreadData(threadId, projectId);
 
+  // Trigger title generation after LLM response is complete
+  const triggerTitleGeneration = useCallback(async () => {
+    try {
+      // Only trigger once per thread and if we have a project
+      if (project?.project_id && !titleGenerationTriggeredRef.current) {
+        titleGenerationTriggeredRef.current = true;
+        
+        // Get the first user message to use for title generation
+        const firstUserMessage = messages.find(msg => msg.type === 'user');
+        if (firstUserMessage) {
+          let prompt = '';
+          if (typeof firstUserMessage.content === 'string') {
+            try {
+              const parsed = JSON.parse(firstUserMessage.content);
+              prompt = parsed.content || parsed;
+            } catch {
+              prompt = firstUserMessage.content;
+            }
+          }
+          
+          if (prompt) {
+            // Call the backend to generate title in background
+            const formData = new FormData();
+            formData.append('project_id', project.project_id);
+            formData.append('prompt', prompt);
+            
+            await fetch('/api/threads/generate-title', {
+              method: 'POST',
+              body: formData
+            });
+            
+            // Refresh sidebar to show the new title
+            refreshSidebar();
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to trigger title generation:', error);
+      // Don't show error to user as this is a background process
+    }
+  }, [project, messages, refreshSidebar]);
+
   // Track if we've already set the initial mode for this thread
   const [hasSetInitialMode, setHasSetInitialMode] = useState(false);
   
-  // Reset hasSetInitialMode when threadId changes
+  // Reset hasSetInitialMode and user selected mode when threadId changes
   useEffect(() => {
     setHasSetInitialMode(false);
+    userSelectedModeRef.current = null;
   }, [threadId]);
   
   // Reset title generation trigger when threadId changes
@@ -170,19 +225,60 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     titleGenerationTriggeredRef.current = false;
   }, [threadId]);
   
-  // Detect if this is a simple chat thread and set initial mode (only once per thread)
+  // Detect chat mode from thread metadata and messages (only once per thread, and only if user hasn't selected)
   useEffect(() => {
-    if (threadQuery.data && !hasSetInitialMode) {
+    // Don't override if user has manually selected a mode
+    if (userSelectedModeRef.current) {
+      return;
+    }
+    
+    if (threadQuery.data && initialLoadCompleted && !hasSetInitialMode) {
+      // First, check messages for adaptive mode metadata (most recent messages first)
+      let detectedMode: ChatMode | null = null;
+      if (messages.length > 0) {
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const message = messages[i];
+          if (message.metadata) {
+            try {
+              const metadata = typeof message.metadata === 'string' 
+                ? JSON.parse(message.metadata) 
+                : message.metadata;
+              if (metadata.chat_mode === 'adaptive' || metadata.chat_mode === 'chat' || metadata.chat_mode === 'simple') {
+                detectedMode = metadata.chat_mode === 'simple' ? 'chat' : metadata.chat_mode;
+                break;
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+      
+      // If found in messages, use it
+      if (detectedMode) {
+        setInitialChatMode(detectedMode);
+        setHasSetInitialMode(true);
+        return;
+      }
+      
+      // Otherwise, check thread metadata
       const threadMetadata = threadQuery.data.metadata;
-      if (threadMetadata && typeof threadMetadata === 'object' && threadMetadata.chat_mode === 'simple') {
-        setInitialChatMode('chat');
+      if (threadMetadata && typeof threadMetadata === 'object') {
+        if (threadMetadata.chat_mode === 'simple') {
+          setInitialChatMode('chat');
+        } else if (threadMetadata.chat_mode === 'adaptive') {
+          setInitialChatMode('adaptive');
+        } else {
+          // Default to execute mode for all other threads
+          setInitialChatMode('execute');
+        }
       } else {
-        // Default to execute mode for all other threads
+        // Default to execute mode if no metadata
         setInitialChatMode('execute');
       }
       setHasSetInitialMode(true);
     }
-  }, [threadQuery.data, hasSetInitialMode]);
+  }, [threadQuery.data, initialLoadCompleted, messages, hasSetInitialMode]);
 
   const {
     toolCalls,
@@ -487,10 +583,163 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     threadAgentData?.agent?.agent_id,
   );
 
+  const startAgentFromAdaptiveDecision = useCallback(async (submitOptions?: { model_name?: string; hidden?: boolean }) => {
+    console.log('[Adaptive] Starting agent from adaptive decision with options:', submitOptions);
+    
+    if (!selectedAgentId) {
+      console.error('[Adaptive] No agent selected, cannot start agent');
+      toast.error('Please select an agent first');
+      return;
+    }
+    
+    try {
+      const agentResult = await startAgentMutation.mutateAsync({
+        threadId,
+        options: {
+          ...submitOptions,
+          agent_id: selectedAgentId,
+        },
+      });
+      
+      console.log('[Adaptive] Agent started successfully, run ID:', agentResult.agent_run_id);
+      setUserInitiatedRun(true);
+      setAgentRunId(agentResult.agent_run_id);
+      triggerTitleGeneration();
+    } catch (error) {
+      console.error('[Adaptive] Failed to start agent:', error);
+
+      if (error instanceof BillingError) {
+        setBillingData({
+          currentUsage: error.detail.currentUsage as number | undefined,
+          limit: error.detail.limit as number | undefined,
+          message:
+            error.detail.message ||
+            'Monthly usage limit reached. Please upgrade.',
+          accountId: null,
+        });
+        setShowBillingAlert(true);
+        return;
+      }
+
+      if (error instanceof AgentRunLimitError) {
+        const { running_thread_ids, running_count } = error.detail;
+
+        setAgentLimitData({
+          runningCount: running_count,
+          runningThreadIds: running_thread_ids,
+        });
+        setShowAgentLimitDialog(true);
+        return;
+      }
+
+      if (error instanceof ProjectLimitError) {
+        setBillingData({
+          currentUsage: error.detail.current_count as number,
+          limit: error.detail.limit as number,
+          message:
+            error.detail.message ||
+            `You've reached your project limit (${error.detail.current_count}/${error.detail.limit}). Please upgrade to create more projects.`,
+          accountId: null,
+        });
+        setShowBillingAlert(true);
+        return;
+      }
+
+      toast.error(error instanceof Error ? error.message : 'Failed to start agent');
+    }
+  }, [startAgentMutation, threadId, selectedAgentId, setUserInitiatedRun, setAgentRunId, triggerTitleGeneration, setBillingData, setShowBillingAlert, setAgentLimitData, setShowAgentLimitDialog]);
+
+  const handleAdaptiveDecisionOutcome = useCallback(async (decision: AdaptiveDecision, originalMessage: string, submitOptions?: { model_name?: string; hidden?: boolean }) => {
+    console.log('[Adaptive] Handling decision outcome:', decision);
+    
+    if (!decision) {
+      console.warn('[Adaptive] No decision provided, clearing prompt');
+      setAdaptivePrompt(null);
+      return;
+    }
+
+    // Handle agent_needed - auto-start the agent
+    if (decision.state === 'agent_needed') {
+      console.log('[Adaptive] Agent needed - auto-starting agent');
+      
+      // Preserve adaptive mode when agent starts (same as chat mode preservation)
+      userSelectedModeRef.current = 'adaptive';
+      setInitialChatMode('adaptive');
+      
+      if (decision.agent_preface) {
+        const prefaceMessage: UnifiedMessage = {
+          message_id: `adaptive-preface-${Date.now()}`,
+          thread_id: threadId,
+          type: 'assistant',
+          is_llm_message: true,
+          content: JSON.stringify({ content: decision.agent_preface }),
+          metadata: JSON.stringify({ chat_mode: 'adaptive', source: 'preface' }),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        setMessages((prev) => [...prev, prefaceMessage]);
+
+        try {
+          await addAssistantMessageMutation.mutateAsync({
+            threadId,
+            content: decision.agent_preface,
+            metadata: { chat_mode: 'adaptive', source: 'preface' },
+          });
+        } catch (error) {
+          console.error('[Adaptive] Failed to persist adaptive preface:', error);
+        }
+      }
+
+      // Clear any existing prompt before starting agent
+      setAdaptivePrompt(null);
+      
+      try {
+        await startAgentFromAdaptiveDecision(submitOptions);
+        console.log('[Adaptive] Agent started successfully');
+      } catch (error) {
+        console.error('[Adaptive] Failed to start agent:', error);
+        toast.error('Failed to start agent. Please try again.');
+      }
+      return;
+    }
+
+    // Handle ask_user - show prompt to user
+    if (decision.state === 'ask_user' && decision.ask_user) {
+      console.log('[Adaptive] Asking user for confirmation:', decision.ask_user);
+      // Preserve adaptive mode when showing prompt
+      userSelectedModeRef.current = 'adaptive';
+      setInitialChatMode('adaptive');
+      setAdaptivePrompt({
+        prompt: decision.ask_user.prompt,
+        yesLabel: decision.ask_user.yes_label || 'Yes',
+        noLabel: decision.ask_user.no_label || "I'm fine",
+        message: originalMessage,
+        reason: decision.reason,
+        options: submitOptions,
+      });
+      return;
+    }
+
+    // Handle agent_not_needed - just clear prompt
+    if (decision.state === 'agent_not_needed') {
+      console.log('[Adaptive] Agent not needed, clearing prompt');
+      // Preserve adaptive mode even when agent not needed
+      userSelectedModeRef.current = 'adaptive';
+      setInitialChatMode('adaptive');
+      setAdaptivePrompt(null);
+      return;
+    }
+
+    // Fallback - clear prompt
+    console.warn('[Adaptive] Unknown decision state, clearing prompt:', decision.state);
+    setAdaptivePrompt(null);
+  }, [threadId, setMessages, addAssistantMessageMutation, startAgentFromAdaptiveDecision]);
+
   const handleSubmitMessage = useCallback(
     async (
       message: string,
-      options?: { model_name?: string; chat_mode?: 'chat' | 'execute'; hidden?: boolean },
+      options?: { model_name?: string; chat_mode?: ChatMode; hidden?: boolean },
     ) => {
       if (!message.trim()) return;
       setIsSending(true);
@@ -540,239 +789,99 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
       }, 10000);
 
       try {
-        if (options?.chat_mode === 'chat') {
-          // Remove the "Hmm..." message immediately
-          setMessages((prev) => 
-            prev.filter((m) => m.message_id !== optimisticHmmMessage.message_id)
-          );
-          clearTimeout(hmmTimeout);
-          
-          // Set simple chat loading state
+        const persistMessagePromise = addUserMessageMutation.mutateAsync({
+          threadId,
+          message,
+        });
+
+        const runFastMode = async (mode: 'chat' | 'adaptive') => {
           setIsSimpleChatLoading(true);
-          
-          // Create a streaming assistant message
+
           const assistantMessageId = `assistant-${Date.now()}`;
-          let streamedContent = '';
-          let displayedContent = '';
-          let characterQueue: string[] = [];
-          let isTyping = false;
-          let characterCount = 0;
-          let useTypewriterEffect = true;
-          
           const assistantMessage: UnifiedMessage = {
             message_id: assistantMessageId,
             thread_id: threadId,
             type: 'assistant',
             is_llm_message: true,
             content: JSON.stringify({ content: '' }),
-            metadata: JSON.stringify({ 
-              chat_mode: 'chat',
-              streaming: true
-            }),
+            metadata: JSON.stringify({ chat_mode: mode, is_streaming: true }),
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };
-          
-          // Add the streaming message to the UI
+
           setMessages((prev) => [...prev, assistantMessage]);
-          
-          // Dynamic typewriter effect: Start with typewriter, then switch to raw streaming
-          const getTypewriterInterval = () => {
-            // First ~500 characters: 10ms (super fast start)
-            if (characterCount < 500) {
-              return 10;
-            }
-            // Next ~1000 characters: 5ms (even faster)
-            else if (characterCount < 1500) {
-              return 5;
-            }
-            // After that: 2ms (maximum speed)
-            else {
-              return 2;
-            }
-          };
-          
-          const startTyping = () => {
-            if (isTyping || characterQueue.length === 0) return;
-            
-            isTyping = true;
-            const typeNextCharacter = () => {
-              if (characterQueue.length === 0) {
-                isTyping = false;
-                return;
-              }
-              
-              const char = characterQueue.shift()!;
-              displayedContent += char;
-              characterCount++;
-              
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.message_id === assistantMessageId
-                    ? {
-                        ...m,
-                        content: JSON.stringify({ content: displayedContent }),
-                        metadata: JSON.stringify({ is_streaming: true }),
-                      }
-                    : m
-                )
-              );
-              
-              // Check if we've reached 500 characters and should switch to raw streaming
-              if (characterCount >= 500) {
-                switchToRawStreaming();
-                return;
-              }
-              
-              setTimeout(typeNextCharacter, getTypewriterInterval());
+
+          try {
+            const response =
+              mode === 'adaptive'
+                ? await adaptiveChat(message)
+                : await fastGeminiChat(message);
+
+            const finalContent = response.response?.trim() || 'No response provided.';
+            const metadataPayload: Record<string, any> = {
+              chat_mode: mode,
+              is_streaming: false,
+              ...(mode === 'adaptive' && 'decision' in response ? { decision: response.decision } : {}),
             };
-            
-            typeNextCharacter();
-          };
-          
-          // Switch to raw streaming after 500 characters
-          const switchToRawStreaming = () => {
-            useTypewriterEffect = false;
-            // Flush any remaining characters in queue immediately
-            if (characterQueue.length > 0) {
-              const remainingContent = characterQueue.join('');
-              displayedContent += remainingContent;
-              characterQueue = [];
-              isTyping = false;
-              
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.message_id === assistantMessageId
-                    ? {
-                        ...m,
-                        content: JSON.stringify({ content: displayedContent }),
-                        metadata: JSON.stringify({ is_streaming: true }),
-                      }
-                    : m
-                )
-              );
-            }
-          };
-          
-          // Save message to database and mark as complete
-          const saveAndCompleteMessage = async () => {
-            const finalMetadata = { 
-              is_streaming: false, 
-              chat_mode: 'chat' // Mark as chat mode message
-            };
-            
-            // Update local state
+
             setMessages((prev) =>
               prev.map((m) =>
                 m.message_id === assistantMessageId
                   ? {
                       ...m,
-                      content: JSON.stringify({ content: streamedContent }),
-                      metadata: JSON.stringify(finalMetadata),
+                      content: JSON.stringify({ content: finalContent }),
+                      metadata: JSON.stringify(metadataPayload),
                     }
-                  : m
-              )
+                  : m,
+              ),
             );
-          };
-          
-          try {
-            // Use the streaming simple chat continue endpoint
-            await continueSimpleChatStream(threadId, message, {
-              onContent: (content: string) => {
-                console.log('ThreadComponent received content chunk:', content.length, 'characters');
-                // Clear loading indicator on first content chunk
-                if (streamedContent === '') {
-                  console.log('Clearing loading indicator - first chunk received');
-                  setIsSimpleChatLoading(false);
-                }
-                
-                streamedContent += content;
-                
-                if (useTypewriterEffect) {
-                  // Add each character to the queue for typewriter effect
-                  for (const char of content) {
-                    characterQueue.push(char);
-                  }
-                  
-                  // Check if we've reached 500 characters and should switch to raw streaming
-                  if (characterCount + characterQueue.length >= 500) {
-                    switchToRawStreaming();
-                  }
-                  
-                  // Start typing if not already typing
-                  startTyping();
-                } else {
-                  // Raw streaming mode - display content immediately in huge chunks
-                  displayedContent += content;
-                  
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.message_id === assistantMessageId
-                        ? {
-                            ...m,
-                            content: JSON.stringify({ content: displayedContent }),
-                            metadata: JSON.stringify({ is_streaming: true }),
-                          }
-                        : m
-                    )
-                  );
-                }
-              },
-              onDone: () => {
-                console.log(`Simple chat streaming completed`);
-                
-                // Invalidate threads list to update ordering when simple chat completes
-                queryClient.invalidateQueries({ queryKey: sidebarThreadKeys.lists() });
-                
-                if (useTypewriterEffect) {
-                  // Wait for all characters to be typed before marking complete
-                  const waitForTyping = () => {
-                    if (characterQueue.length > 0 || isTyping) {
-                      setTimeout(waitForTyping, 50);
-                    } else {
-                      // All characters typed, save to database and mark as complete
-                      saveAndCompleteMessage();
-                    }
-                  };
-                  
-                  waitForTyping();
-                } else {
-                  // Raw streaming mode - save immediately
-                  saveAndCompleteMessage();
-                }
-              },
-              onError: (error: string) => {
-                console.error('Simple chat streaming error:', error);
-                toast.error(`Chat error: ${error}`);
-                // Remove the failed message
-                setMessages((prev) => 
-                  prev.filter((msg) => msg.message_id !== assistantMessageId)
-                );
-              }
-            });
-            
+
+            try {
+              await addAssistantMessageMutation.mutateAsync({
+                threadId,
+                content: finalContent,
+                metadata: metadataPayload,
+              });
+            } catch (error) {
+              console.error('Failed to persist assistant response:', error);
+            }
+
+            queryClient.invalidateQueries({ queryKey: sidebarThreadKeys.lists() });
+
+            if (mode === 'adaptive' && 'decision' in response) {
+              // Don't clear prompt here - let handleAdaptiveDecisionOutcome manage it
+              const adaptiveResponse = response as AdaptiveChatResponse;
+              await handleAdaptiveDecisionOutcome(adaptiveResponse.decision, message, options);
+            } else {
+              setAdaptivePrompt(null);
+            }
           } catch (error) {
-            console.error('Simple chat error:', error);
-            toast.error(`Chat error: ${error}`);
-            // Remove the failed message
-            setMessages((prev) => 
-              prev.filter((msg) => msg.message_id !== assistantMessageId)
+            console.error('Fast chat error:', error);
+            toast.error(error instanceof Error ? error.message : 'Chat error');
+            setMessages((prev) =>
+              prev.filter((msg) => msg.message_id !== assistantMessageId),
             );
           } finally {
-            // Loading state is cleared when streaming starts, but ensure it's cleared on error
-            if (streamedContent === '') {
-              setIsSimpleChatLoading(false);
-            }
+            setIsSimpleChatLoading(false);
           }
-          
+        };
+
+        if (options?.chat_mode === 'chat' || options?.chat_mode === 'adaptive') {
+          setMessages((prev) =>
+            prev.filter((m) => m.message_id !== optimisticHmmMessage.message_id),
+          );
+          clearTimeout(hmmTimeout);
+
+          // Preserve the selected mode (same as chat mode)
+          if (options.chat_mode === 'adaptive') {
+            userSelectedModeRef.current = 'adaptive';
+            setInitialChatMode('adaptive');
+          }
+
+          await persistMessagePromise;
+          await runFastMode(options.chat_mode);
           return;
         }
-
-        // Add user message before handling execute mode
-        const messagePromise = addUserMessageMutation.mutateAsync({
-          threadId,
-          message,
-        });
 
         // Handle Execute Mode - Normal agent run
         const agentPromise = startAgentMutation.mutateAsync({
@@ -784,7 +893,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         });
 
         const results = await Promise.allSettled([
-          messagePromise,
+          persistMessagePromise,
           agentPromise,
         ]);
 
@@ -890,11 +999,16 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
       threadId,
       project?.account_id,
       addUserMessageMutation,
+      addAssistantMessageMutation,
       startAgentMutation,
       setMessages,
       setBillingData,
       setShowBillingAlert,
       setAgentRunId,
+      setAgentLimitData,
+      setShowAgentLimitDialog,
+      queryClient,
+      handleAdaptiveDecisionOutcome,
     ],
   );
 
@@ -960,6 +1074,33 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     },
     [],
   );
+
+  const handleAdaptivePromptConfirm = useCallback(async () => {
+    if (!adaptivePrompt) {
+      console.warn('[Adaptive] Confirm clicked but no prompt available');
+      return;
+    }
+    
+    console.log('[Adaptive] User confirmed - starting agent with options:', adaptivePrompt.options);
+    const options = adaptivePrompt.options;
+    
+    // Clear prompt immediately to provide feedback
+    setAdaptivePrompt(null);
+    
+    try {
+      await startAgentFromAdaptiveDecision(options);
+      console.log('[Adaptive] Agent started successfully after user confirmation');
+    } catch (error) {
+      console.error('[Adaptive] Failed to start agent after confirmation:', error);
+      toast.error('Failed to start agent. Please try again.');
+      // Don't restore prompt on error - let user try again if needed
+    }
+  }, [adaptivePrompt, startAgentFromAdaptiveDecision]);
+
+  const handleAdaptivePromptDecline = useCallback(() => {
+    console.log('[Adaptive] User declined - dismissing prompt');
+    setAdaptivePrompt(null);
+  }, []);
 
   const toolViewAssistant = useCallback(
     (assistantContent?: string, toolContent?: string) => {
@@ -1200,48 +1341,6 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     setDebugMode(debugParam === 'true');
   }, [searchParams]);
 
-  // Trigger title generation after LLM response is complete
-  const triggerTitleGeneration = useCallback(async () => {
-    try {
-      // Only trigger once per thread and if we have a project
-      if (project?.project_id && !titleGenerationTriggeredRef.current) {
-        titleGenerationTriggeredRef.current = true;
-        
-        // Get the first user message to use for title generation
-        const firstUserMessage = messages.find(msg => msg.type === 'user');
-        if (firstUserMessage) {
-          let prompt = '';
-          if (typeof firstUserMessage.content === 'string') {
-            try {
-              const parsed = JSON.parse(firstUserMessage.content);
-              prompt = parsed.content || parsed;
-            } catch {
-              prompt = firstUserMessage.content;
-            }
-          }
-          
-          if (prompt) {
-            // Call the backend to generate title in background
-            const formData = new FormData();
-            formData.append('project_id', project.project_id);
-            formData.append('prompt', prompt);
-            
-            await fetch('/api/threads/generate-title', {
-              method: 'POST',
-              body: formData
-            });
-            
-            // Refresh sidebar to show the new title
-            refreshSidebar();
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Failed to trigger title generation:', error);
-      // Don't show error to user as this is a background process
-    }
-  }, [project, messages]);
-
 
   // Simple chat mode - no special handling needed since conversation is already complete
 
@@ -1380,6 +1479,166 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     );
   }
 
+  const adaptivePromptBubble = adaptivePrompt ? (
+    <div className="w-full pointer-events-auto">
+      <div 
+        className="relative rounded-[32px] bg-[rgba(255,255,255,0.25)] dark:bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl py-5 px-4 space-y-3 overflow-hidden min-h-0"
+        style={{ 
+          animation: 'breathe-3d 3s ease-in-out infinite',
+          transform: 'translateY(0px)'
+        }}
+      >
+        {/* Dark mode gradient rim - inset only */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-[32px] dark:opacity-100 opacity-0"
+          style={{
+            background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+            WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+            WebkitMaskComposite: 'xor',
+            maskComposite: 'exclude',
+            padding: '1px',
+            borderRadius: '32px',
+            clipPath: 'inset(0)'
+          }}
+        />
+        {/* Light mode gradient rim - inset only */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-[32px] light:opacity-100 dark:opacity-0"
+          style={{
+            background: 'linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02) 30%, rgba(0,0,0,0.05) 85%, rgba(0,0,0,0.03))',
+            WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+            WebkitMaskComposite: 'xor',
+            maskComposite: 'exclude',
+            padding: '1px',
+            borderRadius: '32px',
+            clipPath: 'inset(0)'
+          }}
+        />
+        {/* Dark mode specular streak */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-16 dark:opacity-100 opacity-0"
+          style={{
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+            filter: 'blur(6px)',
+            mixBlendMode: 'screen'
+          }}
+        />
+        {/* Light mode specular streak */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-16 light:opacity-100 dark:opacity-0"
+          style={{
+            background: 'linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.03) 45%, rgba(0,0,0,0) 100%)',
+            filter: 'blur(6px)',
+            mixBlendMode: 'screen'
+          }}
+        />
+        {/* Fine noise */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-20"
+          style={{
+            backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='table' tableValues='0 0.03'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>")`,
+            backgroundSize: '100px 100px',
+            mixBlendMode: 'overlay'
+          }}
+        />
+        
+        <div className="relative z-10 space-y-3 w-full">
+          <div className="w-full">
+            <p className="text-sm font-medium text-white/90 dark:text-white/90 light:text-zinc-900 break-words">{adaptivePrompt.prompt}</p>
+            {adaptivePrompt.reason && (
+              <div className="text-xs text-white/70 mt-1.5 light:text-zinc-600 dark:text-white/70 break-words whitespace-pre-line">
+                {adaptivePrompt.reason}
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2 pb-2">
+            <button
+              type="button"
+              className="flex-1 group relative rounded-xl border border-green-500/10 dark:border-green-500/10 light:border-white/10 bg-green-500/5 dark:bg-green-500/5 light:bg-[rgba(255,255,255,0.15)] backdrop-blur-sm py-2 px-3 text-xs font-medium text-white/90 dark:text-white/90 light:text-zinc-900 shadow-lg hover:bg-green-500/10 dark:hover:bg-green-500/10 light:hover:bg-green-500/30 transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 overflow-hidden"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleAdaptivePromptConfirm();
+              }}
+            >
+              {/* Button gradient rim on hover */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity dark:opacity-0 light:opacity-0"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(34,197,94,0.15), rgba(34,197,94,0.05) 30%, rgba(34,197,94,0.1) 85%, rgba(34,197,94,0.08))',
+                  WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                  WebkitMaskComposite: 'xor',
+                  maskComposite: 'exclude',
+                  padding: '1px',
+                  borderRadius: '12px'
+                }}
+              />
+              {/* Light mode gradient rim on hover */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity light:opacity-0 dark:opacity-0"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(34,197,94,0.12), rgba(34,197,94,0.04) 30%, rgba(34,197,94,0.08) 85%, rgba(34,197,94,0.06))',
+                  WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                  WebkitMaskComposite: 'xor',
+                  maskComposite: 'exclude',
+                  padding: '1px',
+                  borderRadius: '12px'
+                }}
+              />
+              <Check className="w-3.5 h-3.5 text-green-500/70 dark:text-green-500/70 light:text-green-600/80 relative z-10" />
+              <span className="relative z-10">{adaptivePrompt.yesLabel}</span>
+            </button>
+            <button
+              type="button"
+              className="flex-1 group relative rounded-xl border border-red-500/10 dark:border-red-500/10 light:border-white/10 bg-red-500/5 dark:bg-red-500/5 light:bg-[rgba(255,255,255,0.15)] backdrop-blur-sm py-2 px-3 text-xs font-medium text-white/90 dark:text-white/90 light:text-zinc-900 shadow-lg hover:bg-red-500/10 dark:hover:bg-red-500/10 light:hover:bg-red-500/30 transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 overflow-hidden"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleAdaptivePromptDecline();
+              }}
+            >
+              {/* Button gradient rim on hover */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity dark:opacity-0 light:opacity-0"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(239,68,68,0.15), rgba(239,68,68,0.05) 30%, rgba(239,68,68,0.1) 85%, rgba(239,68,68,0.08))',
+                  WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                  WebkitMaskComposite: 'xor',
+                  maskComposite: 'exclude',
+                  padding: '1px',
+                  borderRadius: '12px'
+                }}
+              />
+              {/* Light mode gradient rim on hover */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity light:opacity-0 dark:opacity-0"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(239,68,68,0.12), rgba(239,68,68,0.04) 30%, rgba(239,68,68,0.08) 85%, rgba(239,68,68,0.06))',
+                  WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                  WebkitMaskComposite: 'xor',
+                  maskComposite: 'exclude',
+                  padding: '1px',
+                  borderRadius: '12px'
+                }}
+              />
+              <X className="w-3.5 h-3.5 text-red-500/70 dark:text-red-500/70 light:text-red-600/80 relative z-10" />
+              <span className="relative z-10">{adaptivePrompt.noLabel}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   if (compact) {
     return (
       <>
@@ -1453,6 +1712,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
                 scrollContainerRef={scrollContainerRef}
                 isPreviewMode={true}
                 isSimpleChatLoading={isSimpleChatLoading}
+                adaptivePromptBubble={adaptivePromptBubble}
               />
             </div>
           </div>
@@ -1586,6 +1846,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
           agentData={agent}
           scrollContainerRef={scrollContainerRef}
           isSimpleChatLoading={isSimpleChatLoading}
+          adaptivePromptBubble={adaptivePromptBubble}
         />
 
         {/* Floating Tool Preview - Right Side Square */}

@@ -19,6 +19,7 @@ from run_agent_background import run_agent_background
 from core.ai_models import model_manager
 
 from .api_models import AgentStartRequest, AgentVersionResponse, AgentResponse, ThreadAgentResponse, InitiateAgentResponse
+from fast_gemini_chat import ChatRequest as FastChatRequest, run_adaptive_router
 from . import core_utils as utils
 from .core_utils import (
     stop_agent_run_with_helpers as stop_agent_run,
@@ -936,9 +937,38 @@ async def initiate_agent_with_files(
         except Exception as e:
             logger.warning(f"Failed to trigger title generation for project {project_id}: {str(e)}")
 
-        # Handle Chat Mode - Return thread_id without starting agent
+        # Handle Chat/Adaptive Modes - Return thread_id without immediate agent run
         if chat_mode == 'chat':
             logger.info(f"Chat mode initiated for thread {thread_id} - returning without starting agent")
+            return {"thread_id": thread_id, "agent_run_id": None}
+
+        if chat_mode == 'adaptive':
+            logger.info(f"Adaptive mode initiated for thread {thread_id} - generating lightweight response before escalation")
+            try:
+                adaptive_request = FastChatRequest(
+                    message=message_content,
+                    model="gemini-2.5-flash"
+                )
+                adaptive_response = await run_adaptive_router(adaptive_request)
+                assistant_payload = {"role": "assistant", "content": adaptive_response.response}
+                metadata_payload = {
+                    "chat_mode": "adaptive",
+                    "decision": adaptive_response.decision.dict(),
+                    "decision_source": "server_initial",
+                    "original_message": message_content,
+                }
+                assistant_message_id = str(uuid.uuid4())
+                await client.table('messages').insert({
+                    "message_id": assistant_message_id,
+                    "thread_id": thread_id,
+                    "type": "assistant",
+                    "is_llm_message": True,
+                    "content": assistant_payload,
+                    "metadata": metadata_payload,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }).execute()
+            except Exception as adaptive_error:
+                logger.error(f"Adaptive router failed for thread {thread_id}: {adaptive_error}", exc_info=True)
             return {"thread_id": thread_id, "agent_run_id": None}
 
         # Handle Execute Mode - Start agent as normal

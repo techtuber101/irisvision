@@ -18,7 +18,7 @@ import { handleFiles, FileUploadHandler } from './file-upload-handler';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Loader2, ArrowUp, X, Image as ImageIcon, Presentation, BarChart3, FileText, Search, Users, Code2, Sparkles, Sparkle, Brain as BrainIcon, MessageSquare, Zap as ZapIcon, WandSparkles, AlertTriangle, Pencil } from 'lucide-react';
+import { Loader2, ArrowUp, X, Image as ImageIcon, Presentation, BarChart3, FileText, Search, Users, Code2, Sparkles, Sparkle, Brain as BrainIcon, MessageSquare, Zap as ZapIcon, WandSparkles, AlertTriangle, Pencil, Crown } from 'lucide-react';
 import { VoiceRecorder } from './voice-recorder';
 import { UnifiedConfigMenu } from './unified-config-menu';
 import { AttachmentGroup } from '../attachment-group';
@@ -73,7 +73,7 @@ export interface ChatInputHandles {
   clearPendingFiles: () => void;
 }
 
-export type ChatMode = 'chat' | 'execute';
+export type ChatMode = 'chat' | 'execute' | 'adaptive';
 
 export interface ChatInputProps {
   onSubmit: (
@@ -208,6 +208,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
     
     // Chat Mode state - Chat vs Execute
     const [chatMode, setChatMode] = useState<ChatMode>(initialChatMode);
+    const previousInitialChatModeRef = useRef<ChatMode>(initialChatMode);
+    const userInitiatedChangeRef = useRef(false);
     
     // Detect macOS for keyboard shortcut labels
     const isMac = typeof window !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
@@ -217,8 +219,15 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
     
     // Handle chat mode changes
     const handleChatModeChange = useCallback((mode: ChatMode) => {
+      userInitiatedChangeRef.current = true;
       setChatMode(mode);
+      // Update the ref to match what we're setting, so we don't sync back
+      previousInitialChatModeRef.current = mode;
       onChatModeChange?.(mode);
+      // Reset the flag after a short delay to allow parent to update
+      setTimeout(() => {
+        userInitiatedChangeRef.current = false;
+      }, 200);
     }, [onChatModeChange]);
     
     // Handle enhance vision
@@ -296,12 +305,21 @@ Now enhance this prompt:\n\n${value}`;
       }
     }, [value, controlledOnChange]);
 
-    // Sync chat mode with initialChatMode prop changes
+    // Sync chat mode with initialChatMode prop changes (only for external changes, not user-initiated)
     useEffect(() => {
-      if (initialChatMode !== chatMode) {
+      // Only sync if:
+      // 1. The prop actually changed from the previous value (external change)
+      // 2. It's different from current chatMode
+      // 3. It's not a user-initiated change (user changes propagate via onChatModeChange)
+      if (
+        initialChatMode !== previousInitialChatModeRef.current &&
+        initialChatMode !== chatMode &&
+        !userInitiatedChangeRef.current
+      ) {
         setChatMode(initialChatMode);
       }
-    }, [initialChatMode]); // Only sync when prop changes, not when internal state changes
+      previousInitialChatModeRef.current = initialChatMode;
+    }, [initialChatMode, chatMode]); // Include chatMode to properly detect changes
 
     const {
       selectedModel,
@@ -410,16 +428,22 @@ Now enhance this prompt:\n\n${value}`;
       const handleKeyDown = (e: KeyboardEvent) => {
         const isMod = isMac ? e.metaKey : e.ctrlKey;
         
-        // Cmd/Ctrl + 1 for Execute mode (Iris Intelligence)
+        // Cmd/Ctrl + 1 for Quick Chat
         if (isMod && e.key === '1') {
           e.preventDefault();
-          handleChatModeChange('execute');
+          handleChatModeChange('chat');
         }
         
-        // Cmd/Ctrl + 2 for Chat mode (Quick Chat)
+        // Cmd/Ctrl + 2 for Adaptive mode (Iris Intelligence Mode)
         if (isMod && e.key === '2') {
           e.preventDefault();
-          handleChatModeChange('chat');
+          handleChatModeChange('adaptive');
+        }
+
+        // Cmd/Ctrl + 3 for Execute mode (Max-Capability Agent Mode)
+        if (isMod && e.key === '3') {
+          e.preventDefault();
+          handleChatModeChange('execute');
         }
       };
 
@@ -924,35 +948,6 @@ Now enhance this prompt:\n\n${value}`;
                             <TooltipTrigger asChild>
                               <button
                                 type="button"
-                                onClick={() => handleChatModeChange('execute')}
-                                className={cn(
-                                  "p-1.5 rounded-lg transition-all duration-200 cursor-pointer",
-                                  chatMode === 'execute'
-                                    ? "opacity-100 text-white light:text-black"
-                                    : "opacity-60 text-white/70 hover:opacity-80 light:text-black/70 light:hover:text-black/90"
-                                )}
-                              >
-                                <Sparkle className="w-4 h-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              <div className="space-y-1">
-                                <p className="font-medium flex items-center gap-1.5">
-                                  <Sparkle className="w-3 h-3" />
-                                  Iris Intelligence ({isMac ? '⌘' : 'Ctrl'}+1)
-                                </p>
-                                <p className="text-xs text-muted-foreground light:text-white/80">Next-gen intelligence with agentic power</p>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-
-                          {/* Separator line */}
-                          <div className="w-px h-4 bg-white/20 mx-0.5 light:bg-black/20" />
-
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
                                 onClick={() => handleChatModeChange('chat')}
                                 className={cn(
                                   "p-1.5 rounded-lg transition-all duration-200 cursor-pointer",
@@ -968,9 +963,66 @@ Now enhance this prompt:\n\n${value}`;
                               <div className="space-y-1">
                                 <p className="font-medium flex items-center gap-1.5">
                                   <ZapIcon className="w-3 h-3" />
-                                  Quick Chat ({isMac ? '⌘' : 'Ctrl'}+2)
+                                  Quick Chat ({isMac ? '⌘' : 'Ctrl'}+1)
                                 </p>
                                 <p className="text-xs text-muted-foreground light:text-white/80">Lightning-fast responses</p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+
+                          {/* Separator line */}
+                          <div className="w-px h-4 bg-white/20 mx-0.5 light:bg-black/20" />
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => handleChatModeChange('adaptive')}
+                                className={cn(
+                                  "p-1.5 rounded-lg transition-all duration-200 cursor-pointer",
+                                  chatMode === 'adaptive'
+                                    ? "opacity-100 text-white light:text-black"
+                                    : "opacity-60 text-white/70 hover:opacity-80 light:text-black/70 light:hover:text-black/90"
+                                )}
+                              >
+                                <Sparkle className="w-4 h-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <div className="space-y-1">
+                                <p className="font-medium flex items-center gap-1.5">
+                                  <Sparkle className="w-3 h-3" />
+                                  Iris Intelligence Mode ({isMac ? '⌘' : 'Ctrl'}+2)
+                                </p>
+                                <p className="text-xs text-muted-foreground light:text-white/80">Instant answers that intelligently & adaptively transform into comprehensive agentic workflows</p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+
+                          <div className="w-px h-4 bg-white/20 mx-0.5 light:bg-black/20" />
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => handleChatModeChange('execute')}
+                                className={cn(
+                                  "p-1.5 rounded-lg transition-all duration-200 cursor-pointer",
+                                  chatMode === 'execute'
+                                    ? "opacity-100 text-white light:text-black"
+                                    : "opacity-60 text-white/70 hover:opacity-80 light:text-black/70 light:hover:text-black/90"
+                                )}
+                              >
+                                <Crown className="w-4 h-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <div className="space-y-1">
+                                <p className="font-medium flex items-center gap-1.5">
+                                  <Crown className="w-3 h-3" />
+                                  Max Capability Agent ({isMac ? '⌘' : 'Ctrl'}+3)
+                                </p>
+                                <p className="text-xs text-muted-foreground light:text-white/80">Next-gen intelligence with agentic power</p>
                               </div>
                             </TooltipContent>
                           </Tooltip>
@@ -998,7 +1050,7 @@ Now enhance this prompt:\n\n${value}`;
                               </TooltipTrigger>
                               <TooltipContent side="bottom">
                                 <div className="space-y-1">
-                                  <p className="font-medium text-white">Adaptive</p>
+                                  <p className="font-medium text-white">Iris Intelligence Mode</p>
                                   <p className="text-xs text-gray-200 light:text-white/80">Quick responses with smart context switching</p>
                                 </div>
                               </TooltipContent>

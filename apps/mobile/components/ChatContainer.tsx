@@ -5,7 +5,7 @@ import { Project } from '@/stores/ui-store';
 import { UploadedFile } from '@/utils/file-upload';
 import React, { useEffect, useState } from 'react';
 import { Keyboard, KeyboardEvent, Platform, View } from 'react-native';
-import { ChatInput } from './ChatInput';
+import { ChatInput, FastResponsePayload } from './ChatInput';
 import { MessageThread } from './MessageThread';
 import { SkeletonText } from './Skeleton';
 import { Body } from './Typography';
@@ -23,7 +23,7 @@ interface ChatContainerProps {
     onSendMessage: (content: string, files?: UploadedFile[]) => Promise<void>;
     onCancelStream: () => void;
     onTabChange?: (tab: 'workspace' | 'quick') => void;
-    onQuickChatResponse?: (response: string) => void;
+    onQuickChatResponse?: (payload: FastResponsePayload) => void;
 }
 
 export const ChatContainer: React.FC<ChatContainerProps> = ({

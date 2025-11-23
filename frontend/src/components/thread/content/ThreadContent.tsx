@@ -582,6 +582,7 @@ export interface ThreadContentProps {
     agentMetadata?: any; // Add agent metadata prop
     agentData?: any; // Add full agent data prop
     isSimpleChatLoading?: boolean; // Add simple chat loading state prop
+    adaptivePromptBubble?: React.ReactNode; // Add adaptive prompt bubble prop
 }
 
 export const ThreadContent: React.FC<ThreadContentProps> = ({
@@ -609,6 +610,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
     agentMetadata,
     agentData,
     isSimpleChatLoading = false,
+    adaptivePromptBubble,
 }) => {
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const latestMessageRef = useRef<HTMLDivElement>(null);
@@ -1578,6 +1580,12 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            )}
+                            {/* Adaptive prompt bubble - appears after last message */}
+                            {adaptivePromptBubble && (
+                                <div className="pb-3 pt-0">
+                                    {adaptivePromptBubble}
                                 </div>
                             )}
                             <div className="!h-48" />
