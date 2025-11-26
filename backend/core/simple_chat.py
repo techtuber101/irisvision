@@ -92,9 +92,21 @@ def _record_to_history(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     gemini_role = "user" if role == "user" else "model"
     return {"role": gemini_role, "parts": [combined]}
 
+
+def _normalize_uuid(value: Optional[str]) -> Optional[str]:
+    """Return a canonical UUID string or None if invalid."""
+    if not value:
+        return None
+    try:
+        return str(uuid.UUID(str(value)))
+    except (ValueError, TypeError, AttributeError):
+        return None
+
 @router.post("/simple", response_model=SimpleChatResponse, summary="Simple Chat", operation_id="simple_chat")
 async def simple_chat(
     message: str = Form(...),
+    client_project_id: Optional[str] = Form(None),
+    client_thread_id: Optional[str] = Form(None),
     user_id: str = Depends(verify_and_get_user_id_from_jwt)
 ):
     """
@@ -116,7 +128,10 @@ async def simple_chat(
         logger.debug(f"Simple chat initiated for user {user_id} with message: {message[:50]}...")
         
         # 1. Create Project (for URL structure)
-        project_id = str(uuid.uuid4())
+        supplied_project_id = _normalize_uuid(client_project_id)
+        supplied_thread_id = _normalize_uuid(client_thread_id)
+
+        project_id = supplied_project_id or str(uuid.uuid4())
         project = await client.table('projects').insert({
             "project_id": project_id,
             "account_id": account_id,
@@ -127,7 +142,7 @@ async def simple_chat(
         logger.debug(f"Created project: {project_id}")
         
         # 2. Create Thread (minimal)
-        thread_id = str(uuid.uuid4())
+        thread_id = supplied_thread_id or str(uuid.uuid4())
         thread = await client.table('threads').insert({
             "thread_id": thread_id,
             "project_id": project_id,
@@ -270,6 +285,8 @@ async def continue_simple_chat(
 @router.post("/simple/stream")
 async def simple_chat_streaming(
     message: str = Form(...),
+    client_project_id: Optional[str] = Form(None),
+    client_thread_id: Optional[str] = Form(None),
     user_id: str = Depends(verify_and_get_user_id_from_jwt)
 ):
     """
@@ -279,11 +296,13 @@ async def simple_chat_streaming(
         try:
             client = await utils.db.client
             account_id = user_id
+            supplied_project_id = _normalize_uuid(client_project_id)
+            supplied_thread_id = _normalize_uuid(client_thread_id)
             
             logger.debug(f"Streaming simple chat initiated for user {user_id} with message: {message[:50]}...")
             
             # 1. Create Project (for URL structure)
-            project_id = str(uuid.uuid4())
+            project_id = supplied_project_id or str(uuid.uuid4())
             project = await client.table('projects').insert({
                 "project_id": project_id,
                 "account_id": account_id,
@@ -294,7 +313,7 @@ async def simple_chat_streaming(
             logger.debug(f"Created project: {project_id}")
             
             # 2. Create Thread (minimal)
-            thread_id = str(uuid.uuid4())
+            thread_id = supplied_thread_id or str(uuid.uuid4())
             thread = await client.table('threads').insert({
                 "thread_id": thread_id,
                 "project_id": project_id,

@@ -30,6 +30,16 @@ from .core_utils import (
 router = APIRouter(tags=["agent-runs"])
 
 
+def _normalize_uuid(value: Optional[str]) -> Optional[str]:
+    """Return canonical UUID string or None if invalid."""
+    if not value:
+        return None
+    try:
+        return str(uuid.UUID(str(value)))
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
 async def _get_agent_run_with_access_check(client, agent_run_id: str, user_id: str):
     """
     Get an agent run and verify the user has access to it.
@@ -637,6 +647,8 @@ async def initiate_agent_with_files(
     agent_id: Optional[str] = Form(None),  # Add agent_id parameter
     files: List[UploadFile] = File(default=[]),
     chat_mode: Optional[str] = Form(None),  # Add chat_mode parameter
+    client_project_id: Optional[str] = Form(None),
+    client_thread_id: Optional[str] = Form(None),
     user_id: str = Depends(verify_and_get_user_id_from_jwt)
 ):
     """
@@ -748,14 +760,17 @@ async def initiate_agent_with_files(
             logger.warning(f"Project limit exceeded for account {account_id}: {project_limit_check['current_count']}/{project_limit_check['limit']} projects")
             raise HTTPException(status_code=402, detail=error_detail)
 
+    supplied_project_id = _normalize_uuid(client_project_id)
+    supplied_thread_id = _normalize_uuid(client_thread_id)
+
     try:
         # 1. Create Project
         placeholder_name = f"{prompt[:30]}..." if len(prompt) > 30 else prompt
+        project_id = supplied_project_id or str(uuid.uuid4())
         project = await client.table('projects').insert({
-            "project_id": str(uuid.uuid4()), "account_id": account_id, "name": placeholder_name,
+            "project_id": project_id, "account_id": account_id, "name": placeholder_name,
             "created_at": datetime.now(timezone.utc).isoformat()
         }).execute()
-        project_id = project.data[0]['project_id']
         logger.info(f"Created new project: {project_id}")
 
         # 2. Create Sandbox (lazy): only create now if files were uploaded and need the
@@ -807,8 +822,9 @@ async def initiate_agent_with_files(
                 raise Exception("Failed to create sandbox")
 
         # 3. Create Thread
+        thread_id = supplied_thread_id or str(uuid.uuid4())
         thread_data = {
-            "thread_id": str(uuid.uuid4()), 
+            "thread_id": thread_id,
             "project_id": project_id, 
             "account_id": account_id,
             "created_at": datetime.now(timezone.utc).isoformat()
@@ -833,7 +849,6 @@ async def initiate_agent_with_files(
             )
         
         thread = await client.table('threads').insert(thread_data).execute()
-        thread_id = thread.data[0]['thread_id']
         logger.debug(f"Created new thread: {thread_id}")
 
         # Set a temporary default name for instant response
@@ -940,36 +955,21 @@ async def initiate_agent_with_files(
         # Handle Chat/Adaptive Modes - Return thread_id without immediate agent run
         if chat_mode == 'chat':
             logger.info(f"Chat mode initiated for thread {thread_id} - returning without starting agent")
-            return {"thread_id": thread_id, "agent_run_id": None}
+            return {
+                "thread_id": thread_id,
+                "project_id": project_id,
+                "agent_run_id": None
+            }
 
         if chat_mode == 'adaptive':
-            logger.info(f"Adaptive mode initiated for thread {thread_id} - generating lightweight response before escalation")
-            try:
-                adaptive_request = FastChatRequest(
-                    message=message_content,
-                    model="gemini-2.5-flash"
-                )
-                adaptive_response = await run_adaptive_router(adaptive_request)
-                assistant_payload = {"role": "assistant", "content": adaptive_response.response}
-                metadata_payload = {
-                    "chat_mode": "adaptive",
-                    "decision": adaptive_response.decision.dict(),
-                    "decision_source": "server_initial",
-                    "original_message": message_content,
-                }
-                assistant_message_id = str(uuid.uuid4())
-                await client.table('messages').insert({
-                    "message_id": assistant_message_id,
-                    "thread_id": thread_id,
-                    "type": "assistant",
-                    "is_llm_message": True,
-                    "content": assistant_payload,
-                    "metadata": metadata_payload,
-                    "created_at": datetime.now(timezone.utc).isoformat()
-                }).execute()
-            except Exception as adaptive_error:
-                logger.error(f"Adaptive router failed for thread {thread_id}: {adaptive_error}", exc_info=True)
-            return {"thread_id": thread_id, "agent_run_id": None}
+            logger.info(f"Adaptive mode initiated for thread {thread_id} - returning immediately for streaming")
+            # Return thread_id immediately - response will be streamed on the frontend
+            # This allows instant redirect like execute mode
+            return {
+                "thread_id": thread_id,
+                "project_id": project_id,
+                "agent_run_id": None
+            }
 
         # Handle Execute Mode - Start agent as normal
         effective_model = model_name
@@ -1014,7 +1014,11 @@ async def initiate_agent_with_files(
             request_id=request_id,
         )
 
-        return {"thread_id": thread_id, "agent_run_id": agent_run_id}
+        return {
+            "thread_id": thread_id,
+            "project_id": project_id,
+            "agent_run_id": agent_run_id
+        }
 
     except Exception as e:
         logger.error(f"Error in agent initiation: {str(e)}\n{traceback.format_exc()}")

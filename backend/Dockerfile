@@ -12,11 +12,15 @@ RUN apk update && apk add --no-cache \
     linux-headers
 
 # Install Python development dependencies
-RUN apk add --no-cache \
-    freetype-dev \
-    gcc \
-    musl-dev \
-    python3-dev
+# Update package index and install with retry to handle I/O errors
+RUN for i in 1 2 3; do \
+        apk update && apk add --no-cache \
+            freetype-dev \
+            gcc \
+            musl-dev \
+            python3-dev && break || \
+        (echo "Python dev dependencies installation attempt $i failed, retrying..." && sleep 5); \
+    done
 
 # Install Rust compiler separately to avoid conflicts
 # Try installing Rust with retry mechanism to handle I/O errors

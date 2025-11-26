@@ -13,6 +13,7 @@ class AgentStartRequest(BaseModel):
 class InitiateAgentResponse(BaseModel):
     """Response model for agent initiation."""
     thread_id: str
+    project_id: str
     agent_run_id: Optional[str] = None
 
 

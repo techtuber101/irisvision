@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -18,9 +17,7 @@ import {
   ChevronRight,
   Zap,
   Folder,
-  Sparkles,
-  Pencil,
-  Share2
+  Sparkles
 } from "lucide-react"
 import { ThreadIcon } from "./thread-icon"
 import { toast } from "sonner"
@@ -50,7 +47,6 @@ import {
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger
 } from "@/components/ui/tooltip"
 import Link from "next/link"
@@ -63,7 +59,6 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ThreadWithProject, GroupedThreads } from '@/hooks/react-query/sidebar/use-sidebar';
 import { processThreadsWithProjects, useDeleteMultipleThreads, useDeleteThread, useProjects, useThreads, groupThreadsByDate } from '@/hooks/react-query/sidebar/use-sidebar';
 import { projectKeys, threadKeys } from '@/hooks/react-query/sidebar/keys';
-import { useUpdateProject } from '@/hooks/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
@@ -337,23 +332,16 @@ const ThreadItem: React.FC<{
   setShowShareModal,
   isMobile 
 }) => {
-  const queryClient = useQueryClient();
-  const updateProjectMutation = useUpdateProject();
-  
   // State for typewriter effect
   const [previousProjectName, setPreviousProjectName] = useState(thread.projectName);
   const [showTypewriter, setShowTypewriter] = useState(false);
   const [typewriterKey, setTypewriterKey] = useState(0);
   
-  // State for popup (shown on three dots click)
-  const [showPopup, setShowPopup] = useState(false);
+  // State for hover tooltip
+  const [isHovered, setIsHovered] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryText, setSummaryText] = useState('');
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [editName, setEditName] = useState(thread.projectName);
-  const renameInputRef = useRef<HTMLInputElement>(null);
-  const threeDotsButtonRef = useRef<HTMLButtonElement>(null);
-  const [popupPosition, setPopupPosition] = useState({ top: 0, left: 0 });
 
   // Detect when project name changes and trigger typewriter effect
   useEffect(() => {
@@ -364,13 +352,24 @@ const ThreadItem: React.FC<{
     }
   }, [thread.projectName, previousProjectName]);
 
-  // Focus rename input when renaming starts
+  // Handle tooltip delay
   useEffect(() => {
-    if (isRenaming && renameInputRef.current) {
-      renameInputRef.current.focus();
-      renameInputRef.current.select();
+    let timeoutId: NodeJS.Timeout;
+    
+    if (isHovered) {
+      timeoutId = setTimeout(() => {
+        setShowTooltip(true);
+      }, 600); // 1s delay before opening tooltip
+    } else {
+      setShowTooltip(false);
     }
-  }, [isRenaming]);
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [isHovered]);
 
   const handleTypewriterComplete = () => {
     // Hide typewriter effect after completion
@@ -397,92 +396,22 @@ const ThreadItem: React.FC<{
       setSummaryText(e?.message || 'Failed to start summary');
     }
   };
-
-  const handleRename = () => {
-    setIsRenaming(true);
-    setEditName(thread.projectName);
-  };
-
-  const saveRename = async () => {
-    if (editName.trim() === '' || editName === thread.projectName) {
-      setIsRenaming(false);
-      setEditName(thread.projectName);
-      return;
-    }
-
-    try {
-      if (!thread.projectId) {
-        toast.error('Cannot rename: Project ID is missing');
-        setIsRenaming(false);
-        setEditName(thread.projectName);
-        return;
-      }
-
-      await updateProjectMutation.mutateAsync({
-        projectId: thread.projectId,
-        data: { name: editName }
-      });
-      
-      queryClient.invalidateQueries({ queryKey: threadKeys.all });
-      setIsRenaming(false);
-      toast.success('Chat renamed successfully');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to rename chat';
-      toast.error(errorMessage);
-      setIsRenaming(false);
-      setEditName(thread.projectName);
-    }
-  };
-
-  const cancelRename = () => {
-    setIsRenaming(false);
-    setEditName(thread.projectName);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      saveRename();
-    } else if (e.key === 'Escape') {
-      cancelRename();
-    }
-  };
-  // Calculate popup position and handle click outside
-  useEffect(() => {
-    if (!showPopup || !threeDotsButtonRef.current) return;
-    
-    const button = threeDotsButtonRef.current;
-    const rect = button.getBoundingClientRect();
-    
-    // Calculate position relative to viewport
-    setPopupPosition({
-      top: rect.top + rect.height / 2,
-      left: isMobile ? undefined : rect.right + 8,
-      right: isMobile ? window.innerWidth - rect.right + 8 : undefined,
-    });
-
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (!target.closest('.thread-popup-container') && !target.closest('.three-dots-button')) {
-        setShowPopup(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showPopup, isMobile]);
-
   return (
-    <SidebarMenuItem key={`thread-${thread.threadId}`} className="group/row relative" style={{ position: 'relative' }}>
-      <SidebarMenuButton
-        asChild
-        className={`relative hover:bg-black/5 dark:hover:bg-white/5 ${isActive
-          ? 'bg-accent text-accent-foreground font-medium'
-          : isSelected
-            ? 'bg-primary/10'
-            : ''
-          }`}
-      >
-        <div className="flex items-center w-full">
+    <SidebarMenuItem key={`thread-${thread.threadId}`} className="group/row relative">
+      <Tooltip open={showTooltip && !isMobile}>
+        <TooltipTrigger asChild>
+          <SidebarMenuButton
+            asChild
+            className={`relative ${isActive
+              ? 'bg-accent text-accent-foreground font-medium'
+              : isSelected
+                ? 'bg-primary/10'
+                : ''
+              }`}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+          >
+            <div className="flex items-center w-full">
           <Link
             href={thread.url}
             onClick={(e) =>
@@ -505,7 +434,7 @@ const ThreadItem: React.FC<{
                 <TypewriterText
                   key={typewriterKey}
                   text={thread.projectName}
-                  speed={40}
+                  speed={40} // Rapid typing - 40ms per character
                   onComplete={handleTypewriterComplete}
                   showCursor={true}
                   cursorBlinkSpeed={500}
@@ -516,7 +445,7 @@ const ThreadItem: React.FC<{
             </span>
           </Link>
           
-          {/* Checkbox */}
+          {/* Checkbox - only visible on hover of this specific area */}
           <div
             className="mr-1 flex-shrink-0 w-4 h-4 flex items-center justify-center group/checkbox relative"
             onClick={(e) => toggleThreadSelection(thread.threadId, e)}
@@ -542,243 +471,147 @@ const ThreadItem: React.FC<{
               </AnimatePresence>
             </div>
           </div>
-          
-          {/* Three dots button */}
-          <button
-            ref={threeDotsButtonRef}
-            className="three-dots-button cursor-pointer flex-shrink-0 w-4 h-4 flex items-center justify-center hover:bg-muted/50 rounded transition-all duration-150 text-muted-foreground hover:text-foreground opacity-0 group-hover/row:opacity-100"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowPopup(!showPopup);
-            }}
-          >
-            <MoreHorizontal className="h-4 w-4" />
-            <span className="sr-only">More actions</span>
-          </button>
-        </div>
-      </SidebarMenuButton>
-
-      {/* Popup shown on three dots click */}
-      {typeof window !== 'undefined' && createPortal(
-        <AnimatePresence>
-          {showPopup && (
-            <>
-              {/* Backdrop */}
-              <div 
-                className="fixed inset-0 z-40" 
-                onClick={() => setShowPopup(false)}
-              />
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, x: -8 }}
-                animate={{ opacity: 1, scale: 1, x: 0 }}
-                exit={{ opacity: 0, scale: 0.95, x: -8 }}
-                transition={{ duration: 0.2 }}
-                className="thread-popup-container fixed z-[100]"
-                style={{
-                  top: `${popupPosition.top}px`,
-                  left: popupPosition.left !== undefined ? `${popupPosition.left}px` : undefined,
-                  right: popupPosition.right !== undefined ? `${popupPosition.right}px` : undefined,
-                  transform: 'translateY(-50%)',
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="cursor-pointer flex-shrink-0 w-4 h-4 flex items-center justify-center hover:bg-muted/50 rounded transition-all duration-150 text-muted-foreground hover:text-foreground opacity-0 group-hover/row:opacity-100"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  document.body.style.pointerEvents = 'auto';
                 }}
               >
-            <div className="relative rounded-2xl border border-white/10 dark:border-white/10 bg-[rgba(10,14,22,0.55)] dark:bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] dark:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] overflow-hidden p-4 w-72 light:bg-[rgba(255,255,255,0.4)] light:border-black/10 light:backdrop-blur-2xl light:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.05),inset_0_1px_0_0_rgba(0,0,0,0.04)]">
-              {/* Dark mode gradient rim */}
-              <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl dark:opacity-100 opacity-0" style={{
-                background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
-                WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
-                WebkitMaskComposite: 'xor' as any,
-                maskComposite: 'exclude',
-                padding: 1,
-                borderRadius: 16,
-              }} />
-              {/* Light mode gradient rim */}
-              <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl light:opacity-100 dark:opacity-0" style={{
-                background: 'linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02) 30%, rgba(0,0,0,0.05) 85%, rgba(0,0,0,0.03))',
-                WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
-                WebkitMaskComposite: 'xor' as any,
-                maskComposite: 'exclude',
-                padding: 1,
-                borderRadius: 16,
-              }} />
-              {/* Dark mode specular streak */}
-              <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-16 dark:opacity-100 opacity-0" style={{
-                background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
-                filter: 'blur(4px)',
-                mixBlendMode: 'screen',
-              }} />
-              {/* Light mode specular streak */}
-              <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-16 light:opacity-100 dark:opacity-0" style={{
-                background: 'linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.03) 45%, rgba(0,0,0,0) 100%)',
-                filter: 'blur(4px)',
-                mixBlendMode: 'screen',
-              }} />
-              <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl opacity-[0.015]" style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-              }} />
-
-              <div className="relative z-10">
-                {/* Header row */}
-                <div className="flex items-center space-x-3 mb-3">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 dark:bg-white/10 backdrop-blur-sm border border-white/20 dark:border-white/20 light:bg-black/5 light:border-black/10 flex items-center justify-center">
-                    <Image
-                      src="/irissymbolblack.png?v=2"
-                      alt="Iris"
-                      width={16}
-                      height={16}
-                      className="w-4 h-4 dark:hidden"
-                    />
-                    <Image
-                      src="/irissymbolwhite.png?v=2"
-                      alt="Iris"
-                      width={16}
-                      height={16}
-                      className="w-4 h-4 hidden dark:block"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    {isRenaming ? (
-                      <input
-                        ref={renameInputRef}
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        onBlur={saveRename}
-                        className="w-full text-sm font-semibold bg-transparent border border-primary/30 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
-                      />
-                    ) : (
-                      <div className="text-sm font-semibold text-foreground truncate">{thread.projectName}</div>
-                    )}
-                    <div className="text-xs text-muted-foreground">
-                      {(() => {
-                        const date = new Date(thread.updatedAt);
-                        const now = new Date();
-                        const diff = now.getTime() - date.getTime();
-                        const mins = Math.floor(diff / 60000);
-                        const hrs = Math.floor(diff / 3600000);
-                        const days = Math.floor(diff / 86400000);
-                        if (mins < 60) return mins < 1 ? 'Just now' : `${mins}m ago`;
-                        if (hrs < 24) return `${hrs}h ago`;
-                        if (days === 1) return 'Yesterday';
-                        if (days < 7) return `${days}d ago`;
-                        return format(date, 'MMM d');
-                      })()}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Action buttons */}
-                <div className="space-y-3">
-                  {/* Circular icon buttons */}
-                  <div className="flex items-center justify-center gap-3">
-                    <TooltipProvider delayDuration={0}>
-                      {/* Share button */}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setSelectedItem({ threadId: thread?.threadId, projectId: thread?.projectId });
-                              setShowShareModal(true);
-                              setShowPopup(false);
-                            }}
-                            className="w-10 h-10 rounded-full bg-white/5 dark:bg-white/5 hover:bg-white/10 dark:hover:bg-white/10 border border-white/10 dark:border-white/10 backdrop-blur-sm flex items-center justify-center text-foreground transition-all duration-200 active:scale-[0.95] light:bg-black/5 light:hover:bg-black/10 light:border-black/10"
-                          >
-                            <Share2 className="w-4 h-4" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p>Share</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      {/* Delete button */}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleDeleteThread(thread.threadId, thread.projectName);
-                              setShowPopup(false);
-                            }}
-                            className="w-10 h-10 rounded-full bg-white/5 dark:bg-white/5 hover:bg-red-500/10 dark:hover:bg-red-500/10 border border-white/10 dark:border-white/10 hover:border-red-500/30 dark:hover:border-red-500/30 backdrop-blur-sm flex items-center justify-center text-foreground hover:text-red-500 dark:hover:text-red-500 transition-all duration-200 active:scale-[0.95] light:bg-black/5 light:hover:bg-red-500/10 light:border-black/10 light:hover:border-red-500/30"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p>Delete</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      {/* Open in new tab button */}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <a
-                            href={thread.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowPopup(false);
-                            }}
-                            className="w-10 h-10 rounded-full bg-white/5 dark:bg-white/5 hover:bg-white/10 dark:hover:bg-white/10 border border-white/10 dark:border-white/10 backdrop-blur-sm flex items-center justify-center text-foreground transition-all duration-200 active:scale-[0.95] light:bg-black/5 light:hover:bg-black/10 light:border-black/10"
-                          >
-                            <ArrowUpRight className="w-4 h-4" />
-                          </a>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p>Open in New Tab</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      {/* Rename chat button */}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleRename();
-                            }}
-                            className="w-10 h-10 rounded-full bg-white/5 dark:bg-white/5 hover:bg-white/10 dark:hover:bg-white/10 border border-white/10 dark:border-white/10 backdrop-blur-sm flex items-center justify-center text-foreground transition-all duration-200 active:scale-[0.95] light:bg-black/5 light:hover:bg-black/10 light:border-black/10"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p>Rename Chat</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-
-                  {/* Summarise button - full width */}
-                  <button
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSummarize(); }}
-                    className="w-full h-9 rounded-xl bg-primary text-primary-foreground border border-primary/40 backdrop-blur-sm flex items-center justify-center gap-2 text-sm font-medium transition-all duration-200 hover:bg-primary/90 active:scale-[0.99]"
-                    disabled={isSummarizing}
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    <span>{isSummarizing ? 'Summarising…' : 'Summarise'}</span>
-                  </button>
-                </div>
-
-                {summaryText && (
-                  <div className="mt-3 text-xs text-muted-foreground whitespace-pre-wrap max-h-40 overflow-auto">
-                    {summaryText}
-                  </div>
-                )}
-              </div>
+                <MoreHorizontal className="h-4 w-4" />
+                <span className="sr-only">More actions</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              className="w-56 rounded-lg"
+              side={isMobile ? 'bottom' : 'right'}
+              align={isMobile ? 'end' : 'start'}
+            >
+              <DropdownMenuItem onClick={() => {
+                setSelectedItem({ threadId: thread?.threadId, projectId: thread?.projectId })
+                setShowShareModal(true)
+              }}>
+                <ExternalLink className="text-muted-foreground" />
+                <span>Share</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a
+                  href={thread.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ArrowUpRight className="text-muted-foreground" />
+                  <span>Open in New Tab</span>
+                </a>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() =>
+                  handleDeleteThread(
+                    thread.threadId,
+                    thread.projectName,
+                  )
+                }
+              >
+                <Trash2 className="text-muted-foreground" />
+                <span>Delete</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
             </div>
-          </motion.div>
-          </>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
+          </SidebarMenuButton>
+        </TooltipTrigger>
+        <TooltipContent
+          side="right"
+          align="start"
+          sideOffset={8}
+          // Hide the default diamond arrow and allow interacting with content
+          className="p-0 bg-transparent border-none shadow-none [&>svg]:hidden"
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+        >
+          {/* Glassy content (portal, no absolute positioning) */}
+          <div className="relative rounded-2xl border border-white/10 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] overflow-hidden p-4 w-72 light:bg-[rgba(255,255,255,0.4)] light:backdrop-blur-2xl">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl" style={{
+              background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+              WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+              WebkitMaskComposite: 'xor' as any,
+              maskComposite: 'exclude',
+              padding: 1,
+              borderRadius: 16,
+            }} />
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-16" style={{
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+              filter: 'blur(4px)',
+              mixBlendMode: 'screen',
+            }} />
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl opacity-[0.015]" style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+            }} />
+
+            <div className="relative z-10">
+              {/* Header row */}
+              <div className="flex items-center space-x-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center">
+                  <Image
+                    src="/irissymbolblack.png"
+                    alt="Iris"
+                    width={16}
+                    height={16}
+                    className="w-4 h-4 dark:hidden"
+                  />
+                  <Image
+                    src="/irissymbolwhite.png"
+                    alt="Iris"
+                    width={16}
+                    height={16}
+                    className="w-4 h-4 hidden dark:block"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-foreground truncate">{thread.projectName}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {(() => {
+                      const date = new Date(thread.updatedAt);
+                      const now = new Date();
+                      const diff = now.getTime() - date.getTime();
+                      const mins = Math.floor(diff / 60000);
+                      const hrs = Math.floor(diff / 3600000);
+                      const days = Math.floor(diff / 86400000);
+                      if (mins < 60) return mins < 1 ? 'Just now' : `${mins}m ago`;
+                      if (hrs < 24) return `${hrs}h ago`;
+                      if (days === 1) return 'Yesterday';
+                      if (days < 7) return `${days}d ago`;
+                      return format(date, 'MMM d');
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Large action button below */}
+              <div className="mt-3">
+                <button
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSummarize(); }}
+                  className="w-full h-9 rounded-xl bg-primary text-primary-foreground border border-primary/40 backdrop-blur-sm flex items-center justify-center gap-2 text-sm font-medium transition-all duration-200 hover:bg-primary/90 active:scale-[0.99]"
+                  disabled={isSummarizing}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>{isSummarizing ? 'Summarising…' : 'Summarise'}</span>
+                </button>
+              </div>
+
+              {summaryText && (
+                <div className="mt-3 text-xs text-muted-foreground whitespace-pre-wrap max-h-40 overflow-auto">
+                  {summaryText}
+                </div>
+              )}
+            </div>
+          </div>
+        </TooltipContent>
+      </Tooltip>
     </SidebarMenuItem>
   );
 };

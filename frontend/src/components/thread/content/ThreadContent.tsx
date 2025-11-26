@@ -189,7 +189,9 @@ export function renderMarkdownContent(
     fileViewerHandler?: (filePath?: string, filePathList?: string[]) => void,
     sandboxId?: string,
     project?: Project,
-    debugMode?: boolean
+    debugMode?: boolean,
+    chatMode?: 'chat' | 'execute' | 'adaptive',
+    decisionState?: 'agent_needed' | 'agent_not_needed' | 'ask_user'
 ) {
     // Handle special thinking message
     if (content === 'HMM_THINKING_MESSAGE') {
@@ -245,7 +247,12 @@ export function renderMarkdownContent(
         );
     }
 
-    if (isNewXmlFormat(content)) {
+    // Disable tool call rendering in chat mode or adaptive mode when agent is not needed
+    const shouldDisableToolCalls = 
+        chatMode === 'chat' || 
+        (chatMode === 'adaptive' && decisionState !== 'agent_needed');
+
+    if (isNewXmlFormat(content) && !shouldDisableToolCalls) {
         const contentParts: React.ReactNode[] = [];
         let lastIndex = 0;
 
@@ -281,7 +288,7 @@ export function renderMarkdownContent(
 
                     // Render ask tool content with attachment UI
                     contentParts.push(
-                        <div key={`ask-${match.index}-${index}`} className="space-y-3">
+                        <div key={`ask-${match!.index}-${index}`} className="space-y-3">
                             <ComposioUrlDetector content={askText} className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none break-words [&>:first-child]:mt-0 prose-headings:mt-3" />
                             {renderAttachments(attachmentArray, fileViewerHandler, sandboxId, project)}
                         </div>
@@ -291,7 +298,7 @@ export function renderMarkdownContent(
                     const standaloneAttachments = renderStandaloneAttachments(attachmentArray, fileViewerHandler, sandboxId, project);
                     if (standaloneAttachments) {
                         contentParts.push(
-                            <div key={`ask-func-attachments-${match.index}-${index}`}>
+                            <div key={`ask-func-attachments-${match!.index}-${index}`}>
                                 {standaloneAttachments}
                             </div>
                         );
@@ -307,7 +314,7 @@ export function renderMarkdownContent(
 
                     // Render complete tool content with attachment UI
                     contentParts.push(
-                        <div key={`complete-${match.index}-${index}`} className="space-y-3">
+                        <div key={`complete-${match!.index}-${index}`} className="space-y-3">
                             <ComposioUrlDetector content={completeText} className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none break-words [&>:first-child]:mt-0 prose-headings:mt-3" />
                             {renderAttachments(attachmentArray, fileViewerHandler, sandboxId, project)}
                         </div>
@@ -317,7 +324,7 @@ export function renderMarkdownContent(
                     const standaloneAttachments = renderStandaloneAttachments(attachmentArray, fileViewerHandler, sandboxId, project);
                     if (standaloneAttachments) {
                         contentParts.push(
-                            <div key={`complete-func-attachments-${match.index}-${index}`}>
+                            <div key={`complete-func-attachments-${match!.index}-${index}`}>
                                 {standaloneAttachments}
                             </div>
                         );
@@ -339,7 +346,7 @@ export function renderMarkdownContent(
 
                     contentParts.push(
                         <div
-                            key={`tool-${match.index}-${index}`}
+                            key={`tool-${match!.index}-${index}`}
                             className="my-1"
                         >
                             <button
@@ -403,7 +410,12 @@ export function renderMarkdownContent(
         return contentParts.length > 0 ? contentParts : <ComposioUrlDetector content={content} className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none break-words" />;
     }
 
-    // Fall back to old XML format handling
+    // Fall back to old XML format handling (only if tool calls are enabled)
+    if (shouldDisableToolCalls) {
+        // If tool calls are disabled, just render as markdown
+        return <ComposioUrlDetector content={content} className="text-base prose prose-base dark:prose-invert chat-markdown max-w-none break-words" />;
+    }
+
     const xmlRegex = /<(?!inform\b)([a-zA-Z\-_]+)(?:\s+[^>]*)?>(?:[\s\S]*?)<\/\1>|<(?!inform\b)([a-zA-Z\-_]+)(?:\s+[^>]*)?\/>/g;
     let lastIndex = 0;
     const contentParts: React.ReactNode[] = [];
@@ -488,14 +500,10 @@ export function renderMarkdownContent(
             const paramDisplay = extractPrimaryParam(toolName, rawXml);
 
             // Render tool button as a clickable element
-            const toolTimestamp =
-                formatMessageTimestamp(
-                    (typeof toolCall.parameters?.timestamp === 'string' && toolCall.parameters.timestamp) ||
-                    (typeof toolCall.parameters?.time === 'string' && toolCall.parameters.time) ||
-                    (typeof toolCall.parameters?.created_at === 'string' && toolCall.parameters.created_at) ||
-                    (typeof toolCall.parameters?.started_at === 'string' && toolCall.parameters.started_at) ||
-                    messageTimestamp
-                );
+            // Extract timestamp from XML attributes if present
+            const timestampMatch = rawXml.match(/(?:timestamp|time|created_at|started_at)=["']([^"']*)["']/i);
+            const extractedTimestamp = timestampMatch ? timestampMatch[1] : null;
+            const toolTimestamp = formatMessageTimestamp(extractedTimestamp || messageTimestamp);
 
             contentParts.push(
                 <div
@@ -1202,15 +1210,35 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
 
                                                     if (!parsedContent.content) return;
 
+                                                    // Extract chat mode and decision from metadata
+                                                    const messageMetadata = safeJsonParse<any>(message.metadata || '{}', {});
+                                                    const chatMode = messageMetadata.chat_mode || threadMetadata?.chat_mode;
+                                                    const decision = messageMetadata.decision;
+                                                    const decisionState = decision?.state;
+
+                                                    // Fix: Remove errant leading quote if content starts with quote followed by letter
+                                                    // This handles cases where a quote is incorrectly added at the start
+                                                    let contentToRender = parsedContent.content;
+                                                    if (typeof contentToRender === 'string' && contentToRender.length > 1) {
+                                                        // If content starts with quote and second char is a letter (not another quote), remove the quote
+                                                        if (contentToRender.startsWith('"') && 
+                                                            contentToRender.length > 1 && 
+                                                            /^[a-zA-Z]/.test(contentToRender[1])) {
+                                                            contentToRender = contentToRender.slice(1);
+                                                        }
+                                                    }
+
                                                     const renderedContent = renderMarkdownContent(
-                                                        parsedContent.content,
+                                                        contentToRender,
                                                         handleToolClick,
                                                         message.message_id,
                                                         message.created_at,
                                                         handleOpenFileViewer,
                                                         sandboxId,
                                                         project,
-                                                        debugMode
+                                                        debugMode,
+                                                        chatMode,
+                                                        decisionState
                                                     );
 
                                                     const copyContribution = getCopyTextPayload(parsedContent.content ?? message.content);

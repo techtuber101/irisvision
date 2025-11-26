@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, Suspense, useCallback, useEffect, useRef } from 'react';
+import React, { useState, Suspense, useCallback, useEffect, useRef, startTransition } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -28,7 +28,6 @@ import { BillingModal } from '@/components/billing/billing-modal';
 import { useAgentSelection } from '@/lib/stores/agent-selection-store';
 import { IrisModesPanel } from './iris-modes-panel';
 import { AIWorkerTemplates } from './ai-worker-templates';
-import { useThreadQuery } from '@/hooks/react-query/threads/use-threads';
 import { normalizeFilenameToNFC } from '@/lib/utils/unicode';
 import { IrisLogo } from '../sidebar/iris-logo';
 import { AgentRunLimitDialog } from '@/components/thread/agent-run-limit-dialog';
@@ -37,7 +36,7 @@ import { toast } from 'sonner';
 import { ReleaseBadge } from '../auth/release-badge';
 import { Calendar, MessageSquare, Plus, Sparkles, Zap, Shapes, Settings, Home, Bell, Sun, Moon, Lightbulb } from 'lucide-react';
 import { AgentConfigurationDialog } from '@/components/agents/agent-configuration-dialog';
-import { fastGeminiChat } from '@/lib/fast-gemini-chat';
+import { fastGeminiChat, adaptiveChatStream, type AdaptiveDecision } from '@/lib/fast-gemini-chat';
 import { addAssistantMessage } from '@/lib/api';
 import { simpleChat, simpleChatStream } from '@/lib/simple-chat';
 import { useTheme } from 'next-themes';
@@ -51,14 +50,14 @@ export function DashboardContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfigDialog, setShowConfigDialog] = useState(false);
   const [configAgentId, setConfigAgentId] = useState<string | null>(null);
-  const [isRedirecting, setIsRedirecting] = useState(false);
+  // Removed isRedirecting state - we navigate instantly now
   const [autoSubmit, setAutoSubmit] = useState(false);
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'super-worker' | 'worker-templates'>('super-worker');
   const [selectedCharts, setSelectedCharts] = useState<string[]>([]);
   const [selectedOutputFormat, setSelectedOutputFormat] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [chatMode, setChatMode] = useState<'chat' | 'execute' | 'adaptive'>('execute');
+  const [chatMode, setChatMode] = useState<'chat' | 'execute' | 'adaptive'>('adaptive');
   const [showControlMenu, setShowControlMenu] = useState(false);
   const [menuAnimate, setMenuAnimate] = useState(false);
   const controlMenuRef = useRef<HTMLDivElement>(null);
@@ -86,7 +85,6 @@ export function DashboardContent() {
     initializeFromAgents,
     getCurrentAgent
   } = useAgentSelection();
-  const [initiatedThreadId, setInitiatedThreadId] = useState<string | null>(null);
   const { billingError, handleBillingError, clearBillingError } =
     useBillingError();
   const [showAgentLimitDialog, setShowAgentLimitDialog] = useState(false);
@@ -123,8 +121,6 @@ export function DashboardContent() {
   const displayName = selectedAgent?.name || 'Iris';
   const agentAvatar = undefined;
   const isIrisAgent = selectedAgent?.metadata?.is_iris_default || false;
-
-  const threadQuery = useThreadQuery(initiatedThreadId || '');
 
   React.useEffect(() => {
     if (agents.length > 0) {
@@ -169,18 +165,8 @@ export function DashboardContent() {
     }
   }, [searchParams, selectedAgentId, router, setSelectedAgent]);
 
-  React.useEffect(() => {
-    if (threadQuery.data && initiatedThreadId) {
-      const thread = threadQuery.data;
-      setIsRedirecting(true);
-      if (thread.project_id) {
-        router.push(`/projects/${thread.project_id}/thread/${initiatedThreadId}`);
-      } else {
-        router.push(`/agents/${initiatedThreadId}`);
-      }
-      setInitiatedThreadId(null);
-    }
-  }, [threadQuery.data, initiatedThreadId, router]);
+  // Removed useEffect for threadQuery redirect - we navigate instantly now
+  // This was causing delays, now we navigate immediately when we get thread_id
 
 
   const handleSubmit = async (
@@ -193,8 +179,7 @@ export function DashboardContent() {
   ) => {
     if (
       (!message.trim() && !chatInputRef.current?.getPendingFiles().length) ||
-      isSubmitting ||
-      isRedirecting
+      isSubmitting
     )
       return;
 
@@ -209,31 +194,79 @@ export function DashboardContent() {
         // Streaming simple chat mode - real-time response
         let threadId: string | null = null;
         let projectId: string | null = null;
+        let hasRedirected = false;
         
+        // Redirect immediately when we get metadata - use window.location for instant navigation
         await simpleChatStream(message, {
           onMetadata: (data) => {
             threadId = data.thread_id;
             projectId = data.project_id;
+            // Instant navigation - no loading states, no delays
+            if (threadId && projectId && !hasRedirected) {
+              hasRedirected = true;
+              // Use router.replace for instant SPA navigation (no page reload)
+              startTransition(() => {
+                router.replace(`/projects/${projectId}/thread/${threadId}`, { scroll: false });
+              });
+            }
           },
           onContent: (content) => {
             // Content is streamed but we don't need to handle it here
             // The streaming will be handled by the thread page after redirect
           },
           onDone: () => {
-            // Redirect to the created thread after streaming is complete
-            if (threadId && projectId) {
-              router.push(`/projects/${projectId}/thread/${threadId}`);
-            } else {
-              throw new Error('Simple chat streaming did not return thread_id and project_id.');
+            // If we haven't redirected yet (shouldn't happen), redirect now
+            if (!hasRedirected && threadId && projectId) {
+              startTransition(() => {
+                router.replace(`/projects/${projectId}/thread/${threadId}`, { scroll: false });
+              });
             }
           },
           onError: (error) => {
+            setIsSubmitting(false);
             throw new Error(`Simple chat streaming error: ${error}`);
           }
         });
         
         chatInputRef.current?.clearPendingFiles();
         return;
+      }
+
+      // Handle Adaptive Mode - Create thread first, then call adaptive streaming endpoint
+      if (options?.chat_mode === 'adaptive') {
+        // First, create a thread by calling initiate agent endpoint
+        const formData = new FormData();
+        formData.append('prompt', message);
+        formData.append('chat_mode', 'adaptive');
+        formData.append('stream', 'false'); // We'll handle streaming ourselves
+
+        // Add selected agent if one is chosen
+        if (selectedAgentId) {
+          formData.append('agent_id', selectedAgentId);
+        }
+
+        files.forEach((file, index) => {
+          const normalizedName = normalizeFilenameToNFC(file.name);
+          formData.append('files', file, normalizedName);
+        });
+
+        if (options?.model_name) formData.append('model_name', options.model_name);
+        formData.append('enable_context_manager', String(options?.enable_context_manager ?? false));
+
+        const result = await initiateAgentMutation.mutateAsync(formData);
+
+        if (result.thread_id && result.project_id) {
+          // Navigate to thread with query parameter to trigger adaptive mode
+          startTransition(() => {
+            router.replace(`/projects/${result.project_id}/thread/${result.thread_id}?trigger_adaptive=true`, { scroll: false });
+          });
+          
+          // The thread component will detect the query parameter and trigger adaptive streaming
+          chatInputRef.current?.clearPendingFiles();
+          return;
+        } else {
+          throw new Error('Failed to create thread for adaptive mode');
+        }
       }
 
       // Handle Execute Mode - Normal agent execution
@@ -260,8 +293,18 @@ export function DashboardContent() {
       const result = await initiateAgentMutation.mutateAsync(formData);
 
       if (result.thread_id) {
-        setInitiatedThreadId(result.thread_id);
-        // Don't reset isSubmitting here - keep loading until redirect happens
+        // Instant navigation - use router.replace for zero-delay SPA navigation
+        if (result.project_id) {
+          // Navigate instantly - no loading states, no delays
+          startTransition(() => {
+            router.replace(`/projects/${result.project_id}/thread/${result.thread_id}`, { scroll: false });
+          });
+        } else {
+          // Fallback: navigate to agents page
+          startTransition(() => {
+            router.replace(`/agents/${result.thread_id}`, { scroll: false });
+          });
+        }
       } else {
         throw new Error('Agent initiation did not return a thread_id.');
       }
@@ -302,7 +345,7 @@ export function DashboardContent() {
   }, []);
 
   React.useEffect(() => {
-    if (autoSubmit && inputValue && !isSubmitting && !isRedirecting) {
+    if (autoSubmit && inputValue && !isSubmitting) {
       const timer = setTimeout(() => {
         handleSubmit(inputValue);
         setAutoSubmit(false);
@@ -310,7 +353,7 @@ export function DashboardContent() {
 
       return () => clearTimeout(timer);
     }
-  }, [autoSubmit, inputValue, isSubmitting, isRedirecting]);
+  }, [autoSubmit, inputValue, isSubmitting]);
 
   return (
     <>
@@ -478,7 +521,7 @@ export function DashboardContent() {
                         <ChatInput
                           ref={chatInputRef}
                           onSubmit={handleSubmit}
-                          loading={isSubmitting || isRedirecting}
+                          loading={isSubmitting}
                           placeholder="Describe what you need help with..."
                           value={inputValue}
                           onChange={setInputValue}

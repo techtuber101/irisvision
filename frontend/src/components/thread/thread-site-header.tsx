@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { FolderOpen, ExternalLink, Monitor, Copy, Check, Shapes } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { toast } from "sonner"
+import { useSidebar } from "@/components/ui/sidebar"
 import {
   Tooltip,
   TooltipContent,
@@ -53,6 +54,8 @@ export function SiteHeader({
   const [showKnowledgeBase, setShowKnowledgeBase] = useState(false);
   const [copied, setCopied] = useState(false);
   const queryClient = useQueryClient();
+  const { state: sidebarState } = useSidebar();
+  const isSidebarCollapsed = sidebarState === 'collapsed';
   
   // State for typewriter effect
   const [previousProjectName, setPreviousProjectName] = useState(projectName);
@@ -187,7 +190,7 @@ export function SiteHeader({
             <Skeleton className="h-5 w-32" />
           ) : (
             <div
-              className="text-base font-medium text-muted-foreground hover:text-foreground light:text-zinc-800 light:hover:text-zinc-900 cursor-pointer flex items-center"
+              className="text-base font-medium text-muted-foreground hover:text-foreground light:text-zinc-800 light:hover:text-zinc-900 cursor-pointer flex items-center gap-2"
               onClick={startEditing}
               title="Click to rename project"
             >

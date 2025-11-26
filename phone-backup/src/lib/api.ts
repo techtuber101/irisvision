@@ -382,7 +382,8 @@ export type ToolCall = {
 
 export interface InitiateAgentResponse {
   thread_id: string;
-  agent_run_id: string;
+  project_id: string;
+  agent_run_id: string | null;
 }
 
 export interface HealthCheckResponse {

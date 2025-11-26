@@ -10,6 +10,7 @@ export interface FastGeminiChatRequest {
   model?: string;
   system_instructions?: string;
   chat_context?: Array<{ role: string; content: string }>;
+  thread_id?: string;  // Thread ID to load messages from for context compression
 }
 
 export interface FastGeminiChatResponse {
@@ -53,6 +54,10 @@ export interface FastGeminiStreamCallbacks {
   onError?: (error: string) => void;
 }
 
+export interface AdaptiveStreamCallbacks extends FastGeminiStreamCallbacks {
+  onDecision?: (decision: AdaptiveDecision) => void;
+}
+
 /**
  * Non-streaming chat with Gemini 2.5 Flash
  */
@@ -60,7 +65,8 @@ export async function fastGeminiChat(
   message: string,
   model: string = 'gemini-2.5-flash',
   systemInstructions?: string,
-  chatContext?: Array<{ role: string; content: string }>
+  chatContext?: Array<{ role: string; content: string }>,
+  threadId?: string
 ): Promise<FastGeminiChatResponse> {
   const requestBody: FastGeminiChatRequest = { message, model };
   
@@ -68,7 +74,9 @@ export async function fastGeminiChat(
     requestBody.system_instructions = systemInstructions;
   }
   
-  if (chatContext && chatContext.length > 0) {
+  if (threadId) {
+    requestBody.thread_id = threadId;
+  } else if (chatContext && chatContext.length > 0) {
     requestBody.chat_context = chatContext;
   }
 
@@ -92,7 +100,8 @@ export async function adaptiveChat(
   message: string,
   model: string = 'gemini-2.5-flash',
   systemInstructions?: string,
-  chatContext?: Array<{ role: string; content: string }>
+  chatContext?: Array<{ role: string; content: string }>,
+  threadId?: string
 ): Promise<AdaptiveChatResponse> {
   const requestBody: FastGeminiChatRequest = { message, model };
 
@@ -100,7 +109,9 @@ export async function adaptiveChat(
     requestBody.system_instructions = systemInstructions;
   }
 
-  if (chatContext && chatContext.length > 0) {
+  if (threadId) {
+    requestBody.thread_id = threadId;
+  } else if (chatContext && chatContext.length > 0) {
     requestBody.chat_context = chatContext;
   }
 
@@ -120,6 +131,91 @@ export async function adaptiveChat(
   return response.json();
 }
 
+export async function adaptiveChatStream(
+  message: string,
+  callbacks: AdaptiveStreamCallbacks,
+  model: string = 'gemini-2.5-flash',
+  systemInstructions?: string,
+  chatContext?: Array<{ role: string; content: string }>,
+  threadId?: string
+): Promise<void> {
+  const requestBody: FastGeminiChatRequest = { message, model };
+
+  if (systemInstructions) {
+    requestBody.system_instructions = systemInstructions;
+  }
+
+  if (threadId) {
+    requestBody.thread_id = threadId;
+  } else if (chatContext && chatContext.length > 0) {
+    requestBody.chat_context = chatContext;
+  }
+
+  const response = await fetch(`${API_URL}/chat/adaptive/stream`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    callbacks.onError?.(error.detail || 'Failed to stream adaptive message');
+    return;
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    callbacks.onError?.('No response body');
+    return;
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const data = JSON.parse(line.slice(6));
+          switch (data.type) {
+            case 'metadata':
+              callbacks.onStart?.(data.time || Date.now());
+              break;
+            case 'content':
+              callbacks.onChunk?.(data.content || '');
+              break;
+            case 'decision':
+              callbacks.onDecision?.(data.decision as AdaptiveDecision);
+              break;
+            case 'done':
+              callbacks.onDone?.(data.time_ms || 0);
+              break;
+            case 'error':
+              callbacks.onError?.(data.error || 'Adaptive streaming error');
+              return;
+          }
+        } catch (error) {
+          console.error('Failed to parse adaptive stream chunk:', error);
+        }
+      }
+    }
+  } catch (error) {
+    callbacks.onError?.(error instanceof Error ? error.message : 'Adaptive stream error');
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 /**
  * Streaming chat with Gemini 2.5 Flash
  */
@@ -128,7 +224,8 @@ export async function fastGeminiChatStream(
   callbacks: FastGeminiStreamCallbacks,
   model: string = 'gemini-2.5-flash',
   systemInstructions?: string,
-  chatContext?: Array<{ role: string; content: string }>
+  chatContext?: Array<{ role: string; content: string }>,
+  threadId?: string
 ): Promise<void> {
   const requestBody: FastGeminiChatRequest = { message, model };
   
@@ -136,7 +233,9 @@ export async function fastGeminiChatStream(
     requestBody.system_instructions = systemInstructions;
   }
   
-  if (chatContext && chatContext.length > 0) {
+  if (threadId) {
+    requestBody.thread_id = threadId;
+  } else if (chatContext && chatContext.length > 0) {
     requestBody.chat_context = chatContext;
   }
 

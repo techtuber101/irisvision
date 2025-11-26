@@ -177,7 +177,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandles, ChatInputProps>(
       animatePlaceholder = false,
       selectedCharts = [],
       selectedOutputFormat = null,
-      initialChatMode = 'execute',
+      initialChatMode = 'adaptive',
       onChatModeChange,
     },
     ref,
@@ -994,7 +994,10 @@ Now enhance this prompt:\n\n${value}`;
                                   <Sparkle className="w-3 h-3" />
                                   Iris Intelligence Mode ({isMac ? '⌘' : 'Ctrl'}+2)
                                 </p>
-                                <p className="text-xs text-muted-foreground light:text-white/80">Instant answers that intelligently & adaptively transform into comprehensive agentic workflows</p>
+                                <p className="text-xs text-muted-foreground light:text-white/80">
+                                  Instant answers that evolve into
+                                  full agentic workflows <br/>for the best speed & quality.
+                                </p>
                               </div>
                             </TooltipContent>
                           </Tooltip>

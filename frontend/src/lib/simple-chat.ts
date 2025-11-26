@@ -93,6 +93,10 @@ export async function simpleChatStream(
     onContent?: (content: string) => void;
     onDone?: () => void;
     onError?: (error: string) => void;
+  },
+  options?: {
+    projectId?: string;
+    threadId?: string;
   }
 ): Promise<void> {
   const supabase = createClient();
@@ -106,6 +110,12 @@ export async function simpleChatStream(
 
   const formData = new FormData();
   formData.append('message', message);
+  if (options?.projectId) {
+    formData.append('client_project_id', options.projectId);
+  }
+  if (options?.threadId) {
+    formData.append('client_thread_id', options.threadId);
+  }
 
   const response = await fetch(`${API_URL}/simple-chat/simple/stream`, {
     method: 'POST',

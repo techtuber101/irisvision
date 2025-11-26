@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import { UnifiedMessage } from '@/components/thread/types';
 import { safeJsonParse } from '@/components/thread/utils';
-import Link from 'next/link';
 import { parseXmlToolCalls } from '../tool-views/xml-parser';
 import { HIDE_STREAMING_XML_TAGS } from '@/components/thread/utils';
 import { TypewriterText } from '@/components/ui/typewriter-text';
@@ -500,24 +499,6 @@ export const PlaybackControls = ({
         <div className="flex h-14 items-center gap-4 px-4">
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <div className="flex items-center justify-center w-6 h-6 rounded-md overflow-hidden bg-primary/10">
-                <Link href="/">
-                  <img
-                    src="/irissymbolblack.png"
-                    alt="Iris"
-                    width={16}
-                    height={16}
-                    className="object-contain dark:hidden"
-                  />
-                  <img
-                    src="/irissymbolwhite.png"
-                    alt="Iris"
-                    width={16}
-                    height={16}
-                    className="object-contain hidden dark:block"
-                  />
-                </Link>
-              </div>
               <h1>
                 <span className="font-medium text-foreground">
                   {showTypewriter ? (
