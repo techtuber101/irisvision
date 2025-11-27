@@ -87,63 +87,40 @@ const createStreamingAccumulator = (
   updateStreamingContent: (content: string) => void,
 ) => {
   let renderedContent = '';
-  let tableBuffer = '';
-  let isTableMode = false;
-
-  const emit = () => {
-    const payload = isTableMode
-      ? renderedContent + tableBuffer
-      : renderedContent;
-    updateStreamingContent(payload);
-  };
-
-  const tryCompleteTable = () => {
-    if (!isTableMode) return;
-    if (/\n\s*\n/.test(tableBuffer)) {
-      renderedContent += tableBuffer;
-      tableBuffer = '';
-      isTableMode = false;
-      emit();
-    }
-  };
 
   const processChunk = (rawChunk: string) => {
     const chunk = sanitizeStreamChunk(rawChunk);
     if (!chunk) return;
 
-    if (!isTableMode && chunk.includes('|')) {
-      const combined = renderedContent + chunk;
-      const lastPipeIndex = combined.lastIndexOf('|');
-      if (lastPipeIndex !== -1) {
-        const lastNewline = combined.lastIndexOf('\n', lastPipeIndex);
-        const tableStartIndex = lastNewline === -1 ? 0 : lastNewline + 1;
-        renderedContent = combined.slice(0, tableStartIndex);
-        tableBuffer = combined.slice(tableStartIndex);
-        isTableMode = true;
-        emit();
-        tryCompleteTable();
-        return;
-      }
-    }
-
-    if (isTableMode) {
-      tableBuffer += chunk;
-      emit();
-      tryCompleteTable();
-      return;
-    }
-
+    // Stream immediately without any buffering
     renderedContent += chunk;
-    emit();
+    
+    // Remove decision object text if it appears in content
+    // Matches patterns like: ", decision: { state: ask_user, ... }" or "decision: { state: ... }"
+    // Uses a more robust pattern that handles nested objects and various formats
+    let cleanedContent = renderedContent
+      // Remove decision object with comma prefix (most common case)
+      .replace(/,\s*decision\s*:\s*\{[^}]*state\s*:\s*[^,}]+[^}]*\}/gi, '')
+      // Remove decision object without comma prefix
+      .replace(/decision\s*:\s*\{[^}]*state\s*:\s*[^,}]+[^}]*\}/gi, '')
+      // Remove any trailing comma/whitespace that might be left
+      .replace(/,\s*$/, '')
+      .trim();
+    
+    updateStreamingContent(cleanedContent);
   };
 
   const finalize = () => {
-    if (tableBuffer) {
-      renderedContent += tableBuffer;
-      tableBuffer = '';
-      isTableMode = false;
-    }
-    return renderedContent;
+    // Final cleanup to remove any decision text with more comprehensive patterns
+    let finalContent = renderedContent
+      // Remove decision object with comma prefix (handles nested objects better)
+      .replace(/,\s*decision\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/gi, '')
+      // Remove decision object without comma prefix
+      .replace(/decision\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/gi, '')
+      // Remove any trailing comma/whitespace
+      .replace(/,\s*$/, '')
+      .trim();
+    return finalContent;
   };
 
   return { processChunk, finalize };
@@ -179,6 +156,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isSimpleChatLoading, setIsSimpleChatLoading] = useState(false);
+  const fastModeStopRef = useRef<(() => Promise<void>) | null>(null);
   const clearSimpleChatStream = useSimpleChatStreamStore(
     (state) => state.clearStream,
   );
@@ -233,13 +211,55 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   } | null>(null);
   
   // Track initial chat mode from localStorage
-  const [initialChatMode, setInitialChatMode] = useState<ChatMode>('adaptive');
+  // Load persisted chat mode from localStorage, default to 'adaptive'
+  const getPersistedChatMode = useCallback((): ChatMode => {
+    if (typeof window === 'undefined') return 'adaptive';
+    try {
+      const persisted = localStorage.getItem('iris-chat-mode-preference');
+      if (persisted === 'chat' || persisted === 'execute' || persisted === 'adaptive') {
+        return persisted as ChatMode;
+      }
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+    return 'adaptive';
+  }, []);
+
+  const [initialChatMode, setInitialChatMode] = useState<ChatMode>(() => {
+    // Initialize with persisted mode on first render
+    if (typeof window !== 'undefined') {
+      try {
+        const persisted = localStorage.getItem('iris-chat-mode-preference');
+        if (persisted === 'chat' || persisted === 'execute' || persisted === 'adaptive') {
+          return persisted as ChatMode;
+        }
+      } catch (e) {
+        // Ignore localStorage errors
+      }
+    }
+    return 'adaptive';
+  });
   const userSelectedModeRef = useRef<ChatMode | null>(null);
+  
+  // On mount, check if we have a persisted mode and set it
+  useEffect(() => {
+    const persistedMode = getPersistedChatMode();
+    if (persistedMode && persistedMode !== initialChatMode && !userSelectedModeRef.current) {
+      // Only set if user hasn't explicitly selected a mode yet
+      setInitialChatMode(persistedMode);
+    }
+  }, [getPersistedChatMode, initialChatMode]);
   
   // Handle chat mode changes from user interaction
   const handleChatModeChange = useCallback((mode: ChatMode) => {
     userSelectedModeRef.current = mode;
     setInitialChatMode(mode);
+    // Persist user's selection to localStorage
+    try {
+      localStorage.setItem('iris-chat-mode-preference', mode);
+    } catch (e) {
+      // Ignore localStorage errors
+    }
   }, []);
 
   // Handle populating chat input when agent is running
@@ -327,12 +347,18 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   // Track if we've already set the initial mode for this thread
   const [hasSetInitialMode, setHasSetInitialMode] = useState(false);
   
-  // Reset hasSetInitialMode and user selected mode when threadId changes
+  // Reset hasSetInitialMode when threadId changes, but preserve user's mode preference
   useEffect(() => {
     setHasSetInitialMode(false);
-    userSelectedModeRef.current = null;
+    // Don't reset userSelectedModeRef - preserve user's choice across threads
+    // Only reset if user hasn't explicitly selected a mode
+    if (!userSelectedModeRef.current) {
+      // Load persisted preference when switching threads
+      const persistedMode = getPersistedChatMode();
+      setInitialChatMode(persistedMode);
+    }
     setHasTriggeredAdaptive(false);
-  }, [threadId]);
+  }, [threadId, getPersistedChatMode]);
   
   // Reset title generation trigger when threadId changes
   useEffect(() => {
@@ -347,6 +373,15 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     }
     
     if (threadQuery.data && initialLoadCompleted && !hasSetInitialMode) {
+      // First, check if user has a persisted preference
+      const persistedMode = getPersistedChatMode();
+      if (persistedMode && persistedMode !== 'adaptive') {
+        // User has explicitly chosen a mode, use it
+        setInitialChatMode(persistedMode);
+        setHasSetInitialMode(true);
+        return;
+      }
+      
       // First, check messages for adaptive mode metadata (most recent messages first)
       let detectedMode: ChatMode | null = null;
       if (messages.length > 0) {
@@ -368,7 +403,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         }
       }
       
-      // If found in messages, use it
+      // If found in messages, use it (but only if user hasn't selected a different mode)
       if (detectedMode) {
         setInitialChatMode(detectedMode);
         setHasSetInitialMode(true);
@@ -383,16 +418,16 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         } else if (threadMetadata.chat_mode === 'adaptive') {
           setInitialChatMode('adaptive');
         } else {
-          // Default to adaptive mode for all other threads
-          setInitialChatMode('adaptive');
+          // Default to persisted preference or adaptive mode
+          setInitialChatMode(persistedMode);
         }
       } else {
-        // Default to adaptive mode if no metadata
-        setInitialChatMode('adaptive');
+        // Default to persisted preference or adaptive mode
+        setInitialChatMode(persistedMode);
       }
       setHasSetInitialMode(true);
     }
-  }, [threadQuery.data, initialLoadCompleted, messages, hasSetInitialMode]);
+  }, [threadQuery.data, initialLoadCompleted, messages, hasSetInitialMode, getPersistedChatMode]);
 
   const {
     toolCalls,
@@ -600,12 +635,6 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
             }
           }
           
-          // If this is an assistant message, remove any optimistic "Hmm..." messages
-          if (message.type === 'assistant') {
-            const filteredPrev = prev.filter((m) => !m.message_id?.startsWith('hmm-'));
-            return [...filteredPrev, message];
-          }
-          
           return [...prev, message];
         }
       });
@@ -670,15 +699,6 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
 
   const handleStreamClose = useCallback(() => {}, []);
 
-  const handleAssistantStart = useCallback(() => {
-    // Remove the optimistic "Hmm..." message when assistant starts streaming
-    setMessages((prev) => 
-      prev.filter((m) => !m.message_id?.startsWith('hmm-'))
-    );
-    // Note: We can't clear the timeout here since it's scoped to the handleSubmitMessage function
-    // But the message removal is the important part
-  }, [setMessages]);
-
   const {
     status: streamHookStatus,
     textContent: streamingTextContent,
@@ -693,7 +713,6 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
       onStatusChange: handleStreamStatusChange,
       onError: handleStreamError,
       onClose: handleStreamClose,
-      onAssistantStart: handleAssistantStart,
     },
     threadId,
     setMessages,
@@ -826,9 +845,11 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     if (decisionState === 'agent_needed') {
       console.log('[Adaptive] Agent needed - auto-starting agent');
       
-      // Preserve adaptive mode when agent starts (same as chat mode preservation)
-      userSelectedModeRef.current = 'adaptive';
-      setInitialChatMode('adaptive');
+      // Don't override user's selected mode - only set if user hasn't explicitly chosen
+      if (!userSelectedModeRef.current) {
+        userSelectedModeRef.current = 'adaptive';
+        setInitialChatMode('adaptive');
+      }
       
       if (decision.agent_preface) {
         const prefaceMessage: UnifiedMessage = {
@@ -871,9 +892,11 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     // Handle ask_user - show prompt to user
     if (decisionState === 'ask_user' && decision.ask_user) {
       console.log('[Adaptive] Asking user for confirmation:', decision.ask_user);
-      // Preserve adaptive mode when showing prompt
-      userSelectedModeRef.current = 'adaptive';
-      setInitialChatMode('adaptive');
+      // Don't override user's selected mode - only set if user hasn't explicitly chosen
+      if (!userSelectedModeRef.current) {
+        userSelectedModeRef.current = 'adaptive';
+        setInitialChatMode('adaptive');
+      }
       setAdaptivePrompt({
         prompt: decision.ask_user.prompt,
         yesLabel: decision.ask_user.yes_label || 'Yes',
@@ -888,9 +911,11 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     // Handle agent_not_needed - just clear prompt
     if (decisionState === 'agent_not_needed') {
       console.log('[Adaptive] Agent not needed, clearing prompt');
-      // Preserve adaptive mode even when agent not needed
-      userSelectedModeRef.current = 'adaptive';
-      setInitialChatMode('adaptive');
+      // Don't override user's selected mode - only set if user hasn't explicitly chosen
+      if (!userSelectedModeRef.current) {
+        userSelectedModeRef.current = 'adaptive';
+        setInitialChatMode('adaptive');
+      }
       setAdaptivePrompt(null);
       return;
     }
@@ -945,6 +970,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
           // We'll call runFastMode directly
           (async () => {
             setIsSimpleChatLoading(true);
+            setIsSending(true);
             
             const assistantMessageId = `assistant-${Date.now()}`;
             const assistantMessage: UnifiedMessage = {
@@ -999,17 +1025,41 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
               queryClient.invalidateQueries({ queryKey: sidebarThreadKeys.lists() });
             };
 
+            const abortController = new AbortController();
+            let stopRequested = false;
+            let stopCompletionResolve: (() => void) | null = null;
+            const stopCompletionPromise = new Promise<void>((resolve) => {
+              stopCompletionResolve = resolve;
+            });
+
+            fastModeStopRef.current = async () => {
+              if (!stopRequested) {
+                stopRequested = true;
+                abortController.abort();
+              }
+              await stopCompletionPromise;
+            };
+
             try {
               const { processChunk, finalize } = createStreamingAccumulator(
                 updateStreamingContent,
               );
               let adaptiveDecision: AdaptiveDecision | null = null;
+              let streamingStarted = false;
+
+              const handleStreamingChunk = (chunk: string) => {
+                if (!streamingStarted) {
+                  streamingStarted = true;
+                  setIsSimpleChatLoading(false);
+                }
+                processChunk(chunk);
+              };
 
               await adaptiveChatStream(
                 messageContent,
                 {
                   onChunk: (chunk) => {
-                    processChunk(chunk);
+                    handleStreamingChunk(chunk);
                   },
                   onDecision: (decision) => {
                     adaptiveDecision = decision;
@@ -1022,14 +1072,15 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
                 GEMINI_FAST_MODEL,
                 undefined,
                 undefined,
-                threadId
+                threadId,
+                abortController.signal
               );
 
               const rawFinalContent = finalize().trim() || 'No response provided.';
               const handoff = shouldHandOffToAgent(adaptiveDecision);
-              const finalContent = handoff
-                ? buildHandOffMessage(adaptiveDecision)
-                : rawFinalContent;
+              // Always keep the actual router response, don't replace it with handoff message
+              // The bubble will be cleared separately when agent starts
+              const finalContent = rawFinalContent;
               const metadataPayload = {
                 chat_mode: 'adaptive',
                 is_streaming: false,
@@ -1044,13 +1095,20 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
                 setAdaptivePrompt(null);
               }
             } catch (error) {
-              console.error('Adaptive mode trigger error:', error);
-              toast.error(error instanceof Error ? error.message : 'Failed to trigger adaptive mode');
+              if (stopRequested) {
+                setAdaptivePrompt(null);
+              } else {
+                console.error('Adaptive mode trigger error:', error);
+                toast.error(error instanceof Error ? error.message : 'Failed to trigger adaptive mode');
+              }
               setMessages((prev) =>
-                prev.filter((msg) => msg.message_id === assistantMessageId),
+                prev.filter((msg) => msg.message_id !== assistantMessageId),
               );
             } finally {
+              fastModeStopRef.current = null;
+              stopCompletionResolve?.();
               setIsSimpleChatLoading(false);
+              setIsSending(false);
             }
           })();
         }
@@ -1077,22 +1135,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         updated_at: new Date().toISOString(),
       };
 
-      // Add optimistic "Hmm..." message to show immediate responsiveness
-      const optimisticHmmMessage: UnifiedMessage = {
-        message_id: `hmm-${Date.now()}`,
-        thread_id: threadId,
-        type: 'assistant',
-        is_llm_message: true,
-        content: JSON.stringify({
-          content: 'HMM_THINKING_MESSAGE',
-          metadata: { is_optimistic: true, is_thinking: true }
-        }),
-        metadata: JSON.stringify({ is_optimistic: true, is_thinking: true }),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      setMessages((prev) => [...prev, optimisticUserMessage, optimisticHmmMessage]);
+      setMessages((prev) => [...prev, optimisticUserMessage]);
       setNewMessage('');
 
       // Auto-scroll to bottom when user sends a message
@@ -1102,13 +1145,6 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
           setFollowNewMessages(true);
         }
       }, 100);
-
-      // Fallback: Remove Hmm message after 10 seconds if no response comes
-      const hmmTimeout = setTimeout(() => {
-        setMessages((prev) => 
-          prev.filter((m) => m.message_id !== optimisticHmmMessage.message_id)
-        );
-      }, 10000);
 
       try {
         const persistMessagePromise = addUserMessageMutation.mutateAsync({
@@ -1172,17 +1208,68 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
             queryClient.invalidateQueries({ queryKey: sidebarThreadKeys.lists() });
           };
 
-          try {
-            const { processChunk, finalize } = createStreamingAccumulator(
-              updateStreamingContent,
-            );
+          const abortController = new AbortController();
+          let stopRequested = false;
+          let stopCompletionResolve: (() => void) | null = null;
+          const stopCompletionPromise = new Promise<void>((resolve) => {
+            stopCompletionResolve = resolve;
+          });
 
+          fastModeStopRef.current = async () => {
+            if (!stopRequested) {
+              stopRequested = true;
+              abortController.abort();
+            }
+            await stopCompletionPromise;
+          };
+
+          const { processChunk, finalize } = createStreamingAccumulator(
+            updateStreamingContent,
+          );
+          let adaptiveDecision: AdaptiveDecision | null = null;
+          let hasPersisted = false;
+          let streamingStarted = false;
+
+          const handleStreamingChunk = (chunk: string) => {
+            if (!streamingStarted) {
+              streamingStarted = true;
+              setIsSimpleChatLoading(false);
+            }
+            processChunk(chunk);
+          };
+
+          const finalizeAndPersist = async () => {
+            if (hasPersisted) return;
+            hasPersisted = true;
+            const finalContent = finalize().trim() || 'No response provided.';
+            const metadataPayload: Record<string, any> = {
+              chat_mode: mode,
+              is_streaming: false,
+              ...(stopRequested ? { stopped: true } : {}),
+            };
+
+            if (mode === 'adaptive') {
+              if (adaptiveDecision) {
+                metadataPayload.decision = adaptiveDecision;
+                if (!stopRequested) {
+                  const handoff = shouldHandOffToAgent(adaptiveDecision);
+                  if (handoff) {
+                    metadataPayload.handed_off = handoff;
+                  }
+                }
+              }
+            }
+
+            await persistAssistantResponse(finalContent, metadataPayload);
+          };
+
+          try {
             if (mode === 'chat') {
               await fastGeminiChatStream(
                 message,
                 {
                   onChunk: (chunk) => {
-                    processChunk(chunk);
+                    handleStreamingChunk(chunk);
                   },
                   onDone: () => undefined,
                   onError: (error) => {
@@ -1191,25 +1278,19 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
                 },
                 GEMINI_FAST_MODEL,
                 undefined,
-                undefined,  // chatContext - not needed when thread_id is provided
-                threadId  // Pass thread_id for context compression
+                undefined,
+                threadId,
+                abortController.signal,
               );
 
-              const finalContent = finalize().trim() || 'No response provided.';
-              const metadataPayload = {
-                chat_mode: mode,
-                is_streaming: false,
-              };
-              await persistAssistantResponse(finalContent, metadataPayload);
+              await finalizeAndPersist();
               setAdaptivePrompt(null);
             } else {
-              let adaptiveDecision: AdaptiveDecision | null = null;
-
               await adaptiveChatStream(
                 message,
                 {
                   onChunk: (chunk) => {
-                    processChunk(chunk);
+                    handleStreamingChunk(chunk);
                   },
                   onDecision: (decision) => {
                     console.log('[Adaptive] Decision received:', decision);
@@ -1224,65 +1305,92 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
                 },
                 GEMINI_FAST_MODEL,
                 undefined,
-                undefined,  // chatContext - not needed when thread_id is provided
-                threadId  // Pass thread_id for context compression
+                undefined,
+                threadId,
+                abortController.signal,
               );
 
-              const rawFinalContent = finalize().trim() || 'No response provided.';
-              const handoff = shouldHandOffToAgent(adaptiveDecision);
-              const finalContent = handoff
-                ? buildHandOffMessage(adaptiveDecision)
-                : rawFinalContent;
-              const metadataPayload = {
-                chat_mode: mode,
-                is_streaming: false,
-                decision: adaptiveDecision || undefined,
-                handed_off: handoff || undefined,
-              };
-              await persistAssistantResponse(finalContent, metadataPayload);
+              await finalizeAndPersist();
 
-              console.log('[Adaptive] Final decision before handling:', adaptiveDecision);
-              if (adaptiveDecision) {
-                console.log('[Adaptive] Calling handleAdaptiveDecisionOutcome with:', {
-                  state: adaptiveDecision.state,
-                  confidence: adaptiveDecision.confidence,
-                  reason: adaptiveDecision.reason
-                });
-                await handleAdaptiveDecisionOutcome(adaptiveDecision, message, options);
+              if (!stopRequested) {
+                console.log('[Adaptive] Final decision before handling:', adaptiveDecision);
+                if (adaptiveDecision) {
+                  await handleAdaptiveDecisionOutcome(adaptiveDecision, message, options);
+                } else {
+                  console.warn('[Adaptive] No decision received, clearing prompt');
+                  setAdaptivePrompt(null);
+                }
               } else {
-                console.warn('[Adaptive] No decision received, clearing prompt');
                 setAdaptivePrompt(null);
               }
             }
           } catch (error) {
-            console.error('Fast chat error:', error);
-            toast.error(error instanceof Error ? error.message : 'Chat error');
-            setMessages((prev) =>
-              prev.filter((msg) => msg.message_id !== assistantMessageId),
-            );
+            if (stopRequested) {
+              await finalizeAndPersist();
+              setAdaptivePrompt(null);
+            } else {
+              console.error('Fast chat error:', error);
+              toast.error(error instanceof Error ? error.message : 'Chat error');
+              setMessages((prev) =>
+                prev.filter((msg) => msg.message_id !== assistantMessageId),
+              );
+            }
           } finally {
+            fastModeStopRef.current = null;
+            stopCompletionResolve?.();
             setIsSimpleChatLoading(false);
           }
         };
 
         if (options?.chat_mode === 'chat' || options?.chat_mode === 'adaptive') {
-          setMessages((prev) =>
-            prev.filter((m) => m.message_id !== optimisticHmmMessage.message_id),
-          );
-          clearTimeout(hmmTimeout);
 
-          // Preserve the selected mode (same as chat mode)
+          // Save the mode the user selected (this is user-initiated)
           if (options.chat_mode === 'adaptive') {
             userSelectedModeRef.current = 'adaptive';
             setInitialChatMode('adaptive');
+            // Persist user's selection
+            try {
+              localStorage.setItem('iris-chat-mode-preference', 'adaptive');
+            } catch (e) {
+              // Ignore localStorage errors
+            }
+          } else if (options.chat_mode === 'chat') {
+            userSelectedModeRef.current = 'chat';
+            setInitialChatMode('chat');
+            // Persist user's selection
+            try {
+              localStorage.setItem('iris-chat-mode-preference', 'chat');
+            } catch (e) {
+              // Ignore localStorage errors
+            }
           }
 
-          await persistMessagePromise;
-          await runFastMode(options.chat_mode);
+          const fastModePromise = runFastMode(options.chat_mode);
+          persistMessagePromise.catch((error) => {
+            console.error('Failed to persist user message:', error);
+            toast.error(
+              error instanceof Error
+                ? error.message
+                : 'Failed to save message. Please try again.',
+            );
+          });
+          await fastModePromise;
           return;
         }
 
         // Handle Execute Mode - Normal agent run
+        // Save execute mode preference when user initiates agent run
+        if (options?.chat_mode === 'execute' || (!options?.chat_mode && initialChatMode === 'execute')) {
+          userSelectedModeRef.current = 'execute';
+          setInitialChatMode('execute');
+          // Persist user's selection
+          try {
+            localStorage.setItem('iris-chat-mode-preference', 'execute');
+          } catch (e) {
+            // Ignore localStorage errors
+          }
+        }
+        
         const agentPromise = startAgentMutation.mutateAsync({
           threadId,
           options: {
@@ -1321,10 +1429,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
 
             setMessages((prev) =>
               prev.filter(
-                (m) => m.message_id !== optimisticUserMessage.message_id && m.message_id !== optimisticHmmMessage.message_id,
+                (m) => m.message_id !== optimisticUserMessage.message_id,
               ),
             );
-            clearTimeout(hmmTimeout);
             return;
           }
 
@@ -1339,10 +1446,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
 
             setMessages((prev) =>
               prev.filter(
-                (m) => m.message_id !== optimisticUserMessage.message_id && m.message_id !== optimisticHmmMessage.message_id,
+                (m) => m.message_id !== optimisticUserMessage.message_id,
               ),
             );
-            clearTimeout(hmmTimeout);
             return;
           }
 
@@ -1359,10 +1465,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
 
             setMessages((prev) =>
               prev.filter(
-                (m) => m.message_id !== optimisticUserMessage.message_id && m.message_id !== optimisticHmmMessage.message_id,
+                (m) => m.message_id !== optimisticUserMessage.message_id,
               ),
             );
-            clearTimeout(hmmTimeout);
             return;
           }
 
@@ -1376,8 +1481,6 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         // Trigger title generation for agent mode only
         triggerTitleGeneration();
         
-        // Clear the Hmm timeout since we got a successful response
-        clearTimeout(hmmTimeout);
       } catch (err) {
         console.error('Error sending message or starting agent:', err);
         if (
@@ -1387,9 +1490,8 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
           toast.error(err instanceof Error ? err.message : 'Operation failed');
         }
         setMessages((prev) =>
-          prev.filter((m) => m.message_id !== optimisticUserMessage.message_id && m.message_id !== optimisticHmmMessage.message_id),
+          prev.filter((m) => m.message_id !== optimisticUserMessage.message_id),
         );
-        clearTimeout(hmmTimeout);
       } finally {
         setIsSending(false);
       }
@@ -1411,7 +1513,17 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     ],
   );
 
+  const stopFastMode = useCallback(async () => {
+    const stopHandler = fastModeStopRef.current;
+    if (!stopHandler) return false;
+    await stopHandler();
+    return true;
+  }, []);
+
   const handleStopAgent = useCallback(async () => {
+    const stoppedFastMode = await stopFastMode();
+    if (stoppedFastMode) return;
+
     const runIdToStop = agentRunId;
 
     setAgentStatus('idle');
@@ -1433,6 +1545,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
       }
     }
   }, [
+    stopFastMode,
     agentRunId,
     stopStreaming,
     stopAgentMutation,
@@ -1526,15 +1639,33 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
 
       if (remaining <= 0 && !adaptiveAutoTriggerRef.current) {
         adaptiveAutoTriggerRef.current = true;
-        console.log('[Adaptive] Countdown expired - dismissing prompt without auto-escalation');
-        setAdaptivePrompt(null);
-        setCountdown(null);
-        clearInterval(interval);
+        console.log('[Adaptive] Countdown expired - auto-triggering agent run');
+        
+        const promptData = adaptivePrompt || lastAdaptivePromptRef.current;
+        if (promptData) {
+          // Auto-trigger agent run when timer expires
+          const options = promptData.options;
+          setCountdown(null);
+          setAdaptivePrompt(null);
+          clearInterval(interval);
+          
+          // Start agent automatically
+          startAgentFromAdaptiveDecision(promptData.message, options).catch((error) => {
+            console.error('[Adaptive] Failed to auto-trigger agent after countdown:', error);
+            toast.error('Failed to start agent automatically. Please try again.');
+          });
+        } else {
+          // No prompt data available, just dismiss
+          console.log('[Adaptive] Countdown expired but no prompt data - dismissing');
+          setAdaptivePrompt(null);
+          setCountdown(null);
+          clearInterval(interval);
+        }
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [adaptivePrompt]);
+  }, [adaptivePrompt, startAgentFromAdaptiveDecision]);
 
   useEffect(() => {
     lastAdaptivePromptRef.current = adaptivePrompt;

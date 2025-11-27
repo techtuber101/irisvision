@@ -179,7 +179,7 @@ export function SidebarLeft({
       }}></div>
       <SidebarHeader className="px-2 py-1 relative z-10">
         <div className={cn("flex h-[48px] items-center px-1 relative", state === 'collapsed' ? 'justify-center' : '')}>
-          <Link href="/dashboard" className={cn("flex-shrink-0", state === 'collapsed' ? 'ml-[3px]' : '')} onClick={() => isMobile && setOpenMobile(false)}>
+          <Link href="/" className={cn("flex-shrink-0", state === 'collapsed' ? 'ml-[3px]' : '')} onClick={() => isMobile && setOpenMobile(false)}>
             {state === 'collapsed' ? (
               <>
                 <Image
@@ -238,10 +238,10 @@ export function SidebarLeft({
       </SidebarHeader>
       <SidebarContent className="[&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] relative z-10">
         <SidebarGroup>
-          <Link href="/dashboard">
+          <Link href="/">
             <SidebarMenuButton
               className={cn('touch-manipulation', {
-                'bg-accent text-accent-foreground font-medium': pathname === '/dashboard',
+                'bg-accent text-accent-foreground font-medium': pathname === '/',
               })}
               onClick={() => {
                 posthog.capture('new_task_clicked');

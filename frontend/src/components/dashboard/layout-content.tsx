@@ -7,11 +7,11 @@ import { useAccounts } from '@/hooks/use-accounts';
 import { useAuth } from '@/components/AuthProvider';
 import { useMaintenanceNoticeQuery } from '@/hooks/react-query/edge-flags';
 import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
 import { useApiHealth } from '@/hooks/react-query';
 import { MaintenancePage } from '@/components/maintenance/maintenance-page';
 import { DeleteOperationProvider } from '@/contexts/DeleteOperationContext';
 import { StatusOverlay } from '@/components/ui/status-overlay';
+import { IrisLoadingScreen } from '@/components/ui/iris-loading-screen';
 
 import { useProjects, useThreads } from '@/hooks/react-query/sidebar/use-sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -97,11 +97,7 @@ export default function DashboardLayoutContent({
 
   // Show loading state while checking auth, health, or maintenance status
   if (isLoading || isCheckingHealth || maintenanceLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <IrisLoadingScreen />;
   }
 
   // Don't render anything if not authenticated

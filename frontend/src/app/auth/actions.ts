@@ -62,7 +62,7 @@ export async function signIn(prevState: any, formData: FormData) {
   }
 
   // Use client-side navigation instead of server-side redirect
-  return { success: true, redirectTo: returnUrl || '/dashboard' };
+  return { success: true, redirectTo: returnUrl || '/' };
 }
 
 export async function signUp(prevState: any, formData: FormData) {
@@ -90,7 +90,7 @@ export async function signUp(prevState: any, formData: FormData) {
     email,
     password,
     options: {
-      emailRedirectTo: `${origin}/auth/callback?returnUrl=${encodeURIComponent(returnUrl || '/dashboard')}`,
+      emailRedirectTo: `${origin}/auth/callback?returnUrl=${encodeURIComponent(returnUrl || '/')}`,
     },
   });
 
@@ -117,7 +117,7 @@ export async function signUp(prevState: any, formData: FormData) {
   }
 
   // Use client-side navigation instead of server-side redirect
-  return { success: true, redirectTo: returnUrl || '/dashboard' };
+  return { success: true, redirectTo: returnUrl || '/' };
 }
 
 export async function forgotPassword(prevState: any, formData: FormData) {

@@ -1,7 +1,16 @@
 # Caddy v2 with Cloudflare DNS module
 
 irisvision.ai, www.irisvision.ai {
-	encode zstd gzip
+	# Disable compression for SSE streaming endpoints (prevents buffering delays)
+	@sse path /api/chat/*/stream /api/agent-run/*/stream /api/simple/*/stream
+	reverse_proxy @sse backend:8000 {
+		header -Content-Encoding
+		header -Accept-Encoding
+	}
+	
+	# Enable compression for other endpoints
+	@not_sse not path /api/chat/*/stream /api/agent-run/*/stream /api/simple/*/stream
+	encode @not_sse zstd gzip
 
 	# Health check (HTTPS)
 	@health path /health

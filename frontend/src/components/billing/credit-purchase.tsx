@@ -66,8 +66,8 @@ export function CreditPurchaseModal({
         try {
             const response = await backendApi.post('/billing/purchase-credits', {
                 amount_dollars: amount,
-                success_url: `${window.location.origin}/dashboard?credit_purchase=success`,
-                cancel_url: `${window.location.origin}/dashboard?credit_purchase=cancelled`
+                success_url: `${window.location.origin}/?credit_purchase=success`,
+                cancel_url: `${window.location.origin}/?credit_purchase=cancelled`
             });
             if (response.data.url) {
                 window.location.href = response.data.url;

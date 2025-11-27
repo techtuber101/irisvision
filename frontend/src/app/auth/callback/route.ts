@@ -5,7 +5,7 @@ import type { NextRequest } from 'next/server'
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('returnUrl') || searchParams.get('redirect') || '/dashboard'
+  const next = searchParams.get('returnUrl') || searchParams.get('redirect') || '/'
   
   // Use configured URL instead of parsed origin to avoid 0.0.0.0 issues in self-hosted environments
   const baseUrl = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'

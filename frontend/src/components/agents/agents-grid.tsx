@@ -233,7 +233,7 @@ export const AgentsGrid: React.FC<AgentsGridProps> = ({
   };
 
   const handleChat = (agentId: string) => {
-    router.push(`/dashboard?agent_id=${agentId}`);
+    router.push(`/?agent_id=${agentId}`);
     setSelectedAgent(null);
   };
 

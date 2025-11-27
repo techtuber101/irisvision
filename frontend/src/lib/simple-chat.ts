@@ -97,7 +97,8 @@ export async function simpleChatStream(
   options?: {
     projectId?: string;
     threadId?: string;
-  }
+  },
+  signal?: AbortSignal,
 ): Promise<void> {
   const supabase = createClient();
   const {
@@ -123,6 +124,7 @@ export async function simpleChatStream(
       'Authorization': `Bearer ${session.access_token}`,
     },
     body: formData,
+    signal,
   });
 
   if (!response.ok) {
@@ -142,6 +144,7 @@ export async function simpleChatStream(
 
   try {
     while (true) {
+      if (signal?.aborted) break;
       const { done, value } = await reader.read();
       if (done) break;
 
@@ -175,6 +178,9 @@ export async function simpleChatStream(
       }
     }
   } catch (error) {
+    if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+      return;
+    }
     callbacks.onError?.(error instanceof Error ? error.message : 'Streaming error');
   }
 }

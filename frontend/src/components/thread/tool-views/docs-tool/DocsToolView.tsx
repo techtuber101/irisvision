@@ -11,6 +11,7 @@ import {
   Loader2,
   Share,
   ExternalLink,
+  Expand,
 } from 'lucide-react';
 import { ToolViewProps } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,6 +73,7 @@ export function DocsToolView({
   const [editorFilePath, setEditorFilePath] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isEditLoading, setIsEditLoading] = useState(false);
+  const [isExpanding, setIsExpanding] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [documentRefreshToken, setDocumentRefreshToken] = useState(0);
   const [documentPreviewContent, setDocumentPreviewContent] = useState<string | null>(null);
@@ -321,6 +323,115 @@ export function DocsToolView({
     return path.startsWith('/workspace') ? path : `/workspace/${path.replace(/^\//, '')}`;
   };
 
+  const handleExpand = useCallback(async () => {
+    if (!data?.document?.path || !resolvedSandboxId) {
+      toast.error('Document path or sandbox ID not available');
+      return;
+    }
+
+    setIsExpanding(true);
+    try {
+      const supabase = createClient();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      if (!accessToken) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      const docPath = data.document.path.startsWith('/workspace') 
+        ? data.document.path 
+        : `/workspace/${data.document.path.replace(/^\//, '')}`;
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/sandboxes/${resolvedSandboxId}/files/content?path=${encodeURIComponent(docPath)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch document: ${response.status}`);
+      }
+
+      const fileContent = await response.text();
+      let htmlContent = '';
+
+      try {
+        const parsedDocument = JSON.parse(fileContent);
+        if (parsedDocument.type === 'tiptap_document' && parsedDocument.content) {
+          htmlContent = parsedDocument.content;
+        } else {
+          // Fallback: use the content as is if it's already HTML
+          htmlContent = parsedDocument.content || fileContent;
+        }
+      } catch {
+        // If parsing fails, try to use the content directly
+        htmlContent = fileContent;
+      }
+
+      // If we still don't have content, try using the preview content
+      if (!htmlContent || htmlContent === '<p></p>' || htmlContent === '<p><br></p>') {
+        htmlContent = documentPreviewContent || data.content || data.document.content || '';
+      }
+
+      // Create HTML wrapper with styling (same as file-renderers/index.tsx)
+      const htmlWrapper = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { 
+              font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+              padding: 2rem; 
+              max-width: 900px; 
+              margin: 0 auto;
+              line-height: 1.6;
+              background: white;
+              color: #1a1a1a;
+            }
+            h1, h2, h3 { margin-top: 1.5rem; margin-bottom: 0.5rem; }
+            h1 { font-size: 2rem; }
+            h2 { font-size: 1.5rem; }
+            h3 { font-size: 1.25rem; }
+            p { margin: 1rem 0; }
+            ul, ol { margin: 1rem 0; padding-left: 2rem; }
+            code { background: #f5f5f5; padding: 0.2rem 0.4rem; border-radius: 3px; }
+            pre { background: #f5f5f5; padding: 1rem; border-radius: 5px; overflow-x: auto; }
+            blockquote { margin: 1rem 0; padding-left: 1rem; border-left: 3px solid #ddd; color: #666; }
+            table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+            th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+            th { background-color: #f5f5f5; }
+            img { max-width: 100%; height: auto; }
+            a { color: #0066cc; }
+          </style>
+        </head>
+        <body>
+          ${htmlContent}
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob([htmlWrapper], { type: 'text/html' });
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // Open in new tab
+      window.open(blobUrl, '_blank');
+      
+      // Note: We don't revoke the URL immediately since the new tab needs it
+      // The browser will clean it up when the tab is closed
+    } catch (error) {
+      console.error('Failed to expand document:', error);
+      toast.error('Failed to open document in new tab');
+    } finally {
+      setIsExpanding(false);
+    }
+  }, [data, resolvedSandboxId, documentPreviewContent]);
+
   return (
     <>
     <Card className="gap-0 flex border shadow-none border-t border-b-0 border-x-0 p-0 rounded-none flex-col h-full overflow-hidden bg-[rgba(7,10,17,0.95)] backdrop-blur-xl light:bg-white light:text-zinc-800 light:border-black/10">
@@ -369,6 +480,21 @@ export function DocsToolView({
                     <Pen className="h-3 w-3" />
                   )}
                   {isEditLoading ? 'Opening Iris Editor...' : 'Edit'}
+                </Button>
+                
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isExpanding}
+                  className="bg-white/5 border-white/10 text-white/90 hover:bg-white/10 hover:border-white/20 backdrop-blur-sm transition-all duration-200 disabled:opacity-50 light:bg-white light:text-zinc-800 light:border-black/10 light:hover:bg-black/5 light:hover:border-black/20"
+                  onClick={handleExpand}
+                >
+                  {isExpanding ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Expand className="h-3 w-3" />
+                  )}
+                  Expand
                 </Button>
                 
                 <DropdownMenu onOpenChange={setIsDropdownOpen}>

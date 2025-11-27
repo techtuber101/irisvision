@@ -139,7 +139,8 @@ export async function adaptiveChatStream(
   model: string = GEMINI_FAST_MODEL,
   systemInstructions?: string,
   chatContext?: Array<{ role: string; content: string }>,
-  threadId?: string
+  threadId?: string,
+  signal?: AbortSignal,
 ): Promise<void> {
   const requestBody: FastGeminiChatRequest = { message, model };
 
@@ -159,6 +160,7 @@ export async function adaptiveChatStream(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(requestBody),
+    signal,
   });
 
   if (!response.ok) {
@@ -178,6 +180,7 @@ export async function adaptiveChatStream(
 
   try {
     while (true) {
+      if (signal?.aborted) break;
       const { done, value } = await reader.read();
       if (done) break;
 
@@ -212,6 +215,9 @@ export async function adaptiveChatStream(
       }
     }
   } catch (error) {
+    if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+      return;
+    }
     callbacks.onError?.(error instanceof Error ? error.message : 'Adaptive stream error');
   } finally {
     reader.releaseLock();
@@ -227,7 +233,8 @@ export async function fastGeminiChatStream(
   model: string = GEMINI_FAST_MODEL,
   systemInstructions?: string,
   chatContext?: Array<{ role: string; content: string }>,
-  threadId?: string
+  threadId?: string,
+  signal?: AbortSignal,
 ): Promise<void> {
   const requestBody: FastGeminiChatRequest = { message, model };
   
@@ -247,6 +254,7 @@ export async function fastGeminiChatStream(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(requestBody),
+    signal,
   });
 
   if (!response.ok) {
@@ -266,6 +274,7 @@ export async function fastGeminiChatStream(
 
   try {
     while (true) {
+      if (signal?.aborted) break;
       const { done, value } = await reader.read();
       
       if (done) break;
@@ -305,6 +314,9 @@ export async function fastGeminiChatStream(
       }
     }
   } catch (error) {
+    if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+      return;
+    }
     callbacks.onError?.(error instanceof Error ? error.message : 'Stream error');
   } finally {
     reader.releaseLock();

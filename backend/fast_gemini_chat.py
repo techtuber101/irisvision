@@ -389,6 +389,8 @@ async def _build_history(
     return conversation_history
 
 
+
+
 def _chunk_text(value: str, size: int = 50) -> List[str]:
     """Yield reasonably sized chunks for smooth streaming."""
     if not value:
@@ -396,7 +398,11 @@ def _chunk_text(value: str, size: int = 50) -> List[str]:
     return [value[i : i + size] for i in range(0, len(value), size)]
 
 def _decode_json_stream_incremental(raw_text: str, start_index: int) -> tuple[str, int, bool]:
-    """Decode a JSON string incrementally, returning new decoded text and completion flag."""
+    """Decode a JSON string incrementally, returning new decoded text and completion flag.
+    
+    CRITICAL: This function streams characters as they arrive, NOT waiting for the closing quote.
+    This enables zero-latency streaming of answer content.
+    """
     decoded_chars: List[str] = []
     i = start_index
     length = len(raw_text)
@@ -437,13 +443,18 @@ def _decode_json_stream_incremental(raw_text: str, start_index: int) -> tuple[st
                 decoded_chars.append(next_char)
                 i += 2
         elif char == '"':
+            # Found closing quote - mark as completed
             completed = True
             i += 1  # Move past closing quote
             break
         else:
+            # Regular character - decode immediately and continue
+            # This is the key: we don't wait for closing quote, we stream as we go!
             decoded_chars.append(char)
             i += 1
 
+    # Return whatever we've decoded so far, even if not completed
+    # This enables streaming before the closing quote arrives
     return ''.join(decoded_chars), i, completed
 
 @router.post("/fast-gemini-chat")
@@ -921,105 +932,129 @@ async def adaptive_chat_stream(
 
     async def generate_stream():
         try:
+            import asyncio
             start_time = time.time()
             yield f"data: {json.dumps({'type': 'metadata', 'time': start_time})}\n\n"
+            
+            # CRITICAL: Start API call IMMEDIATELY - don't wait for anything!
+            user_parts = _build_user_parts(request.message, request.attachments)
+            
+            # Prepare model and system instructions (no async work needed)
+            resolved_instructions = ADAPTIVE_ROUTER_PROMPT or request.system_instructions
+            model = genai.GenerativeModel(
+                request.model,
+                system_instruction=resolved_instructions if resolved_instructions else None,
+                generation_config={
+                    "temperature": ADAPTIVE_TEMPERATURE,
+                    "top_p": 0.9,
+                    # REMOVED: response_mime_type - no JSON mode for faster generation
+                },
+            )
             
             conversation_history = await _build_history(
                 request, 
                 system_instructions=ADAPTIVE_ROUTER_PROMPT,
                 user_id=user_id
             )
-            user_parts = _build_user_parts(request.message, request.attachments)
 
             # Stream directly from Gemini with JSON mode
-            model = genai.GenerativeModel(
-                request.model,
-                generation_config={
-                    "temperature": ADAPTIVE_TEMPERATURE,
-                    "top_p": 0.9,
-                    "response_mime_type": "application/json",
-                },
-            )
             chat = model.start_chat(history=conversation_history)
             
-            # Stream response tokens as they arrive
+            # Start the API call - this is the critical path for zero latency!
             response = chat.send_message({
                 "role": "user",
                 "parts": user_parts
             }, stream=True)
             
-            # Accumulate full response for parsing
+            # ZERO-LATENCY STREAMING: Stream ALL tokens immediately, filter JSON structure on-the-fly
             full_response = ""
-            in_answer_field = False
+            answer_content_streamed = ""
             answer_start_idx = None
-            raw_answer_buffer = ""
             raw_answer_processed_idx = 0
-            decoded_answer_streamed = ""
-            answer_completed = False
+            in_answer_string = False
+            json_structure_buffer = ""  # Buffer for JSON structure we want to skip
+            streaming_answer = False
             
-            # Stream tokens and extract answer content in real-time
+            # Stream tokens immediately - this is the key to zero latency!
             for chunk in response:
                 if chunk.text:
                     chunk_text = chunk.text
                     full_response += chunk_text
                     
-                    # Look for answer field
-                    if not in_answer_field and '"answer"' in full_response.lower():
-                        lower_resp = full_response.lower()
-                        answer_key_pos = lower_resp.rfind('"answer"')
+                    # Check if we've found the answer field start
+                    if answer_start_idx is None:
+                        # Look for "answer" field
+                        lower_full = full_response.lower()
+                        answer_key_pos = lower_full.rfind('"answer"')
                         if answer_key_pos != -1:
+                            # Find colon after "answer"
                             colon_pos = full_response.find(':', answer_key_pos)
                             if colon_pos != -1:
+                                # Skip whitespace and find opening quote
                                 idx = colon_pos + 1
                                 while idx < len(full_response) and full_response[idx].isspace():
                                     idx += 1
                                 if idx < len(full_response) and full_response[idx] == '"':
-                                    in_answer_field = True
                                     answer_start_idx = idx + 1
-                                    raw_answer_buffer = ""
                                     raw_answer_processed_idx = 0
-                                    decoded_answer_streamed = ""
-                                    answer_completed = False
+                                    in_answer_string = True
+                                    streaming_answer = True
                     
-                    # Stream answer content as it arrives
-                    if (
-                        in_answer_field
-                        and answer_start_idx is not None
-                        and not answer_completed
-                        and len(full_response) > answer_start_idx
-                    ):
-                        raw_answer_buffer = full_response[answer_start_idx:]
-                        decoded_delta, raw_answer_processed_idx, just_completed = _decode_json_stream_incremental(
-                            raw_answer_buffer,
-                            raw_answer_processed_idx,
+                    # If we're in the answer string, extract and stream content IMMEDIATELY
+                    if in_answer_string and answer_start_idx is not None:
+                        # Extract answer string value using incremental decoder
+                        raw_answer = full_response[answer_start_idx:]
+                        decoded_delta, raw_answer_processed_idx, completed = _decode_json_stream_incremental(
+                            raw_answer, raw_answer_processed_idx
                         )
                         if decoded_delta:
-                            for char in decoded_delta:
-                                yield f"data: {json.dumps({'type': 'content', 'content': char})}\n\n"
-                            decoded_answer_streamed += decoded_delta
-                        if just_completed:
-                            answer_completed = True
+                            # Filter out decision object text
+                            cleaned_delta = re.sub(r',\s*decision\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', '', decoded_delta, flags=re.IGNORECASE)
+                            cleaned_delta = re.sub(r'decision\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', '', cleaned_delta, flags=re.IGNORECASE)
+                            
+                            if cleaned_delta:
+                                # STREAM IMMEDIATELY - zero latency!
+                                yield f"data: {json.dumps({'type': 'content', 'content': cleaned_delta})}\n\n"
+                                answer_content_streamed += cleaned_delta
+                        
+                        if completed:
+                            in_answer_string = False
+                    elif not streaming_answer:
+                        # Before we find answer field, we might see JSON structure
+                        # Don't stream it, but also don't wait - process quickly
+                        # The answer field should appear in the first few tokens
+                        pass
             
-            # Parse full response to get decision and ensure we streamed everything
+            # Parse full response to get decision after streaming completes
             try:
                 parsed = _parse_adaptive_decision(full_response)
                 actual_answer = parsed.response
                 
-                # If we didn't stream everything, stream the remainder
-                if len(decoded_answer_streamed) < len(actual_answer):
-                    remaining = actual_answer[len(decoded_answer_streamed):]
-                    for char in remaining:
-                        yield f"data: {json.dumps({'type': 'content', 'content': char})}\n\n"
-                elif not in_answer_field:
-                    # Never found answer field, stream full answer
-                    for char in actual_answer:
-                        yield f"data: {json.dumps({'type': 'content', 'content': char})}\n\n"
+                # If we didn't stream everything, stream the remainder (with decision text filtered)
+                if len(actual_answer) > len(answer_content_streamed):
+                    remaining = actual_answer[len(answer_content_streamed):]
+                    if remaining:
+                        # Filter out decision object text
+                        cleaned_remaining = re.sub(r',\s*decision\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', '', remaining, flags=re.IGNORECASE)
+                        cleaned_remaining = re.sub(r'decision\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', '', cleaned_remaining, flags=re.IGNORECASE)
+                        if cleaned_remaining:
+                            yield f"data: {json.dumps({'type': 'content', 'content': cleaned_remaining})}\n\n"
+                elif answer_start_idx is None:
+                    # Never found answer field, stream full answer (fallback)
+                    # This shouldn't happen if JSON parsing works, but safety fallback
+                    if actual_answer:
+                        # Filter out decision object text
+                        cleaned_answer = re.sub(r',\s*decision\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', '', actual_answer, flags=re.IGNORECASE)
+                        cleaned_answer = re.sub(r'decision\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', '', cleaned_answer, flags=re.IGNORECASE)
+                        if cleaned_answer:
+                            yield f"data: {json.dumps({'type': 'content', 'content': cleaned_answer})}\n\n"
                 
                 # Send the decision and completion
                 # Use model_dump with mode='json' to ensure enum values are serialized as strings
                 decision_dict = parsed.decision.model_dump(mode='json') if hasattr(parsed.decision, 'model_dump') else parsed.decision.dict()
                 logger.info(f"[Adaptive Stream] Sending decision: {decision_dict}")
                 yield f"data: {json.dumps({'type': 'decision', 'decision': decision_dict})}\n\n"
+                
                 elapsed_ms = (time.time() - start_time) * 1000
                 yield f"data: {json.dumps({'type': 'done', 'time_ms': elapsed_ms})}\n\n"
             except Exception as parse_error:
@@ -1027,9 +1062,11 @@ async def adaptive_chat_stream(
                 logger.error(f"Full response (first 1000 chars): {full_response[:1000]}")
                 # Fallback: use non-streaming method
                 result = await run_adaptive_router(request, user_id=user_id)
-                # Stream answer character by character
-                for char in result.response:
-                    yield f"data: {json.dumps({'type': 'content', 'content': char})}\n\n"
+                # Stream answer in chunks
+                chunk_size = 50
+                for i in range(0, len(result.response), chunk_size):
+                    chunk = result.response[i:i + chunk_size]
+                    yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
                 # Use model_dump with mode='json' to ensure enum values are serialized as strings
                 decision_dict = result.decision.model_dump(mode='json') if hasattr(result.decision, 'model_dump') else result.decision.dict()
                 logger.info(f"[Adaptive Stream Fallback] Sending decision: {decision_dict}")

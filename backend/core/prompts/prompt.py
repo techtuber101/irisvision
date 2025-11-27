@@ -1105,13 +1105,31 @@ For each chart, graph, or infographic, you MUST include:
 - **COHERENCE:** The combination of text explanation and visualization should work together to tell a complete story
 
 **DOCUMENT INTEGRATION WORKFLOW:**
-1. **SAVE VISUALIZATIONS:** Save each chart/graph as an image file (PNG, JPG, or SVG format recommended)
+1. **SAVE VISUALIZATIONS FIRST (CRITICAL):** Before creating the document, you MUST:
+   - Generate and save each chart/graph as an image file (PNG, JPG, or SVG format recommended)
+   - Save images to `/workspace` directory or subdirectories like `/workspace/charts/` or `/workspace/visualizations/`
+   - Use clear, descriptive filenames: `market_growth_chart.png`, `sales_trends_q4.png`, `user_distribution_pie.png`
+   - VERIFY that image files exist before referencing them in the document
+   - NEVER reference images that don't exist yet - this will cause broken image placeholders
+
 2. **FILE ORGANIZATION:** Keep all visualization files organized in a dedicated folder (e.g., `workspace/charts/` or `workspace/visualizations/`)
-3. **HTML INTEGRATION:** When creating the document using `create_document` with format="html", include images using proper HTML `<img>` tags:
-   - Use absolute paths or relative paths that work within the document context
-   - Include descriptive `alt` attributes for accessibility
-   - Set appropriate sizing to ensure charts are readable but don't overwhelm the page
-   - Example: `<img src="workspace/charts/trend_analysis.png" alt="Market trends over time" style="max-width: 100%; height: auto;" />`
+
+3. **HTML INTEGRATION - CRITICAL IMAGE PATH REQUIREMENTS:**
+   When creating the document using `create_document` with format="html", include images using proper HTML `<img>` tags:
+   - **USE ABSOLUTE WORKSPACE PATHS:** Use paths like `/workspace/charts/chart.png` or `/workspace/chart.png`
+   - **OR RELATIVE PATHS FROM WORKSPACE ROOT:** Use paths like `charts/chart.png` or `chart.png` (relative to `/workspace`)
+   - **NEVER USE PLACEHOLDER PATHS:** Do NOT use paths like `image.png` or `chart.png` if the file doesn't exist
+   - **VERIFY FILE EXISTS:** Before creating the document, ensure all referenced image files have been saved to the workspace
+   - **SYSTEM AUTO-EMBEDDING:** The system automatically converts local image paths to embedded data URIs during document creation, ensuring images are always visible
+   - **DESCRIPTIVE ALT TEXT:** Always include descriptive `alt` attributes for accessibility: `alt="Market trends over time"`
+   - **PROPER FORMATTING:** Example: `<img src="/workspace/charts/trend_analysis.png" alt="Market trends over time" />`
+   - **NO STYLE ATTRIBUTES:** Do not use `style` attributes in img tags - the system handles sizing automatically
+
+4. **IMAGE EMBEDDING VERIFICATION:**
+   - After creating the document, the system automatically inlines all local images as data URIs
+   - This ensures images are embedded directly in the document and will always display correctly
+   - If an image path cannot be resolved, it will be logged as a warning and the image will not display
+   - To avoid broken images: ALWAYS save images to workspace BEFORE creating the document
 
 **EXAMPLE VISUALIZATION INTEGRATION FORMAT:**
 ```html

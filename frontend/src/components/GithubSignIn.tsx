@@ -36,7 +36,7 @@ export default function GitHubSignIn({ returnUrl }: GitHubSignInProps) {
       markAsUsed();
 
       setTimeout(() => {
-        window.location.href = data.returnUrl || returnUrl || '/dashboard';
+        window.location.href = data.returnUrl || returnUrl || '/';
       }, 100);
     },
     [cleanupAuthState, returnUrl, markAsUsed],
@@ -98,7 +98,7 @@ export default function GitHubSignIn({ returnUrl }: GitHubSignInProps) {
       setIsLoading(true);
 
       if (returnUrl) {
-        sessionStorage.setItem('github-returnUrl', returnUrl || '/dashboard');
+        sessionStorage.setItem('github-returnUrl', returnUrl || '/');
       }
 
       const popup = window.open(

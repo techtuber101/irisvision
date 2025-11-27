@@ -629,6 +629,14 @@ Now enhance this prompt:\n\n${value}`;
       }
     }, [isControlled, controlledValue, uncontrolledValue, controlledOnChange]);
 
+    const canStopStreamingResponse = loading && Boolean(onStopAgent) && !isAgentRunning;
+    const baseButtonDisabled =
+      (isAgentRunning && !value.trim() && uploadedFiles.length === 0 && !onStopAgent) ||
+      (!isAgentRunning && !value.trim() && uploadedFiles.length === 0) ||
+      (disabled && !isAgentRunning) ||
+      isUploading;
+    const isSubmitDisabled = canStopStreamingResponse ? false : baseButtonDisabled || loading;
+
     const removeUploadedFile = useCallback(async (index: number) => {
       const fileToRemove = uploadedFiles[index];
 
@@ -1176,33 +1184,38 @@ Now enhance this prompt:\n\n${value}`;
                       </TooltipProvider>
 
                       <Button
-                      type="submit"
-                      disabled={
-                        (isAgentRunning && !value.trim() && uploadedFiles.length === 0 && !onStopAgent) ||
-                        (!isAgentRunning && !value.trim() && uploadedFiles.length === 0) ||
-                        loading ||
-                        (disabled && !isAgentRunning) ||
-                        isUploading
-                      }
-                      className={cn(
-                        'h-9 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm px-4 text-sm font-medium text-white/90 shadow-[0_2px_8px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-200 hover:border-white/30 hover:bg-white/15 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] active:scale-[0.98] ml-2 light:border-black/10 light:bg-black/5 light:text-black/90 light:shadow-[0_2px_8px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(0,0,0,0.1)] light:hover:border-black/15 light:hover:bg-black/8 light:hover:shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(0,0,0,0.15)]',
-                        ((isAgentRunning && !value.trim() && uploadedFiles.length === 0 && !onStopAgent) ||
-                          (!isAgentRunning && !value.trim() && uploadedFiles.length === 0) ||
-                          loading ||
-                          (disabled && !isAgentRunning) ||
-                          isUploading) && 'opacity-[0.55] cursor-not-allowed'
-                      )}
-                    >
-                      {loading || isUploading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : isAgentRunning && (!value.trim() && uploadedFiles.length === 0) ? (
-                        <span>Stop</span>
-                      ) : isAgentRunning && (value.trim() || uploadedFiles.length > 0) ? (
-                        <span>Follow Up</span>
-                      ) : (
-                        <span>Send</span>
-                      )}
-                    </Button>
+                        type={canStopStreamingResponse ? 'button' : 'submit'}
+                        onClick={
+                          canStopStreamingResponse
+                            ? (event) => {
+                                event.preventDefault();
+                                if (onStopAgent) {
+                                  void onStopAgent();
+                                }
+                              }
+                            : undefined
+                        }
+                        disabled={isSubmitDisabled}
+                        className={cn(
+                          'h-9 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm px-4 text-sm font-medium text-white/90 shadow-[0_2px_8px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all duration-200 hover:border-white/30 hover:bg-white/15 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] active:scale-[0.98] ml-2 light:border-black/10 light:bg-black/5 light:text-black/90 light:shadow-[0_2px_8px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(0,0,0,0.1)] light:hover:border-black/15 light:hover:bg-black/8 light:hover:shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(0,0,0,0.15)]',
+                          isSubmitDisabled && 'opacity-[0.55] cursor-not-allowed'
+                        )}
+                      >
+                        {loading && canStopStreamingResponse ? (
+                          <span className="flex items-center gap-1.5">
+                            <span>Stop</span>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          </span>
+                        ) : loading || isUploading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : isAgentRunning && (!value.trim() && uploadedFiles.length === 0) ? (
+                          <span>Stop</span>
+                        ) : isAgentRunning && (value.trim() || uploadedFiles.length > 0) ? (
+                          <span>Follow Up</span>
+                        ) : (
+                          <span>Send</span>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </form>

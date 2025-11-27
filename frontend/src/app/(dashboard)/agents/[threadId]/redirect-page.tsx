@@ -20,7 +20,7 @@ export function RedirectPage({ threadId }: RedirectPageProps) {
   }, [threadQuery.data, threadId, router]);
 
   if (threadQuery.isError) {
-    router.replace('/dashboard');
+    router.replace('/');
     return null;
   }
   return <ThreadSkeleton isSidePanelOpen={false} />;

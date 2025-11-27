@@ -171,7 +171,7 @@ export function PhoneVerificationPage({
         if (onSuccess) {
           onSuccess();
         } else {
-          router.push('/dashboard');
+          router.push('/');
         }
       }, 2000);
     } catch (err) {

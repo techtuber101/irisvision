@@ -134,7 +134,7 @@ type HeroProps = {
   irisTitle?: string;
   storageKey?: string;
   /** Optional: override the destination after capturing pending prompt */
-  returnUrl?: string; // default "/dashboard"
+  returnUrl?: string; // default "/"
 };
 
 const PENDING_PROMPT_KEY = "pendingAgentPrompt";
@@ -145,7 +145,7 @@ const HeroSection: React.FC<HeroProps> = ({
   subhead = "The world's best agentic AI",
   irisTitle = "Iris",
   storageKey = "iris.chat",
-  returnUrl = "/dashboard",
+  returnUrl = "/",
 }) => {
   const router = useRouter();
   const { user } = useAuth();

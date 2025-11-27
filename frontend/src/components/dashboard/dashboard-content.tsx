@@ -59,11 +59,14 @@ export function DashboardContent() {
   const [selectedOutputFormat, setSelectedOutputFormat] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [chatMode, setChatMode] = useState<'chat' | 'execute' | 'adaptive'>('adaptive');
+  const [isFastModeStreaming, setIsFastModeStreaming] = useState(false);
   const [showControlMenu, setShowControlMenu] = useState(false);
   const [menuAnimate, setMenuAnimate] = useState(false);
   const controlMenuRef = useRef<HTMLDivElement>(null);
   const { theme, resolvedTheme, setTheme } = useTheme();
   const { createSession } = useChatSessionManager();
+  const simpleChatAbortControllerRef = useRef<AbortController | null>(null);
+  const simpleChatStopRequestedRef = useRef(false);
   
   // Update time every minute
   React.useEffect(() => {
@@ -171,6 +174,17 @@ export function DashboardContent() {
   // This was causing delays, now we navigate immediately when we get thread_id
 
 
+  const handleStopSimpleChat = useCallback(async () => {
+    const controller = simpleChatAbortControllerRef.current;
+    if (!controller) return;
+    simpleChatStopRequestedRef.current = true;
+    controller.abort();
+    simpleChatAbortControllerRef.current = null;
+    setIsSubmitting(false);
+    setIsFastModeStreaming(false);
+  }, []);
+
+
   const handleSubmit = async (
     message: string,
     options?: {
@@ -199,6 +213,11 @@ export function DashboardContent() {
         let hasRedirected = false;
         let sessionHandle: ChatSessionHandle | null = null;
         let bufferedContent = '';
+        const abortController = new AbortController();
+        simpleChatAbortControllerRef.current = abortController;
+        simpleChatStopRequestedRef.current = false;
+        setIsFastModeStreaming(true);
+        let wasAborted = false;
 
         const ensureSessionHandle = () => {
           if (!sessionHandle && threadId && projectId) {
@@ -213,47 +232,80 @@ export function DashboardContent() {
         };
         
         // Redirect immediately when we get metadata - use window.location for instant navigation
-        await simpleChatStream(message, {
-          onMetadata: (data) => {
-            threadId = data.thread_id;
-            projectId = data.project_id;
-            ensureSessionHandle();
-            // Instant navigation - no loading states, no delays
-            if (threadId && projectId && !hasRedirected) {
-              hasRedirected = true;
-              // Use router.replace for instant SPA navigation (no page reload)
-              startTransition(() => {
-                router.replace(`/projects/${projectId}/thread/${threadId}`, { scroll: false });
-              });
-            }
-          },
-          onContent: (content) => {
-            if (!threadId || !projectId) {
-              bufferedContent += content;
-              return;
-            }
-            ensureSessionHandle();
-            sessionHandle?.append(content);
-          },
-          onDone: () => {
-            ensureSessionHandle();
-            sessionHandle?.finish();
-            // If we haven't redirected yet (shouldn't happen), redirect now
-            if (!hasRedirected && threadId && projectId) {
-              startTransition(() => {
-                router.replace(`/projects/${projectId}/thread/${threadId}`, { scroll: false });
-              });
-            }
-            setIsSubmitting(false);
-          },
-          onError: (error) => {
-            ensureSessionHandle();
-            sessionHandle?.fail(error);
-            setIsSubmitting(false);
-            throw new Error(`Simple chat streaming error: ${error}`);
+        try {
+          await simpleChatStream(
+            message,
+            {
+              onMetadata: (data) => {
+                threadId = data.thread_id;
+                projectId = data.project_id;
+                ensureSessionHandle();
+                // Instant navigation - no loading states, no delays
+                if (threadId && projectId && !hasRedirected) {
+                  hasRedirected = true;
+                  // Use router.replace for instant SPA navigation (no page reload)
+                  startTransition(() => {
+                    router.replace(`/projects/${projectId}/thread/${threadId}`, { scroll: false });
+                  });
+                }
+              },
+              onContent: (content) => {
+                if (!threadId || !projectId) {
+                  bufferedContent += content;
+                  return;
+                }
+                ensureSessionHandle();
+                sessionHandle?.append(content);
+              },
+              onDone: () => {
+                ensureSessionHandle();
+                sessionHandle?.finish();
+                // If we haven't redirected yet (shouldn't happen), redirect now
+                if (!hasRedirected && threadId && projectId) {
+                  startTransition(() => {
+                    router.replace(`/projects/${projectId}/thread/${threadId}`, { scroll: false });
+                  });
+                }
+                setIsSubmitting(false);
+              },
+              onError: (error) => {
+                ensureSessionHandle();
+                sessionHandle?.fail(error);
+                setIsSubmitting(false);
+                throw new Error(`Simple chat streaming error: ${error}`);
+              },
+            },
+            undefined,
+            abortController.signal,
+          );
+        } catch (error) {
+          wasAborted =
+            abortController.signal.aborted ||
+            simpleChatStopRequestedRef.current ||
+            (error instanceof DOMException && error.name === 'AbortError');
+          if (!wasAborted) {
+            simpleChatAbortControllerRef.current = null;
+            setIsFastModeStreaming(false);
+            throw error;
           }
-        });
-        
+        }
+
+        simpleChatAbortControllerRef.current = null;
+        setIsFastModeStreaming(false);
+        if (!wasAborted) {
+          wasAborted =
+            abortController.signal.aborted || simpleChatStopRequestedRef.current;
+        }
+        simpleChatStopRequestedRef.current = false;
+
+        if (wasAborted) {
+          ensureSessionHandle();
+          sessionHandle?.finish();
+          setIsSubmitting(false);
+          chatInputRef.current?.clearPendingFiles();
+          return;
+        }
+
         chatInputRef.current?.clearPendingFiles();
         return;
       }
@@ -548,6 +600,7 @@ export function DashboardContent() {
                           ref={chatInputRef}
                           onSubmit={handleSubmit}
                           loading={isSubmitting}
+                          onStopAgent={isFastModeStreaming ? handleStopSimpleChat : undefined}
                           placeholder="Describe what you need help with..."
                           value={inputValue}
                           onChange={setInputValue}

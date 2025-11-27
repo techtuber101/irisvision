@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { CircleDashed, CheckCircle, AlertTriangle, Sparkles } from 'lucide-react';
+import { CircleDashed, CheckCircle, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UnifiedMessage, ParsedContent, ParsedMetadata } from '@/components/thread/types';
 import { FileAttachmentGrid } from '@/components/thread/file-attachment';
@@ -13,8 +13,7 @@ import {
     safeJsonParse,
 } from '@/components/thread/utils';
 import { IrisLogo } from '@/components/sidebar/iris-logo';
-import { AgentLoader } from './loader';
-import { SimpleChatLoader } from './simple-chat-loader';
+import { ThinkingIndicator } from '@/components/thread/ThinkingIndicator';
 import { AgentAvatar, AgentName } from './agent-avatar';
 import { parseXmlToolCalls, isNewXmlFormat } from '@/components/thread/tool-views/xml-parser';
 import { ShowToolStream } from './ShowToolStream';
@@ -118,41 +117,17 @@ export function renderMarkdownContent(
     // Handle special thinking message
     if (content === 'HMM_THINKING_MESSAGE') {
         return (
-            <motion.div 
-                className="flex items-center gap-2 text-muted-foreground/70"
-                initial={{ opacity: 0, y: 4, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -4, scale: 0.95 }}
-                transition={{ 
-                    duration: 0.2, 
-                    ease: "easeOut",
-                    opacity: { duration: 0.15 }
+            <motion.div
+                className="flex items-center"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{
+                    duration: 0.2,
+                    ease: "easeOut"
                 }}
             >
-                <motion.div 
-                    className="w-6 h-6 rounded-full border border-muted-foreground/30 flex items-center justify-center bg-muted/20"
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ 
-                        delay: 0.05, 
-                        duration: 0.15, 
-                        ease: "easeOut" 
-                    }}
-                >
-                    <Sparkles className="w-3 h-3 text-muted-foreground/60" />
-                </motion.div>
-                <motion.span 
-                    className="text-sm italic"
-                    initial={{ opacity: 0, x: -4 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ 
-                        delay: 0.1, 
-                        duration: 0.15, 
-                        ease: "easeOut" 
-                    }}
-                >
-                    Hmm...
-                </motion.span>
+                <ThinkingIndicator />
             </motion.div>
         );
     }
@@ -1189,10 +1164,8 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                                         // Show minimal processing indicator when agent is active but no streaming text after preprocessing
                                                                         if (!textToRender && (streamHookStatus === 'streaming' || streamHookStatus === 'connecting')) {
                                                                             return (
-                                                                                <div className="flex items-center gap-1 py-1 ">
-                                                                                    <div className="h-1 w-1 rounded-full bg-primary/40 animate-pulse duration-1000" />
-                                                                                    <div className="h-1 w-1 rounded-full bg-primary/40 animate-pulse duration-1000 delay-150" />
-                                                                                    <div className="h-1 w-1 rounded-full bg-primary/40 animate-pulse duration-1000 delay-300" />
+                                                                                <div className="py-1">
+                                                                                    <ThinkingIndicator />
                                                                                 </div>
                                                                             );
                                                                         }
@@ -1259,6 +1232,14 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                                         const textBeforeTag = detectedTag ? textToRender.substring(0, tagStartIndex) : textToRender;
                                                                         const showCursor = isStreamingText && !detectedTag;
 
+                                                                        if (!textBeforeTag && !detectedTag) {
+                                                                            return (
+                                                                                <div className="py-1">
+                                                                                    <ThinkingIndicator />
+                                                                                </div>
+                                                                            );
+                                                                        }
+
                                                                         return (
                                                                             <>
                                                                                 {/* In debug mode, show raw streaming content */}
@@ -1302,8 +1283,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                 });
                             })()}
                             {((agentStatus === 'running' || agentStatus === 'connecting') && !streamingTextContent &&
-                                !readOnly &&
-                                (messages.length === 0 || messages[messages.length - 1].type === 'user')) && (
+                                !readOnly) && (
                                     <div ref={latestMessageRef} className='w-full h-22 rounded'>
                                         <div className="flex flex-col gap-2">
                                             {/* Logo positioned above the loader */}
@@ -1317,15 +1297,14 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                             </div>
 
                                             {/* Loader content */}
-                                            <div className="space-y-2 w-full h-12">
-                                                <AgentLoader />
+                                            <div className="space-y-2 w-full h-12 flex items-center">
+                                                <ThinkingIndicator />
                                             </div>
                                         </div>
                                     </div>
                                 )}
                             {/* Simple Chat Loading Indicator */}
-                            {isSimpleChatLoading && !readOnly &&
-                                (messages.length === 0 || messages[messages.length - 1].type === 'user') && (
+                            {isSimpleChatLoading && !readOnly && (
                                     <div ref={latestMessageRef} className='w-full h-22 rounded'>
                                         <div className="flex flex-col gap-2">
                                             {/* Logo positioned above the loader */}
@@ -1339,8 +1318,8 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                             </div>
 
                                             {/* Simple Chat Loader content */}
-                                            <div className="space-y-2 w-full h-12">
-                                                <SimpleChatLoader />
+                                            <div className="space-y-2 w-full h-12 flex items-center">
+                                                <ThinkingIndicator />
                                             </div>
                                         </div>
                                     </div>
@@ -1417,11 +1396,7 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
 
                                         {/* Streaming indicator content */}
                                         <div className="max-w-[90%] px-4 py-3 text-sm">
-                                            <div className="flex items-center gap-1.5 py-1">
-                                                <div className="h-1.5 w-1.5 rounded-full bg-primary/50 animate-pulse duration-1000" />
-                                                <div className="h-1.5 w-1.5 rounded-full bg-primary/50 animate-pulse duration-1000 delay-150" />
-                                                <div className="h-1.5 w-1.5 rounded-full bg-primary/50 animate-pulse duration-1000 delay-300" />
-                                            </div>
+                                            <ThinkingIndicator />
                                         </div>
                                     </div>
                                 </div>

@@ -118,7 +118,7 @@ export function Navbar() {
                 {user ? (
                   <Link
                     className="group relative inline-flex"
-                    href="/dashboard"
+                    href="/"
                   >
                     <motion.div
                       whileHover={{ y: -1 }}
@@ -295,7 +295,7 @@ export function Navbar() {
                 <div className="flex flex-col gap-2">
                   {user ? (
                     <Link
-                      href="/dashboard"
+                      href="/"
                       className="group relative inline-flex w-full"
                     >
                       <motion.div

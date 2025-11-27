@@ -24,7 +24,6 @@ const BILLING_ROUTES = [
 
 // Routes that require authentication and active subscription
 const PROTECTED_ROUTES = [
-  '/dashboard',
   '/agents',
   '/projects',
   '/settings',
@@ -43,48 +42,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Special handling for homepage: redirect logged-in users to dashboard
+  // Special handling for homepage: allow both logged-in and non-logged-in users
+  // Logged-in users will see dashboard content, non-logged-in will see homepage
   if (pathname === '/') {
-    let supabaseResponse = NextResponse.next({
-      request,
-    });
-
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-            supabaseResponse = NextResponse.next({
-              request,
-            });
-            cookiesToSet.forEach(({ name, value, options }) =>
-              supabaseResponse.cookies.set(name, value, options)
-            );
-          },
-        },
-      }
-    );
-
-    try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      // If user is logged in, redirect to dashboard
-      if (!authError && user) {
-        const url = request.nextUrl.clone();
-        url.pathname = '/dashboard';
-        return NextResponse.redirect(url);
-      }
-    } catch (error) {
-      console.error('Middleware error checking auth for homepage:', error);
-    }
-
-    // Allow non-logged-in users to access homepage
+    // Allow all users to access homepage - the page component will handle what to show
     return NextResponse.next();
+  }
+
+  // Redirect /dashboard to / (root) - dashboard is now at root
+  if (pathname === '/dashboard') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/';
+    return NextResponse.redirect(url);
   }
 
   // Allow all public routes without any checks

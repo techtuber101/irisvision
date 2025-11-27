@@ -1,6 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { CircleDashed, CheckCircle, AlertTriangle, Sparkles, Copy } from 'lucide-react';
-import { AdaptiveLoader } from './adaptive-loader';
+import { CircleDashed, CheckCircle, AlertTriangle, Copy } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UnifiedMessage, ParsedContent } from '@/components/thread/types';
 import { FileAttachmentGrid } from '@/components/thread/file-attachment';
@@ -14,8 +13,6 @@ import {
     safeJsonParse,
 } from '@/components/thread/utils';
 import { IrisLogo } from '@/components/sidebar/iris-logo';
-import { AgentLoader } from './loader';
-import { SimpleChatLoader } from './simple-chat-loader';
 import { AgentAvatar, AgentName } from './agent-avatar';
 import { parseXmlToolCalls, isNewXmlFormat } from '@/components/thread/tool-views/xml-parser';
 import { ShowToolStream } from './ShowToolStream';
@@ -23,6 +20,7 @@ import { ComposioUrlDetector } from './composio-url-detector';
 import { StreamingText } from './StreamingText';
 import { HIDE_STREAMING_XML_TAGS } from '@/components/thread/utils';
 import { useAgentsFromCache } from '@/hooks/react-query/agents/use-agents';
+import { ThinkingIndicator } from '@/components/thread/ThinkingIndicator';
 
 const DAY_IN_MS = 86_400_000;
 const ATTACHMENT_TAG_REGEX = /\[Uploaded File: .*?\]/g;
@@ -196,47 +194,20 @@ export function renderMarkdownContent(
 ) {
     // Handle special thinking message
     if (content === 'HMM_THINKING_MESSAGE') {
-        const isAdaptiveMode = chatMode === 'adaptive';
         return (
             <motion.div 
-                className="flex items-center gap-2 text-muted-foreground/70"
-                initial={{ opacity: 0, y: 4, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                className="flex items-center"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
                 transition={{ 
                     duration: 0.2, 
-                    ease: "easeOut",
-                    opacity: { duration: 0.15 }
+                    ease: "easeOut"
                 }}
             >
-                <motion.div 
-                    className={isAdaptiveMode ? "flex items-center justify-center" : "w-6 h-6 rounded-full border border-muted-foreground/30 flex items-center justify-center bg-muted/20"}
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ 
-                        delay: 0.05, 
-                        duration: 0.15, 
-                        ease: "easeOut" 
-                    }}
-                >
-                    {isAdaptiveMode ? (
-                        <AdaptiveLoader />
-                    ) : (
-                        <Sparkles className="w-3 h-3 text-muted-foreground/60" />
-                    )}
-                </motion.div>
-                <motion.span 
-                    className="text-sm italic"
-                    initial={{ opacity: 0, x: -4 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ 
-                        delay: 0.1, 
-                        duration: 0.15, 
-                        ease: "easeOut" 
-                    }}
-                >
-                    Hmm...
-                </motion.span>
+                <div className="text-sm font-medium dark:text-white text-black">
+                    <ThinkingIndicator />
+                </div>
             </motion.div>
         );
     }
@@ -1214,13 +1185,46 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                     const parsedContent = safeJsonParse<ParsedContent>(message.content, {});
                                                     const msgKey = message.message_id || `submsg-assistant-${msgIndex}`;
 
-                                                    if (!parsedContent.content) return;
-
                                                     // Extract chat mode and decision from metadata
                                                     const messageMetadata = safeJsonParse<any>(message.metadata || '{}', {});
                                                     const chatMode = messageMetadata.chat_mode || threadMetadata?.chat_mode;
                                                     const decision = messageMetadata.decision;
                                                     const decisionState = decision?.state;
+                                                    const isStreaming = messageMetadata.is_streaming === true;
+
+                                                    // If message is empty but streaming, show thinking indicator
+                                                    if (!parsedContent.content || (typeof parsedContent.content === 'string' && parsedContent.content.trim() === '')) {
+                                                        if (isStreaming && (chatMode === 'adaptive' || chatMode === 'chat')) {
+                                                            // Show thinking indicator for streaming empty messages in adaptive/quick chat mode
+                                                            elements.push(
+                                                                <AnimatePresence key={msgKey} mode="wait">
+                                                                    <motion.div
+                                                                        className={assistantMessageCount > 0 ? "mt-4" : ""}
+                                                                        initial={{ opacity: 0, y: 8 }}
+                                                                        animate={{ opacity: 1, y: 0 }}
+                                                                        exit={{ 
+                                                                            opacity: 0, 
+                                                                            y: -16,
+                                                                            scale: 0.92,
+                                                                            filter: "blur(8px)"
+                                                                        }}
+                                                                        transition={{
+                                                                            duration: 0.5,
+                                                                            ease: [0.4, 0, 0.2, 1]
+                                                                        }}
+                                                                    >
+                                                                        <div className="prose prose-base dark:prose-invert chat-markdown max-w-none [&>:first-child]:mt-0 prose-headings:mt-3 break-words overflow-hidden">
+                                                                            <div className="py-1">
+                                                                                <ThinkingIndicator />
+                                                                            </div>
+                                                                        </div>
+                                                                    </motion.div>
+                                                                </AnimatePresence>
+                                                            );
+                                                            assistantMessageCount++;
+                                                        }
+                                                        return;
+                                                    }
 
                                                     // Fix: Remove errant leading quote if content starts with quote followed by letter
                                                     // This handles cases where a quote is incorrectly added at the start
@@ -1231,6 +1235,18 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                             /^[a-zA-Z]/.test(contentToRender[1])) {
                                                             contentToRender = contentToRender.slice(1);
                                                         }
+                                                        
+                                                        // Remove decision object text if it appears in content
+                                                        // Matches patterns like: ", decision: { state: ask_user, ... }" or "decision: { state: ... }"
+                                                        // Uses comprehensive pattern that handles nested objects
+                                                        contentToRender = contentToRender
+                                                            // Remove decision object with comma prefix (handles nested objects better)
+                                                            .replace(/,\s*decision\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/gi, '')
+                                                            // Remove decision object without comma prefix
+                                                            .replace(/decision\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/gi, '')
+                                                            // Remove any trailing comma/whitespace
+                                                            .replace(/,\s*$/, '')
+                                                            .trim();
                                                     }
 
                                                     const renderedContent = renderMarkdownContent(
@@ -1378,10 +1394,8 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                                         // Show minimal processing indicator when agent is active but no streaming text after preprocessing
                                                                         if (!textToRender && (streamHookStatus === 'streaming' || streamHookStatus === 'connecting')) {
                                                                             return (
-                                                                                <div className="flex items-center gap-1 py-1 ">
-                                                                                    <div className="h-1 w-1 rounded-full bg-primary/40 animate-pulse duration-1000" />
-                                                                                    <div className="h-1 w-1 rounded-full bg-primary/40 animate-pulse duration-1000 delay-150" />
-                                                                                    <div className="h-1 w-1 rounded-full bg-primary/40 animate-pulse duration-1000 delay-300" />
+                                                                                <div className="py-1">
+                                                                                    <ThinkingIndicator />
                                                                                 </div>
                                                                             );
                                                                         }
@@ -1448,6 +1462,14 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                                         const textBeforeTag = detectedTag ? textToRender.substring(0, tagStartIndex) : textToRender;
                                                                         const showCursor = isStreamingText && !detectedTag;
 
+                                                                        if (!textBeforeTag && !detectedTag) {
+                                                                            return (
+                                                                                <div className="py-1">
+                                                                                    <ThinkingIndicator />
+                                                                                </div>
+                                                                            );
+                                                                        }
+
                                                                         return (
                                                                             <>
                                                                                 {/* In debug mode, show raw streaming content */}
@@ -1506,15 +1528,27 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                             </div>
 
                                             {/* Loader content */}
-                                            <div className="space-y-2 w-full h-12">
-                                                <AgentLoader />
+                                            <div className="space-y-2 w-full h-12 flex items-center">
+                                                <ThinkingIndicator />
                                             </div>
                                         </div>
                                     </div>
                                 )}
                             {/* Simple Chat Loading Indicator */}
-                            {isSimpleChatLoading && !readOnly &&
-                                (messages.length === 0 || messages[messages.length - 1].type === 'user') && (
+                            {isSimpleChatLoading && !readOnly && (() => {
+                                // Check if there's already a streaming message in the list to avoid duplicates
+                                const hasStreamingMessage = displayMessages.some(msg => {
+                                    if (msg.type === 'assistant') {
+                                        const metadata = safeJsonParse<any>(msg.metadata || '{}', {});
+                                        return metadata.is_streaming === true;
+                                    }
+                                    return false;
+                                });
+                                
+                                // Only show if there's no existing streaming message
+                                if (hasStreamingMessage) return null;
+                                
+                                return (
                                     <div ref={latestMessageRef} className='w-full h-22 rounded'>
                                         <div className="flex flex-col gap-2">
                                             {/* Logo positioned above the loader */}
@@ -1529,55 +1563,12 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
 
                                             {/* Simple Chat Loader content - Show adaptive loader if in adaptive mode */}
                                             <div className="space-y-2 w-full h-12 flex items-center">
-                                                {(() => {
-                                                    // Check if we're in adaptive mode by looking at:
-                                                    // 1. Last user message metadata
-                                                    // 2. Thread metadata
-                                                    // 3. URL parameter (for redirect scenarios)
-                                                    const lastUserMessage = [...messages].reverse().find(msg => msg.type === 'user');
-                                                    let isAdaptiveMode = false;
-                                                    
-                                                    // Check thread metadata first (most reliable)
-                                                    if (threadMetadata?.chat_mode === 'adaptive') {
-                                                        isAdaptiveMode = true;
-                                                    }
-                                                    // Check last user message metadata
-                                                    else if (lastUserMessage) {
-                                                        try {
-                                                            const metadata = safeJsonParse<any>(lastUserMessage.metadata || '{}', {});
-                                                            if (metadata.chat_mode === 'adaptive') {
-                                                                isAdaptiveMode = true;
-                                                            }
-                                                        } catch {
-                                                            // Parsing failed, continue to other checks
-                                                        }
-                                                    }
-                                                    
-                                                    // If we still can't determine and we're in a redirect scenario (no messages or last is user),
-                                                    // check URL parameter as fallback
-                                                    if (!isAdaptiveMode && (messages.length === 0 || (lastUserMessage && !messages.some(m => m.type === 'assistant' && m.created_at > lastUserMessage.created_at)))) {
-                                                        try {
-                                                            const urlParams = new URLSearchParams(window.location.search);
-                                                            if (urlParams.get('trigger_adaptive') === 'true') {
-                                                                isAdaptiveMode = true;
-                                                            }
-                                                        } catch {
-                                                            // URL parsing failed, continue
-                                                        }
-                                                    }
-                                                    
-                                                    return isAdaptiveMode ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <AdaptiveLoader />
-                                                        </div>
-                                                    ) : (
-                                                        <SimpleChatLoader />
-                                                    );
-                                                })()}
+                                                <ThinkingIndicator />
                                             </div>
                                         </div>
                                     </div>
-                                )}
+                                );
+                            })()}
                             {readOnly && currentToolCall && (
                                 <div ref={latestMessageRef}>
                                     <div className="flex flex-col gap-2">
@@ -1649,13 +1640,9 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                         </div>
 
                                         {/* Streaming indicator content */}
-                                        <div className="max-w-[90%] px-4 py-3 text-sm">
-                                            <div className="flex items-center gap-1.5 py-1">
-                                                <div className="h-1.5 w-1.5 rounded-full bg-primary/50 animate-pulse duration-1000" />
-                                                <div className="h-1.5 w-1.5 rounded-full bg-primary/50 animate-pulse duration-1000 delay-150" />
-                                                <div className="h-1.5 w-1.5 rounded-full bg-primary/50 animate-pulse duration-1000 delay-300" />
+                                            <div className="max-w-[90%] px-4 py-3 text-sm">
+                                                <ThinkingIndicator />
                                             </div>
-                                        </div>
                                     </div>
                                 </div>
                             )}

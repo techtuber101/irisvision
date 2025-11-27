@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense } from 'react';
+import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 import { CTASection } from '@/components/home/sections/cta-section';
 import { FooterSection } from '@/components/home/sections/footer-section';
 import { HeroSection } from '@/components/home/sections/hero-section';
@@ -13,29 +14,48 @@ import { ModalProviders } from '@/providers/modal-providers';
 import { HeroVideoSection } from '@/components/home/sections/hero-video-section';
 import { BackgroundAALChecker } from '@/components/auth/background-aal-checker';
 import { useAuth } from '@/components/AuthProvider';
-// Reference layout does not use these extra sections; keep imports minimal
+import DashboardLayoutContent from '@/components/dashboard/layout-content';
+import { DashboardContent } from '@/components/dashboard/dashboard-content';
+import { IrisLoadingScreen } from '@/components/ui/iris-loading-screen';
 
 export default function Home() {
-  const router = useRouter();
   const { user, isLoading } = useAuth();
-
-  // Redirect logged-in users to dashboard
-  useEffect(() => {
-    if (!isLoading && user) {
-      router.replace('/dashboard');
-    }
-  }, [user, isLoading, router]);
 
   // Show loading state while checking auth
   if (isLoading) {
-    return null; // Or you could show a loading spinner here
+    return <IrisLoadingScreen />;
   }
 
-  // Don't render homepage content if user is logged in (redirect will happen)
+  // If user is logged in, show dashboard with full layout at root
   if (user) {
-    return null;
+    return (
+      <DashboardLayoutContent>
+        <Suspense
+          fallback={
+            <div className="flex flex-col h-full w-full">
+              <div className="flex-1 flex flex-col items-center justify-center px-4">
+                <div className={cn(
+                  "flex flex-col items-center text-center w-full space-y-8",
+                  "max-w-[850px] sm:max-w-full sm:px-4"
+                )}>
+                  <Skeleton className="h-10 w-40 sm:h-8 sm:w-32" />
+                  <Skeleton className="h-7 w-56 sm:h-6 sm:w-48" />
+                  <Skeleton className="w-full h-[100px] rounded-xl sm:h-[80px]" />
+                  <div className="block sm:hidden lg:block w-full">
+                    <Skeleton className="h-20 w-full" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          }
+        >
+          <DashboardContent />
+        </Suspense>
+      </DashboardLayoutContent>
+    );
   }
 
+  // Show homepage for non-logged-in users
   return (
     <>
       <ModalProviders />

@@ -40,7 +40,7 @@ export default function SubscriptionRequiredPage() {
                            response.data.tier.name !== 'free';
       
       if ((hasActiveSubscription && hasActiveTier) || (hasActiveTrial && hasActiveTier)) {
-        router.push('/dashboard');
+        router.push('/');
       }
     } catch (error) {
       console.error('Error checking billing status:', error);
@@ -132,7 +132,7 @@ export default function SubscriptionRequiredPage() {
           </p>
         </div>
         <PricingSection 
-          returnUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/dashboard?subscription=activated`}
+          returnUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/?subscription=activated`}
           showTitleAndTabs={false}
           onSubscriptionUpdate={handleSubscriptionUpdate}
           showInfo={false}

@@ -138,6 +138,7 @@ class SandboxDocsTool(SandboxToolsBase):
         return content
 
     def _resolve_image_path(self, src: str) -> Optional[str]:
+        """Resolve image path with multiple fallback strategies."""
         if not src:
             return None
 
@@ -219,8 +220,56 @@ class SandboxDocsTool(SandboxToolsBase):
 
         logger.debug(f"Could not resolve image path: {src} (cleaned: {cleaned_src})")
         return None
+    
+    async def _try_resolve_image_with_fallbacks(self, src: str) -> Optional[str]:
+        """Try multiple strategies to resolve an image path."""
+        # Strategy 1: Direct resolution
+        resolved = self._resolve_image_path(src)
+        if resolved:
+            return resolved
+        
+        # Strategy 2: Extract filename and search common locations
+        filename = os.path.basename(src)
+        if filename and filename != src:
+            # Common locations where images might be saved
+            search_locations = [
+                self.workspace_path,  # Root
+                self.docs_dir,  # Docs directory
+                f"{self.workspace_path}/designs",  # Designer tool output
+                f"{self.workspace_path}/images",  # Images directory
+                f"{self.workspace_path}/output",  # Output directory
+                f"{self.workspace_path}/charts",  # Charts directory
+                f"{self.workspace_path}/graphs",  # Graphs directory
+            ]
+            
+            for location in search_locations:
+                candidate = os.path.normpath(os.path.join(location, filename))
+                if not candidate.startswith('/'):
+                    candidate = f'/{candidate.lstrip("/")}'
+                if candidate.startswith(self.workspace_path):
+                    return candidate
+        
+        # Strategy 3: Try with common image extensions if missing
+        if not any(filename.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp']):
+            for ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp']:
+                filename_with_ext = f"{filename}{ext}"
+                search_locations = [
+                    self.workspace_path,
+                    self.docs_dir,
+                    f"{self.workspace_path}/designs",
+                    f"{self.workspace_path}/images",
+                ]
+                for location in search_locations:
+                    candidate = os.path.normpath(os.path.join(location, filename_with_ext))
+                    if not candidate.startswith('/'):
+                        candidate = f'/{candidate.lstrip("/")}'
+                    if candidate.startswith(self.workspace_path):
+                        return candidate
+        
+        return None
 
     async def _inline_local_images(self, content: str) -> str:
+        """Inline local images as data URIs for proper embedding in documents."""
         if not content:
             return content
 
@@ -237,20 +286,27 @@ class SandboxDocsTool(SandboxToolsBase):
             return content
 
         updated = False
+        failed_images = []
 
         for img in images:
             src = img.get('src')
             if not src:
+                logger.warning("Image tag found without src attribute")
                 continue
 
             # Skip if already a data URI or URL
             src_lower = src.lower().strip()
             if src_lower.startswith(('data:', 'http://', 'https://', 'blob:')):
+                logger.debug(f"Image already has data URI or URL: {src[:50]}...")
                 continue
 
-            resolved_path = self._resolve_image_path(src)
+            # Try to resolve image path with multiple fallback strategies
+            resolved_path = await self._try_resolve_image_with_fallbacks(src)
+            
             if not resolved_path:
-                logger.debug(f"Could not resolve image path for inlining: {src}")
+                logger.warning(f"Could not resolve image path for inlining: {src}. Image will not be visible.")
+                failed_images.append(src)
+                # Keep the original src but log the issue
                 continue
 
             try:
@@ -258,30 +314,36 @@ class SandboxDocsTool(SandboxToolsBase):
                 try:
                     file_info = await self.sandbox.fs.get_file_info(resolved_path)
                     if file_info.is_dir:
-                        logger.warning(f"Image path is a directory, not a file: {src}")
+                        logger.warning(f"Image path is a directory, not a file: {src} (resolved: {resolved_path})")
+                        failed_images.append(src)
                         continue
-                except Exception:
-                    logger.debug(f"Could not get file info for image: {src} (resolved: {resolved_path})")
+                except Exception as e:
+                    logger.warning(f"Could not get file info for image: {src} (resolved: {resolved_path}): {e}")
+                    failed_images.append(src)
                     continue
 
                 image_bytes = await self.sandbox.fs.download_file(resolved_path)
             except Exception as exc:
-                logger.warning(f"Failed to inline image '{src}' (resolved: {resolved_path}): {exc}")
+                logger.error(f"Failed to download image '{src}' (resolved: {resolved_path}): {exc}")
+                failed_images.append(src)
                 continue
 
             if not isinstance(image_bytes, (bytes, bytearray)):
                 if isinstance(image_bytes, str):
                     image_bytes = image_bytes.encode()
                 else:
-                    logger.warning(f"Image data is not bytes for '{src}': {type(image_bytes)}")
+                    logger.error(f"Image data is not bytes for '{src}': {type(image_bytes)}")
+                    failed_images.append(src)
                     continue
 
             # Limit data URI size to avoid performance issues (max 10MB)
             max_size = 10 * 1024 * 1024  # 10MB
             if len(image_bytes) > max_size:
                 logger.warning(f"Image '{src}' is too large ({len(image_bytes)} bytes) to inline as data URI. Consider using a URL instead.")
+                failed_images.append(src)
                 continue
 
+            # Determine MIME type
             mime_type, _ = mimetypes.guess_type(resolved_path)
             if not mime_type or not mime_type.startswith('image/'):
                 # Try to detect from file extension
@@ -301,10 +363,17 @@ class SandboxDocsTool(SandboxToolsBase):
                 data_uri = f"data:{mime_type};base64,{base64.b64encode(image_bytes).decode('ascii')}"
                 img['src'] = data_uri
                 updated = True
-                logger.debug(f"Successfully inlined image: {src} -> data URI ({len(image_bytes)} bytes)")
+                logger.info(f"Successfully inlined image: {src} -> data URI ({len(image_bytes)} bytes, {mime_type})")
             except Exception as exc:
-                logger.warning(f"Failed to create data URI for image '{src}': {exc}")
+                logger.error(f"Failed to create data URI for image '{src}': {exc}")
+                failed_images.append(src)
                 continue
+
+        # Log summary
+        if failed_images:
+            logger.warning(f"Failed to inline {len(failed_images)} image(s): {failed_images}")
+        if updated:
+            logger.info(f"Successfully inlined images in document. {len(images) - len(failed_images)}/{len(images)} images embedded.")
 
         return str(soup) if updated else content
         
@@ -387,6 +456,15 @@ class SandboxDocsTool(SandboxToolsBase):
 - Line breaks: <br />
 - Horizontal rules: <hr />
 
+CRITICAL IMAGE REQUIREMENTS:
+- Images MUST be saved to the workspace BEFORE being referenced in documents
+- Use absolute workspace paths like /workspace/filename.png or relative paths from workspace root
+- When generating charts, graphs, or images, ALWAYS save them to /workspace first, then reference them
+- Image paths should be relative to /workspace (e.g., "chart.png" or "/workspace/chart.png")
+- The system will automatically convert local image paths to embedded data URIs
+- DO NOT use placeholder paths or non-existent file references
+- If an image doesn't exist, it will not display in the document
+
 IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupported tags or attributes like style, class (except for standard TipTap classes), or custom elements. Start with a paragraph or heading tag."""
                     },
                     "format": {
@@ -420,7 +498,30 @@ IMPORTANT: All content must be wrapped in proper HTML tags. Do not use unsupport
             
             if format == "html":
                 content = self._validate_and_clean_tiptap_html(content)
+                
+                # Inline images - this is critical for proper display
+                content_before_inline = content
                 content = await self._inline_local_images(content)
+                
+                # Validate that images were properly inlined
+                try:
+                    soup = BeautifulSoup(content, 'html.parser')
+                    images = soup.find_all('img')
+                    if images:
+                        non_data_uri_images = []
+                        for img in images:
+                            src = img.get('src', '')
+                            if src and not src.lower().startswith(('data:', 'http://', 'https://', 'blob:')):
+                                non_data_uri_images.append(src)
+                        
+                        if non_data_uri_images:
+                            logger.warning(f"Some images could not be inlined as data URIs: {non_data_uri_images}")
+                            # Try one more time with more aggressive path resolution
+                            logger.info("Retrying image inlining with enhanced path resolution...")
+                            content = await self._inline_local_images(content)
+                except Exception as e:
+                    logger.warning(f"Could not validate image inlining: {e}")
+                
                 logger.debug(f"Cleaned HTML content for TipTap: {content[:200]}...")
                 
                 document_wrapper = {

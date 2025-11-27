@@ -62,7 +62,7 @@ function LoginContent() {
       router.push(redirectPath);
     } else if (!isLoading && user && !pendingRedirect) {
       // User is logged in but no pending redirect (e.g., page refresh)
-      const redirectPath = returnUrl || '/dashboard';
+      const redirectPath = returnUrl || '/';
       router.push(redirectPath);
     }
   }, [user, isLoading, router, returnUrl, pendingRedirect]);

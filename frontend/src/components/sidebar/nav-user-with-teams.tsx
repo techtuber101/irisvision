@@ -158,7 +158,7 @@ export function NavUserWithTeams({
 
     // Navigate to the appropriate dashboard
     if (team.personal_account) {
-      router.push('/dashboard');
+      router.push('/');
     } else {
       router.push(`/${team.slug}`);
     }
