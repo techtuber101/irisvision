@@ -850,7 +850,7 @@ export function NavAgents() {
           // Navigate to dashboard before deleting
           isNavigatingRef.current = true;
           document.body.style.pointerEvents = 'none';
-          router.push('/dashboard');
+          router.push('/');
 
           // Wait a moment for navigation to start
           await new Promise(resolve => setTimeout(resolve, 100));
