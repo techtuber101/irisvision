@@ -48,6 +48,7 @@ dependencies = [
   "openai>=1.99.5",
   "nest-asyncio==1.6.0",
   "vncdotool==1.2.0",
+  "zstandard==0.23.0",
   "tavily-python==0.5.4",
   "pytesseract==0.3.13",
   "stripe==11.6.0",
