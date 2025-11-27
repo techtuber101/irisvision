@@ -23,10 +23,15 @@ router = APIRouter()
 
 # Configure Gemini
 genai.configure(api_key=config.GEMINI_API_KEY)
+
+# Model configuration - can be overridden via FAST_GEMINI_RESEARCH_MODEL environment variable
+# This applies to both Quick Chat mode and Adaptive mode
 DEFAULT_GEMINI_RESEARCH_MODEL = os.getenv(
     "FAST_GEMINI_RESEARCH_MODEL",
     "gemini-3-pro-preview",
 )
+
+# Temperature settings
 FAST_CHAT_TEMPERATURE = float(os.getenv("FAST_CHAT_TEMPERATURE", "1"))
 ADAPTIVE_TEMPERATURE = float(os.getenv("ADAPTIVE_ROUTER_TEMPERATURE", "1"))
 
@@ -675,7 +680,7 @@ def _strip_json_wrappers(raw_text: str) -> str:
 
 
 def _fix_json_control_chars(json_str: str) -> str:
-    """Fix unescaped control characters in JSON strings by properly escaping them."""
+    """Fix unescaped control characters and special chars in JSON strings by properly escaping them."""
     result = []
     i = 0
     in_string = False
@@ -704,16 +709,23 @@ def _fix_json_control_chars(json_str: str) -> str:
             continue
         
         if in_string:
-            # Inside a string, escape control characters that aren't already escaped
+            # Inside a string, escape control characters and problematic chars that aren't already escaped
             if char == '\n':
                 result.append('\\n')
             elif char == '\r':
                 result.append('\\r')
             elif char == '\t':
                 result.append('\\t')
+            elif char == '`':
+                # Escape backticks (common in markdown code blocks)
+                result.append('\\`')
+            elif char == '\b':
+                result.append('\\b')
+            elif char == '\f':
+                result.append('\\f')
             elif ord(char) < 32:
-                # Other control characters - replace with space to avoid breaking JSON
-                result.append(' ')
+                # Other control characters - escape as unicode or replace with space
+                result.append(f'\\u{ord(char):04x}')
             else:
                 result.append(char)
         else:
@@ -737,11 +749,50 @@ def _parse_adaptive_decision(raw_text: str) -> AdaptiveChatResponse:
         logger.error(f"Could not extract JSON from adaptive router response")
         logger.error(f"Raw response (first 1000 chars): {raw_text[:1000]}")
         # Try one more time with a more aggressive search
-        # Look for any JSON-like structure
-        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', raw_text, re.DOTALL)
+        # Look for JSON object that contains "answer" and "decision" fields (not CSS or other code)
+        # First try to find JSON with both required fields
+        json_match = re.search(r'\{[^{}]*"(?:answer|decision)"[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', raw_text, re.DOTALL | re.IGNORECASE)
         if json_match:
-            cleaned = json_match.group(0)
-            logger.info("Found JSON using aggressive regex search")
+            # Verify it has both fields
+            match_text = json_match.group(0)
+            if '"answer"' in match_text.lower() and '"decision"' in match_text.lower():
+                cleaned = match_text
+                logger.info("Found JSON using aggressive regex search with answer and decision fields")
+            else:
+                # Try to find the outermost JSON object that contains both fields
+                # Look for JSON starting with { and containing both answer and decision
+                start_idx = raw_text.find('{')
+                if start_idx != -1:
+                    # Find matching closing brace by counting braces
+                    brace_count = 0
+                    in_string = False
+                    escape_next = False
+                    for i in range(start_idx, len(raw_text)):
+                        char = raw_text[i]
+                        if escape_next:
+                            escape_next = False
+                            continue
+                        if char == '\\':
+                            escape_next = True
+                            continue
+                        if char == '"':
+                            in_string = not in_string
+                            continue
+                        if not in_string:
+                            if char == '{':
+                                brace_count += 1
+                            elif char == '}':
+                                brace_count -= 1
+                                if brace_count == 0:
+                                    candidate = raw_text[start_idx:i+1]
+                                    if '"answer"' in candidate.lower() and '"decision"' in candidate.lower():
+                                        cleaned = candidate
+                                        logger.info("Found JSON by matching braces with answer and decision fields")
+                                        break
+                    if not cleaned:
+                        # Fallback: use the regex match anyway
+                        cleaned = match_text
+                        logger.info("Found JSON using aggressive regex search (fallback)")
         else:
             raise HTTPException(status_code=500, detail="Adaptive router returned empty or invalid response. Expected JSON format with 'answer' and 'decision' fields.")
     
@@ -756,20 +807,55 @@ def _parse_adaptive_decision(raw_text: str) -> AdaptiveChatResponse:
         logger.error(f"Fixed JSON (first 500 chars): {fixed_json[:500]}")
         logger.error(f"Cleaned text (first 500 chars): {cleaned[:500]}")
         logger.error(f"Raw text (first 500 chars): {raw_text[:500]}")
-        # Try to extract JSON more aggressively
+        # Try to extract JSON more aggressively using brace matching
         try:
-            # Look for JSON object in the text
+            # Find the outermost JSON object by matching braces properly
             json_start = fixed_json.find('{')
-            json_end = fixed_json.rfind('}') + 1
-            if json_start != -1 and json_end > json_start:
+            if json_start == -1:
+                raise HTTPException(status_code=500, detail=f"Adaptive router returned invalid JSON: {str(exc)}")
+            
+            # Find matching closing brace by counting braces (respecting strings)
+            brace_count = 0
+            in_string = False
+            escape_next = False
+            json_end = -1
+            
+            for i in range(json_start, len(fixed_json)):
+                char = fixed_json[i]
+                if escape_next:
+                    escape_next = False
+                    continue
+                if char == '\\':
+                    escape_next = True
+                    continue
+                if char == '"':
+                    in_string = not in_string
+                    continue
+                if not in_string:
+                    if char == '{':
+                        brace_count += 1
+                    elif char == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            json_end = i + 1
+                            break
+            
+            if json_end > json_start:
                 extracted = fixed_json[json_start:json_end]
                 # Fix control chars again on extracted portion
                 extracted = _fix_json_control_chars(extracted)
-                payload = json.loads(extracted)
-                logger.info("Successfully extracted and fixed JSON after retry")
+                # Verify it contains required fields before trying to parse
+                if '"answer"' in extracted.lower() and '"decision"' in extracted.lower():
+                    payload = json.loads(extracted)
+                    logger.info("Successfully extracted and fixed JSON after retry with brace matching")
+                else:
+                    raise HTTPException(status_code=500, detail=f"Adaptive router returned invalid JSON: extracted JSON missing required fields (answer/decision)")
             else:
                 raise HTTPException(status_code=500, detail=f"Adaptive router returned invalid JSON: {str(exc)}")
         except (json.JSONDecodeError, HTTPException) as retry_exc:
+            # If it's already an HTTPException, re-raise it
+            if isinstance(retry_exc, HTTPException):
+                raise retry_exc
             raise HTTPException(status_code=500, detail=f"Adaptive router returned invalid JSON: {str(exc)}")
 
     if not isinstance(payload, dict):

@@ -1,11 +1,17 @@
 # Caddy v2 with Cloudflare DNS module
 
 irisvision.ai, www.irisvision.ai {
-	# Disable compression for SSE streaming endpoints (prevents buffering delays)
+	# Disable compression and buffering for SSE streaming endpoints (prevents buffering delays)
 	@sse path /api/chat/*/stream /api/agent-run/*/stream /api/simple/*/stream
 	reverse_proxy @sse backend:8000 {
 		header -Content-Encoding
 		header -Accept-Encoding
+		# Critical: Flush immediately for streaming responses (disable buffering)
+		# -1 means flush on every write, enabling real-time streaming
+		flush_interval -1
+		# Ensure response headers prevent buffering
+		header_down X-Accel-Buffering "no"
+		header_down Cache-Control "no-cache"
 	}
 	
 	# Enable compression for other endpoints
@@ -22,7 +28,10 @@ irisvision.ai, www.irisvision.ai {
 
 	# API + WebSockets → backend
 	@api path /api/* /ws/*
-	reverse_proxy @api backend:8000
+	reverse_proxy @api backend:8000 {
+		# For non-streaming endpoints, use default buffering
+		# But ensure streaming endpoints are handled by @sse matcher above
+	}
 
 	# Everything else → frontend (Next.js)
 	reverse_proxy frontend:3000
