@@ -87,17 +87,17 @@ QUICK_CHAT_SYSTEM_PROMPT = """You are Iris Quick Chat.
 - If the user asks for Iris Intelligence mode, politely suggest switching modes but stay lightweight.
 - Keep tone confident, friendly, and focused on the key information the user needs right now."""
 
-ADAPTIVE_ROUTER_PROMPT = """You are Iris Adaptive Mode Router. Answer the user's question FIRST, then make a routing decision.
+ADAPTIVE_ROUTER_PROMPT = """You are Iris Adaptive Mode Router. Answer user's question FIRST, then route.
 
 STEP 1: ANSWER BRILLIANTLY
-Provide a comprehensive, accurate answer that fully addresses the question. When NOT choosing agent_needed, give an exceptional answer.
+Provide comprehensive, accurate answer fully addressing question. When NOT choosing agent_needed, give exceptional answer.
 
 **Answer Requirements:**
 - Direct, complete, accurate (verify facts)
 - Include facts, figures, statistics, dates when relevant
-- Use rich markdown formatting (tables, headings, lists, emphasis, code blocks)
-- **TABLES ARE MANDATORY** for: comparisons, structured data, rankings, multi-attribute lists
-- Don't use bullet lists when tables would be clearer
+- Use rich markdown: tables, headings, lists, emphasis, code blocks
+- **TABLES MANDATORY** for: comparisons, structured data, rankings, multi-attribute lists
+- Use tables instead of bullet lists when clearer
 
 **Formatting:**
 - Tables: | Item | Attribute 1 | Attribute 2 | for comparisons/rankings/data
@@ -106,12 +106,10 @@ Provide a comprehensive, accurate answer that fully addresses the question. When
 - Emphasis: **bold** key terms, *italics* for emphasis, `code` for technical terms
 
 STEP 2: ROUTING DECISION
-After answering, analyze and route. Don't ask when the answer is clear.
+After answering, analyze and route. Don't ask when answer is clear.
 
 === AUTO-TRIGGER AGENT MODE (agent_needed, 0.9+) ===
 MUST trigger agent mode - DO NOT ask:
-
-**Clear Deliverables:**
 - "create/build/make" + website/app/report/slides → agent_needed (0.95+)
 - "create intense research report" / "do deep research" → agent_needed (0.95+)
 - "deep"/"intense"/"comprehensive" + research/analysis → agent_needed (0.95+)
@@ -122,10 +120,9 @@ MUST trigger agent mode - DO NOT ask:
 Stay in chat mode with BRILLIANT answers:
 - "what/how/why/explain" queries → agent_not_needed (0.9+)
 - Clarifications, follow-ups → agent_not_needed (0.95+)
-- Must include facts, figures, tables for comparisons/rankings
+- Include facts, figures, tables for comparisons/rankings
 
 === AMBIGUOUS MODE (ask_user, 0.5-0.7) ===
-**WHAT IS AMBIGUOUS MODE?**
 Grey area where request could be satisfied TWO ways:
 1. **Instant Answer**: Quick response (satisfies immediate need)
 2. **Agentic Work**: Deep research/analysis (goes beyond simple answer)
@@ -139,7 +136,7 @@ Grey area where request could be satisfied TWO ways:
 1. Genuinely ambiguous - could be quick answer OR deep work
 2. NO "create"/"build"/"make"/"deep"/"intense"/"comprehensive" keywords
 3. NO clear deliverable (website/report/slides/app)
-4. Your instant answer fully satisfies, but agentic work adds value
+4. Instant answer fully satisfies, but agentic work adds value
 
 **APPROACH:**
 1. Provide BRILLIANT complete answer (facts, figures, tables)
@@ -179,12 +176,12 @@ Grey area where request could be satisfied TWO ways:
 - MUST include ask_user object with prompt/yes_label/no_label
 
 CRITICAL JSON FORMAT REQUIREMENTS:
-- You MUST return ONLY valid JSON, nothing else
+- Return ONLY valid JSON, nothing else
 - NO markdown code fences (no ```json or ```)
-- NO explanatory text before or after the JSON
-- NO code examples outside the JSON
-- Start your response with { and end with }
-- The "answer" field should contain your markdown-formatted answer as a JSON string (properly escaped)
+- NO explanatory text before or after JSON
+- NO code examples outside JSON
+- Start response with { and end with }
+- "answer" field contains markdown-formatted answer as JSON string (properly escaped)
 
 JSON structure (strict JSON, no markdown fences, no extra text):
 {"answer": "<beautifully formatted markdown answer with tables/headings/lists>", "decision": {"state": "agent_needed|agent_not_needed|ask_user", "confidence": 0.0-1.0, "reason": "<bullet points>", "agent_preface": "I'll continue in Iris Intelligence mode.", "ask_user": {"prompt": "<short snappy question>", "yes_label": "Yes, continue", "no_label": "No, I'm fine"}, "metadata": {"suggested_tools": [], "urgency": "low|medium|high"}}}
@@ -336,20 +333,13 @@ async def _build_history(
     
     If thread_id is provided, loads and compresses messages from the thread.
     Otherwise, uses chat_context if provided.
+    
+    NOTE: System instructions are NOT added here - they should be passed as
+    system_instruction parameter to GenerativeModel, not as user messages.
     """
     conversation_history: List[Dict] = []
 
     resolved_instructions = system_instructions or request.system_instructions
-
-    if resolved_instructions:
-        conversation_history.append({
-            "role": "user",
-            "parts": [{"text": f"System Instructions: {resolved_instructions}"}]
-        })
-        conversation_history.append({
-            "role": "model",
-            "parts": [{"text": "Understood. I will follow these instructions."}]
-        })
 
     # Priority: thread_id > chat_context
     if request.thread_id:
@@ -480,13 +470,18 @@ async def fast_gemini_chat_non_streaming(
         )
         user_parts = _build_user_parts(request.message, request.attachments)
 
-        # Create model and generate response
+        # Resolve system instructions (request override takes precedence, then default prompt)
+        resolved_instructions = request.system_instructions or QUICK_CHAT_SYSTEM_PROMPT
+
+        # Create model with proper system instructions (full prompt passed as system_instruction)
         model = genai.GenerativeModel(
             request.model,
+            system_instruction=resolved_instructions,
             generation_config={
                 "temperature": FAST_CHAT_TEMPERATURE,
             },
         )
+        logger.debug(f"[Quick Chat] Using system instructions (length: {len(resolved_instructions)} chars)")
         chat = model.start_chat(history=conversation_history)
         response = chat.send_message({
             "role": "user",
@@ -526,12 +521,18 @@ async def fast_gemini_chat_streaming(
             )
             user_parts = _build_user_parts(request.message, request.attachments)
 
+            # Resolve system instructions (request override takes precedence, then default prompt)
+            resolved_instructions = request.system_instructions or QUICK_CHAT_SYSTEM_PROMPT
+
+            # Create model with proper system instructions (full prompt passed as system_instruction)
             model = genai.GenerativeModel(
                 request.model,
+                system_instruction=resolved_instructions,
                 generation_config={
                     "temperature": FAST_CHAT_TEMPERATURE,
                 },
             )
+            logger.debug(f"[Quick Chat Stream] Using system instructions (length: {len(resolved_instructions)} chars)")
             chat = model.start_chat(history=conversation_history)
             
             # Stream response
@@ -963,15 +964,22 @@ async def run_adaptive_router(
     )
     user_parts = _build_user_parts(request.message, request.attachments)
 
+    # Resolve system instructions (request override takes precedence, then default prompt)
+    resolved_instructions = request.system_instructions or ADAPTIVE_ROUTER_PROMPT
+
     # Force JSON output by using response_mime_type
+    # Full prompt passed as system_instruction (not as user message)
+    # Optimized: removed top_p for faster generation
     model = genai.GenerativeModel(
         request.model,
+        system_instruction=resolved_instructions,
         generation_config={
             "temperature": ADAPTIVE_TEMPERATURE,
-            "top_p": 0.9,
+            # Removed top_p for faster generation
             "response_mime_type": "application/json",
         },
     )
+    logger.debug(f"[Adaptive] Using system instructions (length: {len(resolved_instructions)} chars)")
     chat = model.start_chat(history=conversation_history)
     response = chat.send_message({
         "role": "user",
@@ -1025,23 +1033,28 @@ async def adaptive_chat_stream(
             # CRITICAL: Start API call IMMEDIATELY - don't wait for anything!
             user_parts = _build_user_parts(request.message, request.attachments)
             
-            # Prepare model and system instructions (no async work needed)
-            resolved_instructions = ADAPTIVE_ROUTER_PROMPT or request.system_instructions
-            model = genai.GenerativeModel(
-                request.model,
-                system_instruction=resolved_instructions if resolved_instructions else None,
-                generation_config={
-                    "temperature": ADAPTIVE_TEMPERATURE,
-                    "top_p": 0.9,
-                    # REMOVED: response_mime_type - no JSON mode for faster generation
-                },
-            )
+            # Resolve system instructions (request override takes precedence, then default prompt)
+            resolved_instructions = request.system_instructions or ADAPTIVE_ROUTER_PROMPT
             
+            # Build conversation history (system instructions NOT added as user messages)
             conversation_history = await _build_history(
                 request, 
                 system_instructions=ADAPTIVE_ROUTER_PROMPT,
                 user_id=user_id
             )
+            
+            # Create model with proper system instructions (full prompt passed as system_instruction, not as user messages)
+            # Optimized: removed top_p for faster generation, kept temperature for quality
+            model = genai.GenerativeModel(
+                request.model,
+                system_instruction=resolved_instructions,
+                generation_config={
+                    "temperature": ADAPTIVE_TEMPERATURE,
+                    # Removed top_p for faster generation
+                    # REMOVED: response_mime_type - no JSON mode for faster generation
+                },
+            )
+            logger.debug(f"[Adaptive Stream] Using system instructions (length: {len(resolved_instructions)} chars)")
 
             # Stream directly from Gemini with JSON mode
             chat = model.start_chat(history=conversation_history)
@@ -1094,9 +1107,14 @@ async def adaptive_chat_stream(
                             raw_answer, raw_answer_processed_idx
                         )
                         if decoded_delta:
-                            # Filter out decision object text
-                            cleaned_delta = re.sub(r',\s*decision\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', '', decoded_delta, flags=re.IGNORECASE)
-                            cleaned_delta = re.sub(r'decision\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', '', cleaned_delta, flags=re.IGNORECASE)
+                            # Optimized: Only run regex if we detect potential decision text (check for "decision" keyword first)
+                            # This avoids expensive regex on every chunk when decision text isn't present
+                            if 'decision' in decoded_delta.lower() or '}' in decoded_delta:
+                                # Filter out decision object text only when needed
+                                cleaned_delta = re.sub(r',\s*decision\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', '', decoded_delta, flags=re.IGNORECASE)
+                                cleaned_delta = re.sub(r'decision\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', '', cleaned_delta, flags=re.IGNORECASE)
+                            else:
+                                cleaned_delta = decoded_delta
                             
                             if cleaned_delta:
                                 # STREAM IMMEDIATELY - zero latency!
