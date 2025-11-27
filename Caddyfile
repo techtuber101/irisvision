@@ -4,15 +4,15 @@ irisvision.ai, www.irisvision.ai {
 	# Disable compression and buffering for SSE streaming endpoints (prevents buffering delays)
 	@sse path /api/chat/*/stream /api/agent-run/*/stream /api/simple/*/stream
 	reverse_proxy @sse backend:8000 {
-		header -Content-Encoding
-		header -Accept-Encoding
 		# Critical: Flush immediately for streaming responses (disable buffering)
 		# -1 means flush on every write, enabling real-time streaming
 		flush_interval -1
-		# Ensure response headers prevent buffering
-		header_down X-Accel-Buffering "no"
-		header_down Cache-Control "no-cache"
 	}
+	# Remove compression headers and set streaming headers for SSE endpoints
+	header @sse -Content-Encoding
+	header @sse -Accept-Encoding
+	header @sse X-Accel-Buffering "no"
+	header @sse Cache-Control "no-cache"
 	
 	# Enable compression for other endpoints
 	@not_sse not path /api/chat/*/stream /api/agent-run/*/stream /api/simple/*/stream
