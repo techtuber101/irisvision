@@ -166,11 +166,14 @@ export function MaintenancePage() {
 
           <div className="pt-4 border-t border-border/50 w-full max-w-xl text-center">
             <p className="text-sm text-muted-foreground">
-              {isLocalMode() ? (
-                "Need help? Check the documentation for setup instructions."
-              ) : (
-                "For urgent matters, please contact our support team."
-              )}
+              <a 
+                href="https://status.irisvision.ai" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                Check latest status at status.irisvision.ai
+              </a>
             </p>
           </div>
 

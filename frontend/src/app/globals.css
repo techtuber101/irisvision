@@ -1437,3 +1437,57 @@
   mix-blend-mode: overlay;
   border-radius: inherit;
 }
+
+/* Adaptive Mode Loader */
+.adaptive-loader {
+  width: 20px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.15);
+  animation: adaptive-loader-pulse 1.5s infinite linear;
+  position: relative;
+}
+
+.adaptive-loader:before,
+.adaptive-loader:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.15);
+  animation: inherit;
+  animation-delay: -0.5s;
+}
+
+.adaptive-loader:after {
+  animation-delay: -1s;
+}
+
+@keyframes adaptive-loader-pulse {
+  100% {
+    box-shadow: 0 0 0 40px transparent;
+  }
+}
+
+/* Light mode specific adjustments for adaptive loader */
+.light .adaptive-loader {
+  background: oklch(0.205 0 0);
+  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.12);
+}
+
+.light .adaptive-loader:before,
+.light .adaptive-loader:after {
+  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.12);
+}
+
+/* Dark mode specific adjustments for adaptive loader */
+.dark .adaptive-loader {
+  background: oklch(0.985 0 0);
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.25);
+}
+
+.dark .adaptive-loader:before,
+.dark .adaptive-loader:after {
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.25);
+}

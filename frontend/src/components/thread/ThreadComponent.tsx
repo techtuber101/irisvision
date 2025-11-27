@@ -6,6 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { motion } from 'framer-motion';
 import { useSearchParams } from 'next/navigation';
 import { BillingError, AgentRunLimitError, ProjectLimitError } from '@/lib/api';
 import { toast } from 'sonner';
@@ -54,11 +55,111 @@ import { useQueryClient } from '@tanstack/react-query';
 import { threadKeys } from '@/hooks/react-query/threads/keys';
 import { threadKeys as sidebarThreadKeys } from '@/hooks/react-query/sidebar/keys';
 import { useProjectRealtime } from '@/hooks/useProjectRealtime';
-import { fastGeminiChatStream, adaptiveChatStream, type AdaptiveDecision } from '@/lib/fast-gemini-chat';
+import {
+  fastGeminiChatStream,
+  adaptiveChatStream,
+  type AdaptiveDecision,
+  GEMINI_FAST_MODEL,
+} from '@/lib/fast-gemini-chat';
 import { handleGoogleSlidesUpload } from './tool-views/utils/presentation-utils';
 import { FloatingToolPreview, ToolCallInput } from '@/components/thread/chat-input/floating-tool-preview';
 import { Check, X, Timer } from 'lucide-react';
 import { useSimpleChatStreamStore } from '@/lib/stores/simple-chat-stream-store';
+
+const ADAPTIVE_PROMPT_COUNTDOWN = 30;
+const ADAPTIVE_AGENTIC_DIRECTIVE = [
+  'ADAPTIVE ESCALATION DIRECTIVE:',
+  'Restart the entire task from the start.',
+  'Ignore the lightweight adaptive response above—you are now the Iris Intelligence agent assigned to execute the user\u2019s request end-to-end with full planning, tooling, and deliverables.',
+  'Treat the restated user request below as your mission and re-run everything from scratch.'
+].join('\n');
+
+const sanitizeStreamChunk = (chunk: string) => {
+  if (!chunk) return '';
+  return chunk
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\\t/g, '\t')
+    .replace(/\\n/g, '\n');
+};
+
+const createStreamingAccumulator = (
+  updateStreamingContent: (content: string) => void,
+) => {
+  let renderedContent = '';
+  let tableBuffer = '';
+  let isTableMode = false;
+
+  const emit = () => {
+    const payload = isTableMode
+      ? renderedContent + tableBuffer
+      : renderedContent;
+    updateStreamingContent(payload);
+  };
+
+  const tryCompleteTable = () => {
+    if (!isTableMode) return;
+    if (/\n\s*\n/.test(tableBuffer)) {
+      renderedContent += tableBuffer;
+      tableBuffer = '';
+      isTableMode = false;
+      emit();
+    }
+  };
+
+  const processChunk = (rawChunk: string) => {
+    const chunk = sanitizeStreamChunk(rawChunk);
+    if (!chunk) return;
+
+    if (!isTableMode && chunk.includes('|')) {
+      const combined = renderedContent + chunk;
+      const lastPipeIndex = combined.lastIndexOf('|');
+      if (lastPipeIndex !== -1) {
+        const lastNewline = combined.lastIndexOf('\n', lastPipeIndex);
+        const tableStartIndex = lastNewline === -1 ? 0 : lastNewline + 1;
+        renderedContent = combined.slice(0, tableStartIndex);
+        tableBuffer = combined.slice(tableStartIndex);
+        isTableMode = true;
+        emit();
+        tryCompleteTable();
+        return;
+      }
+    }
+
+    if (isTableMode) {
+      tableBuffer += chunk;
+      emit();
+      tryCompleteTable();
+      return;
+    }
+
+    renderedContent += chunk;
+    emit();
+  };
+
+  const finalize = () => {
+    if (tableBuffer) {
+      renderedContent += tableBuffer;
+      tableBuffer = '';
+      isTableMode = false;
+    }
+    return renderedContent;
+  };
+
+  return { processChunk, finalize };
+};
+
+const shouldHandOffToAgent = (decision?: AdaptiveDecision | null) =>
+  Boolean(
+    decision && String(decision.state).toLowerCase() === 'agent_needed',
+  );
+
+const buildHandOffMessage = (decision?: AdaptiveDecision | null) => {
+  const reason = decision?.reason?.trim();
+  return `Switching to Iris Intelligence Mode for deeper work.${
+    reason ? `\n\nWhy: ${reason}` : ''
+  }`;
+};
 
 
 interface ThreadComponentProps {
@@ -154,6 +255,8 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const titleGenerationTriggeredRef = useRef<boolean>(false); // Track if title generation has been triggered
   const previousToolCallCountRef = useRef<number>(0);
   const processedServerAdaptiveMessagesRef = useRef<Set<string>>(new Set());
+  const adaptiveAutoTriggerRef = useRef(false);
+  const lastAdaptivePromptRef = useRef<typeof adaptivePrompt>(null);
 
   // Sidebar
   const { state: leftSidebarState, setOpen: setLeftSidebarOpen } = useSidebar();
@@ -607,6 +710,12 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     }
     
     try {
+      const escalationDirective = `${ADAPTIVE_AGENTIC_DIRECTIVE}\n\nUSER REQUEST TO EXECUTE FROM SCRATCH:\n${originalMessage}`;
+      await addUserMessageMutation.mutateAsync({
+        threadId,
+        message: escalationDirective,
+      });
+
       // Ensure message is fully persisted before starting agent
       // Wait a small delay to ensure database commit
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -667,7 +776,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
 
       toast.error(error instanceof Error ? error.message : 'Failed to start agent');
     }
-  }, [startAgentMutation, threadId, selectedAgentId, setUserInitiatedRun, setAgentRunId, triggerTitleGeneration, setBillingData, setShowBillingAlert, setAgentLimitData, setShowAgentLimitDialog]);
+  }, [startAgentMutation, threadId, selectedAgentId, setUserInitiatedRun, setAgentRunId, triggerTitleGeneration, setBillingData, setShowBillingAlert, setAgentLimitData, setShowAgentLimitDialog, addUserMessageMutation]);
 
   const derivedSimpleChatLoading =
     isSimpleChatLoading ||
@@ -891,56 +1000,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
             };
 
             try {
-              let streamedContent = '';
-              let renderedContent = '';
-              let isTableMode = false;
-              let tableBuffer = '';
-
-              const processChunk = (chunk: string) => {
-                streamedContent += chunk;
-                if (!isTableMode && chunk.includes('|')) {
-                  isTableMode = true;
-                  const lastPipeIndex = streamedContent.lastIndexOf('|');
-                  if (lastPipeIndex > 0) {
-                    const beforePipe = streamedContent.substring(0, lastPipeIndex);
-                    const lineStart = beforePipe.lastIndexOf('\n') + 1;
-                    renderedContent = streamedContent.substring(0, lineStart);
-                    tableBuffer = streamedContent.substring(lineStart);
-                  } else {
-                    tableBuffer = chunk;
-                  }
-                }
-
-                if (isTableMode) {
-                  tableBuffer += chunk;
-                  const hasDoubleNewline = tableBuffer.includes('\n\n');
-                  const lines = tableBuffer.split('\n');
-                  const lastLine = lines[lines.length - 1] || '';
-                  const isEmptyLine = lastLine.trim() === '';
-
-                  if (hasDoubleNewline || (lines.length > 1 && isEmptyLine)) {
-                    renderedContent += tableBuffer;
-                    tableBuffer = '';
-                    isTableMode = false;
-                    updateStreamingContent(renderedContent);
-                  } else {
-                    updateStreamingContent(renderedContent);
-                  }
-                } else {
-                  renderedContent += chunk;
-                  updateStreamingContent(renderedContent);
-                }
-              };
-
-              const finalizeContent = () => {
-                if (isTableMode && tableBuffer) {
-                  renderedContent += tableBuffer;
-                  tableBuffer = '';
-                  isTableMode = false;
-                }
-                return renderedContent || streamedContent;
-              };
-
+              const { processChunk, finalize } = createStreamingAccumulator(
+                updateStreamingContent,
+              );
               let adaptiveDecision: AdaptiveDecision | null = null;
 
               await adaptiveChatStream(
@@ -957,17 +1019,22 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
                     throw new Error(error);
                   },
                 },
-                'gemini-2.5-flash',
+                GEMINI_FAST_MODEL,
                 undefined,
                 undefined,
                 threadId
               );
 
-              const finalContent = finalizeContent().trim() || 'No response provided.';
+              const rawFinalContent = finalize().trim() || 'No response provided.';
+              const handoff = shouldHandOffToAgent(adaptiveDecision);
+              const finalContent = handoff
+                ? buildHandOffMessage(adaptiveDecision)
+                : rawFinalContent;
               const metadataPayload = {
                 chat_mode: 'adaptive',
                 is_streaming: false,
                 decision: adaptiveDecision || undefined,
+                handed_off: handoff || undefined,
               };
               await persistAssistantResponse(finalContent, metadataPayload);
 
@@ -1106,68 +1173,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
           };
 
           try {
-            // Table buffering state
-            let isTableMode = false;
-            let tableBuffer = '';
-            let renderedContent = '';
-            let streamedContent = '';
-
-            // Helper to process chunks with table buffering
-            const processChunk = (chunk: string) => {
-              streamedContent += chunk;
-
-              // Detect if we're entering table mode - look for pipe character
-              if (!isTableMode && chunk.includes('|')) {
-                isTableMode = true;
-                // Find where table starts in accumulated content
-                const lastPipeIndex = streamedContent.lastIndexOf('|');
-                if (lastPipeIndex > 0) {
-                  // Find the start of the line containing the pipe
-                  const beforePipe = streamedContent.substring(0, lastPipeIndex);
-                  const lineStart = beforePipe.lastIndexOf('\n') + 1;
-                  renderedContent = streamedContent.substring(0, lineStart);
-                  tableBuffer = streamedContent.substring(lineStart);
-                } else {
-                  tableBuffer = chunk;
-                }
-              }
-
-              if (isTableMode) {
-                tableBuffer += chunk;
-
-                // Detect end of table: double newline or empty line
-                const hasDoubleNewline = tableBuffer.includes('\n\n');
-                const lines = tableBuffer.split('\n');
-                const lastLine = lines[lines.length - 1] || '';
-                const isEmptyLine = lastLine.trim() === '';
-
-                // Table is complete if we have double newline or empty line after table content
-                if (hasDoubleNewline || (lines.length > 1 && isEmptyLine)) {
-                  // Render the complete table
-                  renderedContent += tableBuffer;
-                  tableBuffer = '';
-                  isTableMode = false;
-                  updateStreamingContent(renderedContent);
-                } else {
-                  // Still building table - show content up to the table start
-                  updateStreamingContent(renderedContent);
-                }
-              } else {
-                // Not in table mode - render immediately
-                renderedContent += chunk;
-                updateStreamingContent(renderedContent);
-              }
-            };
-
-            // Finalize any remaining table buffer
-            const finalizeContent = () => {
-              if (isTableMode && tableBuffer) {
-                renderedContent += tableBuffer;
-                tableBuffer = '';
-                isTableMode = false;
-              }
-              return renderedContent || streamedContent;
-            };
+            const { processChunk, finalize } = createStreamingAccumulator(
+              updateStreamingContent,
+            );
 
             if (mode === 'chat') {
               await fastGeminiChatStream(
@@ -1181,13 +1189,13 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
                     throw new Error(error);
                   },
                 },
-                'gemini-2.5-flash',
+                GEMINI_FAST_MODEL,
                 undefined,
                 undefined,  // chatContext - not needed when thread_id is provided
                 threadId  // Pass thread_id for context compression
               );
 
-              const finalContent = finalizeContent().trim() || 'No response provided.';
+              const finalContent = finalize().trim() || 'No response provided.';
               const metadataPayload = {
                 chat_mode: mode,
                 is_streaming: false,
@@ -1214,17 +1222,22 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
                     throw new Error(error);
                   },
                 },
-                'gemini-2.5-flash',
+                GEMINI_FAST_MODEL,
                 undefined,
                 undefined,  // chatContext - not needed when thread_id is provided
                 threadId  // Pass thread_id for context compression
               );
 
-              const finalContent = finalizeContent().trim() || 'No response provided.';
+              const rawFinalContent = finalize().trim() || 'No response provided.';
+              const handoff = shouldHandOffToAgent(adaptiveDecision);
+              const finalContent = handoff
+                ? buildHandOffMessage(adaptiveDecision)
+                : rawFinalContent;
               const metadataPayload = {
                 chat_mode: mode,
                 is_streaming: false,
                 decision: adaptiveDecision || undefined,
+                handed_off: handoff || undefined,
               };
               await persistAssistantResponse(finalContent, metadataPayload);
 
@@ -1462,20 +1475,22 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   );
 
   const handleAdaptivePromptConfirm = useCallback(async () => {
-    if (!adaptivePrompt) {
+    const promptData = adaptivePrompt || lastAdaptivePromptRef.current;
+    if (!promptData) {
       console.warn('[Adaptive] Confirm clicked but no prompt available');
       return;
     }
+    adaptiveAutoTriggerRef.current = true;
     
-    console.log('[Adaptive] User confirmed - starting agent with options:', adaptivePrompt.options);
-    const options = adaptivePrompt.options;
+    console.log('[Adaptive] User confirmed - starting agent with options:', promptData.options);
+    const options = promptData.options;
     
     // Clear countdown and prompt immediately to provide feedback
     setCountdown(null);
     setAdaptivePrompt(null);
     
     try {
-      await startAgentFromAdaptiveDecision(adaptivePrompt.message, options);
+      await startAgentFromAdaptiveDecision(promptData.message, options);
       console.log('[Adaptive] Agent started successfully after user confirmation');
     } catch (error) {
       console.error('[Adaptive] Failed to start agent after confirmation:', error);
@@ -1490,42 +1505,50 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     setAdaptivePrompt(null);
   }, []);
 
-  // Auto-trigger countdown timer for adaptive prompts
+  // Auto-trigger countdown timer for adaptive prompts (no longer escalates automatically)
   useEffect(() => {
     if (!adaptivePrompt) {
       setCountdown(null);
+      adaptiveAutoTriggerRef.current = false;
       return;
     }
 
-    // Start countdown at 30 seconds
-    setCountdown(30);
+    adaptiveAutoTriggerRef.current = false;
+    setCountdown(ADAPTIVE_PROMPT_COUNTDOWN);
+    const countdownEnd = Date.now() + ADAPTIVE_PROMPT_COUNTDOWN * 1000;
 
     const interval = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev === null) {
-          clearInterval(interval);
-          return null;
-        }
-        
-        if (prev <= 1) {
-          clearInterval(interval);
-          // Auto-trigger "Yes, continue" after countdown reaches 0
-          console.log('[Adaptive] Auto-triggering agent mode after countdown reached 0');
-          // Use setTimeout to ensure state is updated before triggering
-          setTimeout(() => {
-            handleAdaptivePromptConfirm();
-          }, 0);
-          return 0;
-        }
-        
-        return prev - 1;
-      });
+      const remaining = Math.max(
+        0,
+        Math.ceil((countdownEnd - Date.now()) / 1000),
+      );
+      setCountdown(remaining);
+
+      if (remaining <= 0 && !adaptiveAutoTriggerRef.current) {
+        adaptiveAutoTriggerRef.current = true;
+        console.log('[Adaptive] Countdown expired - dismissing prompt without auto-escalation');
+        setAdaptivePrompt(null);
+        setCountdown(null);
+        clearInterval(interval);
+      }
     }, 1000);
 
-    return () => {
-      clearInterval(interval);
-    };
-  }, [adaptivePrompt, handleAdaptivePromptConfirm]);
+    return () => clearInterval(interval);
+  }, [adaptivePrompt]);
+
+  useEffect(() => {
+    lastAdaptivePromptRef.current = adaptivePrompt;
+  }, [adaptivePrompt]);
+
+  useEffect(() => {
+    if (
+      adaptivePrompt &&
+      (agentStatus === 'running' || agentStatus === 'connecting')
+    ) {
+      setAdaptivePrompt(null);
+      setCountdown(null);
+    }
+  }, [adaptivePrompt, agentStatus]);
 
   const toolViewAssistant = useCallback(
     (assistantContent?: string, toolContent?: string) => {
@@ -1905,13 +1928,16 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   }
 
   const adaptivePromptBubble = adaptivePrompt ? (
-    <div className="w-full pointer-events-auto">
-      <div 
+    <motion.div
+      className="w-full pointer-events-auto"
+      initial={{ opacity: 0, y: 12, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.35, ease: 'easeOut' }}
+    >
+      <motion.div 
         className="relative rounded-[32px] bg-[rgba(255,255,255,0.25)] dark:bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl py-5 px-4 space-y-3 overflow-hidden min-h-0"
-        style={{ 
-          animation: 'breathe-3d 3s ease-in-out infinite',
-          transform: 'translateY(0px)'
-        }}
+        animate={{ y: -4 }}
+        transition={{ duration: 4, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' }}
       >
         {/* Dark mode gradient rim - inset only */}
         <div
@@ -2020,8 +2046,14 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
                 }}
               />
               <Check className="w-3.5 h-3.5 text-green-500/70 dark:text-green-500/70 light:text-green-600/80 relative z-10" />
-              <span className="relative z-10">
-                {countdown !== null && countdown > 0 ? `${adaptivePrompt.yesLabel} (${countdown}s)` : adaptivePrompt.yesLabel}
+              <span className="relative z-10 flex items-center gap-2">
+                <span>{adaptivePrompt.yesLabel}</span>
+                {countdown !== null && (
+                  <span className="flex items-center gap-1 text-[11px] font-medium text-white/80 dark:text-white/80 light:text-zinc-800">
+                    <Timer className="w-3 h-3" />
+                    {countdown}s
+                  </span>
+                )}
               </span>
             </button>
             <button
@@ -2064,8 +2096,8 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   ) : null;
 
   if (compact) {

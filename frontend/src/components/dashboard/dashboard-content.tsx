@@ -38,8 +38,9 @@ import { Calendar, MessageSquare, Plus, Sparkles, Zap, Shapes, Settings, Home, B
 import { AgentConfigurationDialog } from '@/components/agents/agent-configuration-dialog';
 import { fastGeminiChat, adaptiveChatStream, type AdaptiveDecision } from '@/lib/fast-gemini-chat';
 import { addAssistantMessage } from '@/lib/api';
-import { simpleChat, simpleChatStream } from '@/lib/simple-chat';
+import { simpleChatStream } from '@/lib/simple-chat';
 import { useTheme } from 'next-themes';
+import { useChatSessionManager, type ChatSessionHandle } from '@/hooks/use-chat-session-manager';
 
 const PENDING_PROMPT_KEY = 'pendingAgentPrompt';
 
@@ -62,6 +63,7 @@ export function DashboardContent() {
   const [menuAnimate, setMenuAnimate] = useState(false);
   const controlMenuRef = useRef<HTMLDivElement>(null);
   const { theme, resolvedTheme, setTheme } = useTheme();
+  const { createSession } = useChatSessionManager();
   
   // Update time every minute
   React.useEffect(() => {
@@ -195,12 +197,27 @@ export function DashboardContent() {
         let threadId: string | null = null;
         let projectId: string | null = null;
         let hasRedirected = false;
+        let sessionHandle: ChatSessionHandle | null = null;
+        let bufferedContent = '';
+
+        const ensureSessionHandle = () => {
+          if (!sessionHandle && threadId && projectId) {
+            sessionHandle = createSession({
+              prompt: message,
+              projectId,
+              threadId,
+              initialContent: bufferedContent,
+            });
+            bufferedContent = '';
+          }
+        };
         
         // Redirect immediately when we get metadata - use window.location for instant navigation
         await simpleChatStream(message, {
           onMetadata: (data) => {
             threadId = data.thread_id;
             projectId = data.project_id;
+            ensureSessionHandle();
             // Instant navigation - no loading states, no delays
             if (threadId && projectId && !hasRedirected) {
               hasRedirected = true;
@@ -211,18 +228,27 @@ export function DashboardContent() {
             }
           },
           onContent: (content) => {
-            // Content is streamed but we don't need to handle it here
-            // The streaming will be handled by the thread page after redirect
+            if (!threadId || !projectId) {
+              bufferedContent += content;
+              return;
+            }
+            ensureSessionHandle();
+            sessionHandle?.append(content);
           },
           onDone: () => {
+            ensureSessionHandle();
+            sessionHandle?.finish();
             // If we haven't redirected yet (shouldn't happen), redirect now
             if (!hasRedirected && threadId && projectId) {
               startTransition(() => {
                 router.replace(`/projects/${projectId}/thread/${threadId}`, { scroll: false });
               });
             }
+            setIsSubmitting(false);
           },
           onError: (error) => {
+            ensureSessionHandle();
+            sessionHandle?.fail(error);
             setIsSubmitting(false);
             throw new Error(`Simple chat streaming error: ${error}`);
           }

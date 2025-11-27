@@ -20,7 +20,8 @@ type ConversationMessage = {
   time?: number;
 };
 
-const MODEL_NAME = 'gemini-2.5-flash';
+const QUICK_CHAT_MODEL =
+  process.env.EXPO_PUBLIC_GEMINI_RESEARCH_MODEL?.trim() || 'gemini-3-pro-preview';
 
 export const QuickChatPane: React.FC = () => {
   const scheme = useColorScheme();
@@ -244,7 +245,7 @@ export const QuickChatPane: React.FC = () => {
     try {
       const response = await quickChatMutation.mutateAsync({
         message: trimmed,
-        model: MODEL_NAME,
+        model: QUICK_CHAT_MODEL,
         chatContext: history.map(({ role, content }) => ({ role, content })),
       });
 
@@ -279,7 +280,7 @@ export const QuickChatPane: React.FC = () => {
         </Text>
         <View style={styles.chipRow}>
           <View style={styles.chip}>
-            <Text style={styles.chipText}>{MODEL_NAME}</Text>
+            <Text style={styles.chipText}>{QUICK_CHAT_MODEL}</Text>
           </View>
           <View style={styles.chip}>
             <Text style={styles.chipText}>ephemeral</Text>

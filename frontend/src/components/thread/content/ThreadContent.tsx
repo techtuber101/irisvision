@@ -1,5 +1,6 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { CircleDashed, CheckCircle, AlertTriangle, Sparkles, Copy } from 'lucide-react';
+import { AdaptiveLoader } from './adaptive-loader';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UnifiedMessage, ParsedContent } from '@/components/thread/types';
 import { FileAttachmentGrid } from '@/components/thread/file-attachment';
@@ -195,6 +196,7 @@ export function renderMarkdownContent(
 ) {
     // Handle special thinking message
     if (content === 'HMM_THINKING_MESSAGE') {
+        const isAdaptiveMode = chatMode === 'adaptive';
         return (
             <motion.div 
                 className="flex items-center gap-2 text-muted-foreground/70"
@@ -208,7 +210,7 @@ export function renderMarkdownContent(
                 }}
             >
                 <motion.div 
-                    className="w-6 h-6 rounded-full border border-muted-foreground/30 flex items-center justify-center bg-muted/20"
+                    className={isAdaptiveMode ? "flex items-center justify-center" : "w-6 h-6 rounded-full border border-muted-foreground/30 flex items-center justify-center bg-muted/20"}
                     initial={{ scale: 0, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ 
@@ -217,7 +219,11 @@ export function renderMarkdownContent(
                         ease: "easeOut" 
                     }}
                 >
-                    <Sparkles className="w-3 h-3 text-muted-foreground/60" />
+                    {isAdaptiveMode ? (
+                        <AdaptiveLoader />
+                    ) : (
+                        <Sparkles className="w-3 h-3 text-muted-foreground/60" />
+                    )}
                 </motion.div>
                 <motion.span 
                     className="text-sm italic"
@@ -1220,9 +1226,8 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                     // This handles cases where a quote is incorrectly added at the start
                                                     let contentToRender = parsedContent.content;
                                                     if (typeof contentToRender === 'string' && contentToRender.length > 1) {
-                                                        // If content starts with quote and second char is a letter (not another quote), remove the quote
-                                                        if (contentToRender.startsWith('"') && 
-                                                            contentToRender.length > 1 && 
+                                                        const firstChar = contentToRender[0];
+                                                        if ((firstChar === '"' || firstChar === "'") &&
                                                             /^[a-zA-Z]/.test(contentToRender[1])) {
                                                             contentToRender = contentToRender.slice(1);
                                                         }
@@ -1522,9 +1527,53 @@ export const ThreadContent: React.FC<ThreadContentProps> = ({
                                                 </p>
                                             </div>
 
-                                            {/* Simple Chat Loader content */}
-                                            <div className="space-y-2 w-full h-12">
-                                                <SimpleChatLoader />
+                                            {/* Simple Chat Loader content - Show adaptive loader if in adaptive mode */}
+                                            <div className="space-y-2 w-full h-12 flex items-center">
+                                                {(() => {
+                                                    // Check if we're in adaptive mode by looking at:
+                                                    // 1. Last user message metadata
+                                                    // 2. Thread metadata
+                                                    // 3. URL parameter (for redirect scenarios)
+                                                    const lastUserMessage = [...messages].reverse().find(msg => msg.type === 'user');
+                                                    let isAdaptiveMode = false;
+                                                    
+                                                    // Check thread metadata first (most reliable)
+                                                    if (threadMetadata?.chat_mode === 'adaptive') {
+                                                        isAdaptiveMode = true;
+                                                    }
+                                                    // Check last user message metadata
+                                                    else if (lastUserMessage) {
+                                                        try {
+                                                            const metadata = safeJsonParse<any>(lastUserMessage.metadata || '{}', {});
+                                                            if (metadata.chat_mode === 'adaptive') {
+                                                                isAdaptiveMode = true;
+                                                            }
+                                                        } catch {
+                                                            // Parsing failed, continue to other checks
+                                                        }
+                                                    }
+                                                    
+                                                    // If we still can't determine and we're in a redirect scenario (no messages or last is user),
+                                                    // check URL parameter as fallback
+                                                    if (!isAdaptiveMode && (messages.length === 0 || (lastUserMessage && !messages.some(m => m.type === 'assistant' && m.created_at > lastUserMessage.created_at)))) {
+                                                        try {
+                                                            const urlParams = new URLSearchParams(window.location.search);
+                                                            if (urlParams.get('trigger_adaptive') === 'true') {
+                                                                isAdaptiveMode = true;
+                                                            }
+                                                        } catch {
+                                                            // URL parsing failed, continue
+                                                        }
+                                                    }
+                                                    
+                                                    return isAdaptiveMode ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <AdaptiveLoader />
+                                                        </div>
+                                                    ) : (
+                                                        <SimpleChatLoader />
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
                                     </div>

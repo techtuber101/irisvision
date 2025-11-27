@@ -1,9 +1,11 @@
 /**
  * Fast Gemini Chat Client
- * Ultra-fast streaming chat with Gemini 2.5 Flash
+ * Ultra-fast streaming chat with Gemini 3 Pro Preview
  */
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000/api';
+export const GEMINI_FAST_MODEL =
+  process.env.NEXT_PUBLIC_GEMINI_RESEARCH_MODEL?.trim() || 'gemini-3-pro-preview';
 
 export interface FastGeminiChatRequest {
   message: string;
@@ -33,11 +35,11 @@ export interface FastGeminiStreamCallbacks {
 }
 
 /**
- * Non-streaming chat with Gemini 2.5 Flash
+ * Non-streaming chat with Gemini 3 Pro Preview
  */
 export async function fastGeminiChat(
   message: string,
-  model: string = 'gemini-2.5-flash',
+  model: string = GEMINI_FAST_MODEL,
   systemInstructions?: string,
   chatContext?: Array<{ role: string; content: string }>
 ): Promise<FastGeminiChatResponse> {
@@ -68,12 +70,12 @@ export async function fastGeminiChat(
 }
 
 /**
- * Streaming chat with Gemini 2.5 Flash
+ * Streaming chat with Gemini 3 Pro Preview
  */
 export async function fastGeminiChatStream(
   message: string,
   callbacks: FastGeminiStreamCallbacks,
-  model: string = 'gemini-2.5-flash',
+  model: string = GEMINI_FAST_MODEL,
   systemInstructions?: string,
   chatContext?: Array<{ role: string; content: string }>
 ): Promise<void> {

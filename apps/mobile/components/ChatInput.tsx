@@ -19,6 +19,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system';
 
+const QUICK_ADAPTIVE_MODEL =
+    process.env.EXPO_PUBLIC_GEMINI_RESEARCH_MODEL?.trim() || 'gemini-3-pro-preview';
+
 export type IrisChatMode = 'intelligence' | 'adaptive' | 'quick';
 
 export interface FastResponsePayload {
@@ -124,7 +127,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     const attachmentsPayload = await prepareQuickChatAttachments();
                     const response = await sendQuickChat({
                         message: finalMessage,
-                        model: 'gemini-2.5-flash',
+                        model: QUICK_ADAPTIVE_MODEL,
                         attachments: attachmentsPayload,
                     });
 
@@ -145,7 +148,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     const attachmentsPayload = await prepareQuickChatAttachments();
                     const response: AdaptiveChatResponse = await sendAdaptiveChat({
                         message: finalMessage,
-                        model: 'gemini-2.5-flash',
+                        model: QUICK_ADAPTIVE_MODEL,
                         attachments: attachmentsPayload,
                     });
 
