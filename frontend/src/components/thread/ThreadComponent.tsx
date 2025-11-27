@@ -1618,7 +1618,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     setAdaptivePrompt(null);
   }, []);
 
-  // Auto-trigger countdown timer for adaptive prompts (no longer escalates automatically)
+  // Auto-trigger countdown timer for adaptive prompts
   useEffect(() => {
     if (!adaptivePrompt) {
       setCountdown(null);
@@ -1627,17 +1627,15 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     }
 
     adaptiveAutoTriggerRef.current = false;
-    setCountdown(ADAPTIVE_PROMPT_COUNTDOWN);
-    const countdownEnd = Date.now() + ADAPTIVE_PROMPT_COUNTDOWN * 1000;
+    // Start countdown at the full duration
+    let currentCountdown = ADAPTIVE_PROMPT_COUNTDOWN;
+    setCountdown(currentCountdown);
 
     const interval = setInterval(() => {
-      const remaining = Math.max(
-        0,
-        Math.ceil((countdownEnd - Date.now()) / 1000),
-      );
-      setCountdown(remaining);
+      currentCountdown = Math.max(0, currentCountdown - 1);
+      setCountdown(currentCountdown);
 
-      if (remaining <= 0 && !adaptiveAutoTriggerRef.current) {
+      if (currentCountdown <= 0 && !adaptiveAutoTriggerRef.current) {
         adaptiveAutoTriggerRef.current = true;
         console.log('[Adaptive] Countdown expired - auto-triggering agent run');
         
@@ -2067,8 +2065,13 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     >
       <motion.div 
         className="relative rounded-[32px] bg-[rgba(255,255,255,0.25)] dark:bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl py-5 px-4 space-y-3 overflow-hidden min-h-0"
-        animate={{ y: -4 }}
-        transition={{ duration: 4, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' }}
+        animate={{ y: [-10, 10] }}
+        transition={{ 
+          duration: 2, 
+          repeat: Infinity, 
+          repeatType: 'loop',
+          ease: 'easeInOut' 
+        }}
       >
         {/* Dark mode gradient rim - inset only */}
         <div

@@ -398,7 +398,7 @@ const ThreadItem: React.FC<{
   };
   return (
     <SidebarMenuItem key={`thread-${thread.threadId}`} className="group/row relative">
-      <Tooltip open={showTooltip && !isMobile}>
+      <Tooltip open={showTooltip && !isMobile} delayDuration={0}>
         <TooltipTrigger asChild>
           <SidebarMenuButton
             asChild
@@ -406,7 +406,7 @@ const ThreadItem: React.FC<{
               ? 'bg-accent text-accent-foreground font-medium'
               : isSelected
                 ? 'bg-primary/10'
-                : ''
+                : 'hover:bg-[rgba(99,102,241,0.1)] dark:hover:bg-[rgba(99,102,241,0.15)]'
               }`}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
@@ -486,39 +486,92 @@ const ThreadItem: React.FC<{
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-56 rounded-lg"
+              className="w-64 rounded-xl border border-white/10 bg-[rgba(10,14,22,0.95)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] overflow-hidden p-2 light:bg-[rgba(255,255,255,0.95)] light:backdrop-blur-2xl"
               side={isMobile ? 'bottom' : 'right'}
               align={isMobile ? 'end' : 'start'}
             >
-              <DropdownMenuItem onClick={() => {
-                setSelectedItem({ threadId: thread?.threadId, projectId: thread?.projectId })
-                setShowShareModal(true)
-              }}>
-                <ExternalLink className="text-muted-foreground" />
-                <span>Share</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <a
-                  href={thread.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+              {/* Gradient rim */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-xl"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+                  WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                  WebkitMaskComposite: 'xor' as any,
+                  maskComposite: 'exclude',
+                  padding: 1,
+                  borderRadius: 12,
+                }}
+              />
+              
+              {/* Specular streak */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 top-0 h-16"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+                  filter: 'blur(4px)',
+                  mixBlendMode: 'screen',
+                }}
+              />
+
+              <div className="relative z-10 space-y-1">
+                <DropdownMenuItem 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSummarize();
+                  }}
+                  className="rounded-lg cursor-pointer"
                 >
-                  <ArrowUpRight className="text-muted-foreground" />
-                  <span>Open in New Tab</span>
-                </a>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() =>
-                  handleDeleteThread(
-                    thread.threadId,
-                    thread.projectName,
-                  )
-                }
-              >
-                <Trash2 className="text-muted-foreground" />
-                <span>Delete</span>
-              </DropdownMenuItem>
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span>Auto Summarise</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSelectedItem({ threadId: thread?.threadId, projectId: thread?.projectId })
+                    setShowShareModal(true)
+                  }}
+                  className="rounded-lg cursor-pointer"
+                >
+                  <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                  <span>Share</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  asChild
+                  className="rounded-lg cursor-pointer"
+                >
+                  <a
+                    href={thread.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
+                    <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+                    <span>Open in New Tab</span>
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDeleteThread(
+                      thread.threadId,
+                      thread.projectName,
+                    )
+                  }}
+                  className="rounded-lg cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete</span>
+                </DropdownMenuItem>
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
             </div>
