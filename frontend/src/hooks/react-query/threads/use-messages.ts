@@ -23,10 +23,12 @@ export const useAddUserMessageMutation = () => {
     ({
       threadId,
       message,
+      metadata,
     }: {
       threadId: string;
       message: string;
-    }) => addUserMessage(threadId, message),
+      metadata?: Record<string, any>;
+    }) => addUserMessage(threadId, message, metadata),
     {
       onSuccess: () => {
         // Invalidate threads list to update ordering when a message is added

@@ -17,7 +17,8 @@ import {
   ChevronRight,
   Zap,
   Folder,
-  Sparkles
+  Sparkles,
+  Pencil
 } from "lucide-react"
 import { ThreadIcon } from "./thread-icon"
 import { toast } from "sonner"
@@ -44,11 +45,6 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger
-} from "@/components/ui/tooltip"
 import Link from "next/link"
 import { ShareModal } from "./share-modal"
 import { TypewriterText } from '@/components/ui/typewriter-text';
@@ -62,7 +58,8 @@ import { projectKeys, threadKeys } from '@/hooks/react-query/sidebar/keys';
 import { format, formatDistanceToNow } from 'date-fns';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
-import { getMessages, streamThreadSummary } from '@/lib/api';
+import { getMessages, streamThreadSummary, updateProject } from '@/lib/api';
+import { useUpdateProject } from '@/hooks/react-query/sidebar/use-project-mutations';
 
 // Component for date group headers
 const DateGroupHeader: React.FC<{ dateGroup: string; count: number }> = ({ dateGroup, count }) => {
@@ -337,11 +334,14 @@ const ThreadItem: React.FC<{
   const [showTypewriter, setShowTypewriter] = useState(false);
   const [typewriterKey, setTypewriterKey] = useState(0);
   
-  // State for hover tooltip
-  const [isHovered, setIsHovered] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(false);
+  // State for popover menu
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryText, setSummaryText] = useState('');
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(thread.projectName);
+  const queryClient = useQueryClient();
+  const updateProjectMutation = useUpdateProject();
 
   // Detect when project name changes and trigger typewriter effect
   useEffect(() => {
@@ -352,24 +352,10 @@ const ThreadItem: React.FC<{
     }
   }, [thread.projectName, previousProjectName]);
 
-  // Handle tooltip delay
+  // Update rename value when thread name changes
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    
-    if (isHovered) {
-      timeoutId = setTimeout(() => {
-        setShowTooltip(true);
-      }, 600); // 1s delay before opening tooltip
-    } else {
-      setShowTooltip(false);
-    }
-
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [isHovered]);
+    setRenameValue(thread.projectName);
+  }, [thread.projectName]);
 
   const handleTypewriterComplete = () => {
     // Hide typewriter effect after completion
@@ -396,21 +382,68 @@ const ThreadItem: React.FC<{
       setSummaryText(e?.message || 'Failed to start summary');
     }
   };
+
+  const handleRename = async () => {
+    if (!renameValue.trim() || renameValue === thread.projectName) {
+      setIsRenaming(false);
+      return;
+    }
+
+    try {
+      if (!thread.projectId) {
+        toast.error('Cannot rename: Project ID is missing');
+        setIsRenaming(false);
+        setRenameValue(thread.projectName);
+        return;
+      }
+
+      await updateProjectMutation.mutateAsync({
+        projectId: thread.projectId,
+        data: { name: renameValue.trim() }
+      });
+
+      queryClient.invalidateQueries({ queryKey: projectKeys.all });
+      queryClient.invalidateQueries({ queryKey: threadKeys.all });
+      setIsRenaming(false);
+      toast.success('Chat renamed successfully');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to rename chat');
+      setRenameValue(thread.projectName);
+      setIsRenaming(false);
+    }
+  };
+  const formatTimestamp = (updatedAt: string) => {
+    const date = new Date(updatedAt);
+    const now = new Date();
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+    if (diffInMinutes < 60) {
+      return diffInMinutes < 1 ? 'Just now' : `${diffInMinutes}m ago`;
+    } else if (diffInHours < 24) {
+      return `${diffInHours}h ago`;
+    } else if (diffInDays === 1) {
+      return 'Yesterday';
+    } else if (diffInDays < 7) {
+      return `${diffInDays}d ago`;
+    } else {
+      return format(date, 'MMM d');
+    }
+  };
+
   return (
     <SidebarMenuItem key={`thread-${thread.threadId}`} className="group/row relative">
-      <Tooltip open={showTooltip && !isMobile} delayDuration={0}>
-        <TooltipTrigger asChild>
-          <SidebarMenuButton
-            asChild
-            className={`relative ${isActive
-              ? 'bg-accent text-accent-foreground font-medium'
-              : isSelected
-                ? 'bg-primary/10'
-                : 'hover:bg-[rgba(99,102,241,0.1)] dark:hover:bg-[rgba(99,102,241,0.15)]'
-              }`}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-          >
+      <SidebarMenuButton
+        asChild
+        className={`relative transition-all duration-200 ${isActive
+          ? 'bg-white/10 dark:bg-white/5 backdrop-blur-sm !border-transparent text-foreground font-medium hover:!bg-white/12 dark:hover:!bg-white/6 hover:backdrop-blur-sm'
+          : isSelected
+            ? 'bg-white/8 dark:bg-white/8 backdrop-blur-sm !border-white/15 dark:!border-white/15'
+            : 'border border-transparent hover:!bg-black/5 dark:hover:!bg-white/5 hover:backdrop-blur-sm hover:!border-black/10 dark:hover:!border-white/10'
+          }`}
+      >
             <div className="flex items-center w-full">
           <Link
             href={thread.url}
@@ -471,13 +504,14 @@ const ThreadItem: React.FC<{
               </AnimatePresence>
             </div>
           </div>
-          <DropdownMenu>
+          <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
             <DropdownMenuTrigger asChild>
               <button
                 className="cursor-pointer flex-shrink-0 w-4 h-4 flex items-center justify-center hover:bg-muted/50 rounded transition-all duration-150 text-muted-foreground hover:text-foreground opacity-0 group-hover/row:opacity-100"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  setIsMenuOpen(true);
                   document.body.style.pointerEvents = 'auto';
                 }}
               >
@@ -486,21 +520,21 @@ const ThreadItem: React.FC<{
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-64 rounded-xl border border-white/10 bg-[rgba(10,14,22,0.95)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] overflow-hidden p-2 light:bg-[rgba(255,255,255,0.95)] light:backdrop-blur-2xl"
+              className="w-72 rounded-2xl border border-white/10 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] overflow-hidden p-4 light:bg-[rgba(255,255,255,0.4)] light:backdrop-blur-2xl"
               side={isMobile ? 'bottom' : 'right'}
               align={isMobile ? 'end' : 'start'}
             >
               {/* Gradient rim */}
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 rounded-xl"
+                className="pointer-events-none absolute inset-0 rounded-2xl"
                 style={{
                   background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
                   WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
                   WebkitMaskComposite: 'xor' as any,
                   maskComposite: 'exclude',
                   padding: 1,
-                  borderRadius: 12,
+                  borderRadius: 16,
                 }}
               />
               
@@ -515,156 +549,145 @@ const ThreadItem: React.FC<{
                 }}
               />
 
-              <div className="relative z-10 space-y-1">
-                <DropdownMenuItem 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleSummarize();
-                  }}
-                  className="rounded-lg cursor-pointer"
-                >
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  <span>Auto Summarise</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-white/10" />
-                <DropdownMenuItem 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setSelectedItem({ threadId: thread?.threadId, projectId: thread?.projectId })
-                    setShowShareModal(true)
-                  }}
-                  className="rounded-lg cursor-pointer"
-                >
-                  <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                  <span>Share</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  asChild
-                  className="rounded-lg cursor-pointer"
-                >
+              {/* Fine noise */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-2xl opacity-[0.015]"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+                }}
+              />
+
+              <div className="relative z-10">
+                {/* Header row - Logo and Chat Name */}
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center">
+                    <Image
+                      src="/irissymbolblack.png"
+                      alt="Iris"
+                      width={16}
+                      height={16}
+                      className="w-4 h-4 dark:hidden"
+                    />
+                    <Image
+                      src="/irissymbolwhite.png"
+                      alt="Iris"
+                      width={16}
+                      height={16}
+                      className="w-4 h-4 hidden dark:block"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {isRenaming ? (
+                      <input
+                        type="text"
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onBlur={handleRename}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleRename();
+                          } else if (e.key === 'Escape') {
+                            setIsRenaming(false);
+                            setRenameValue(thread.projectName);
+                          }
+                        }}
+                        className="w-full text-sm font-semibold text-foreground bg-transparent border-b border-white/20 focus:border-white/40 focus:outline-none"
+                        autoFocus
+                      />
+                    ) : (
+                      <div className="text-sm font-semibold text-foreground truncate">{thread.projectName}</div>
+                    )}
+                    <div className="text-xs text-muted-foreground">
+                      {formatTimestamp(thread.updatedAt)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4 Glassy Buttons */}
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  {/* Share Button */}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSelectedItem({ threadId: thread.threadId, projectId: thread.projectId });
+                      setShowShareModal(true);
+                      setIsMenuOpen(false);
+                    }}
+                    className="h-10 rounded-xl bg-white/5 dark:bg-white/5 border border-white/10 dark:border-white/10 backdrop-blur-sm hover:bg-white/8 dark:hover:bg-white/8 hover:border-white/15 dark:hover:border-white/15 transition-all duration-200 flex items-center justify-center gap-2 text-xs font-medium text-foreground/80"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span>Share</span>
+                  </button>
+
+                  {/* Delete Button */}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDeleteThread(thread.threadId, thread.projectName);
+                      setIsMenuOpen(false);
+                    }}
+                    className="h-10 rounded-xl bg-white/5 dark:bg-white/5 border border-white/10 dark:border-white/10 backdrop-blur-sm hover:bg-red-500/20 hover:border-red-500/30 transition-all duration-200 flex items-center justify-center gap-2 text-xs font-medium text-red-400"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Delete</span>
+                  </button>
+
+                  {/* Open in New Tab Button */}
                   <a
                     href={thread.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => {
                       e.stopPropagation();
+                      setIsMenuOpen(false);
                     }}
+                    className="h-10 rounded-xl bg-white/5 dark:bg-white/5 border border-white/10 dark:border-white/10 backdrop-blur-sm hover:bg-white/8 dark:hover:bg-white/8 hover:border-white/15 dark:hover:border-white/15 transition-all duration-200 flex items-center justify-center gap-2 text-xs font-medium text-foreground/80"
                   >
-                    <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
-                    <span>Open in New Tab</span>
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                    <span>New Tab</span>
                   </a>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-white/10" />
-                <DropdownMenuItem
+
+                  {/* Rename Button */}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsRenaming(true);
+                    }}
+                    className="h-10 rounded-xl bg-white/5 dark:bg-white/5 border border-white/10 dark:border-white/10 backdrop-blur-sm hover:bg-white/8 dark:hover:bg-white/8 hover:border-white/15 dark:hover:border-white/15 transition-all duration-200 flex items-center justify-center gap-2 text-xs font-medium text-foreground/80"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    <span>Rename</span>
+                  </button>
+                </div>
+
+                {/* Summarize Button */}
+                <button
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    handleDeleteThread(
-                      thread.threadId,
-                      thread.projectName,
-                    )
+                    handleSummarize();
                   }}
-                  className="rounded-lg cursor-pointer text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span>Delete</span>
-                </DropdownMenuItem>
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
-            </div>
-          </SidebarMenuButton>
-        </TooltipTrigger>
-        <TooltipContent
-          side="right"
-          align="start"
-          sideOffset={8}
-          // Hide the default diamond arrow and allow interacting with content
-          className="p-0 bg-transparent border-none shadow-none [&>svg]:hidden"
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-        >
-          {/* Glassy content (portal, no absolute positioning) */}
-          <div className="relative rounded-2xl border border-white/10 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] overflow-hidden p-4 w-72 light:bg-[rgba(255,255,255,0.4)] light:backdrop-blur-2xl">
-            <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl" style={{
-              background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
-              WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
-              WebkitMaskComposite: 'xor' as any,
-              maskComposite: 'exclude',
-              padding: 1,
-              borderRadius: 16,
-            }} />
-            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-16" style={{
-              background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
-              filter: 'blur(4px)',
-              mixBlendMode: 'screen',
-            }} />
-            <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl opacity-[0.015]" style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-            }} />
-
-            <div className="relative z-10">
-              {/* Header row */}
-              <div className="flex items-center space-x-3">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center">
-                  <Image
-                    src="/irissymbolblack.png"
-                    alt="Iris"
-                    width={16}
-                    height={16}
-                    className="w-4 h-4 dark:hidden"
-                  />
-                  <Image
-                    src="/irissymbolwhite.png"
-                    alt="Iris"
-                    width={16}
-                    height={16}
-                    className="w-4 h-4 hidden dark:block"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-foreground truncate">{thread.projectName}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {(() => {
-                      const date = new Date(thread.updatedAt);
-                      const now = new Date();
-                      const diff = now.getTime() - date.getTime();
-                      const mins = Math.floor(diff / 60000);
-                      const hrs = Math.floor(diff / 3600000);
-                      const days = Math.floor(diff / 86400000);
-                      if (mins < 60) return mins < 1 ? 'Just now' : `${mins}m ago`;
-                      if (hrs < 24) return `${hrs}h ago`;
-                      if (days === 1) return 'Yesterday';
-                      if (days < 7) return `${days}d ago`;
-                      return format(date, 'MMM d');
-                    })()}
-                  </div>
-                </div>
-              </div>
-
-              {/* Large action button below */}
-              <div className="mt-3">
-                <button
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSummarize(); }}
-                  className="w-full h-9 rounded-xl bg-primary text-primary-foreground border border-primary/40 backdrop-blur-sm flex items-center justify-center gap-2 text-sm font-medium transition-all duration-200 hover:bg-primary/90 active:scale-[0.99]"
+                  className="w-full h-9 rounded-xl bg-primary text-primary-foreground border border-primary/40 backdrop-blur-sm flex items-center justify-center gap-2 text-sm font-medium transition-all duration-200 hover:bg-primary/90 active:scale-[0.99] disabled:opacity-50"
                   disabled={isSummarizing}
                 >
                   <Sparkles className="w-4 h-4" />
                   <span>{isSummarizing ? 'Summarising…' : 'Summarise'}</span>
                 </button>
-              </div>
 
-              {summaryText && (
-                <div className="mt-3 text-xs text-muted-foreground whitespace-pre-wrap max-h-40 overflow-auto">
-                  {summaryText}
-                </div>
-              )}
+                {summaryText && (
+                  <div className="mt-3 text-xs text-muted-foreground whitespace-pre-wrap max-h-40 overflow-auto">
+                    {summaryText}
+                  </div>
+                )}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
             </div>
-          </div>
-        </TooltipContent>
-      </Tooltip>
+          </SidebarMenuButton>
     </SidebarMenuItem>
   );
 };

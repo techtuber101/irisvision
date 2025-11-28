@@ -86,8 +86,8 @@ class ThreadManager:
         # Cumulative token tracking for context summarization
         self.cumulative_tokens = 0
         self.summarization_triggered = False
-        self.summarization_boundary_index = -1  # Index of last message before summarization (messages before this are summarized)
-        self.current_summary = None  # Store the current summary in memory (not in DB)
+        self.boundary_message_id = None  # Message ID of first message kept fresh (not summarized) - persisted in DB
+        self.current_summary = None  # Cache for current summary (loaded from DB when needed)
 
     def add_tool(self, tool_class: Type[Tool], function_names: Optional[List[str]] = None, **kwargs):
         """Add a tool to the ThreadManager."""
@@ -97,7 +97,7 @@ class ThreadManager:
         """Set cumulative token state from AgentRunner for context summarization."""
         self.cumulative_tokens = cumulative_tokens
         self.summarization_triggered = summarization_triggered
-        # Note: summarization_boundary_index is set when summarization occurs
+        # Note: boundary_message_id is set when summarization occurs and persisted in DB
 
     async def create_thread(
         self,
@@ -310,36 +310,92 @@ class ThreadManager:
         
         return False
     
-    def _filter_summarized_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def _load_summary_from_db(self, thread_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Load the active summary message from database for a thread.
+        Returns summary message dict with metadata, or None if no summary exists.
+        """
+        try:
+            client = await self.db.client
+            # Use the helper function from migration (returns a table)
+            result = await client.rpc('get_thread_summary', {'thread_uuid': thread_id}).execute()
+            
+            if result.data and len(result.data) > 0:
+                summary_data = result.data[0]
+                boundary_message_id = summary_data.get('boundary_message_id')
+                content_data = summary_data.get('content', {})
+                
+                # Extract content - handle both dict and string formats
+                if isinstance(content_data, dict):
+                    content_text = content_data.get('content', '')
+                elif isinstance(content_data, str):
+                    # Try to parse as JSON
+                    try:
+                        parsed = json.loads(content_data)
+                        content_text = parsed.get('content', '') if isinstance(parsed, dict) else content_data
+                    except:
+                        content_text = content_data
+                else:
+                    content_text = str(content_data)
+                
+                # Reconstruct summary message in the format expected by the system
+                summary_message = {
+                    "role": "system",
+                    "content": content_text,
+                    "message_id": summary_data.get('message_id')
+                }
+                
+                # Store boundary message ID for filtering
+                if boundary_message_id:
+                    self.boundary_message_id = boundary_message_id
+                    logger.debug(f"Loaded summary from DB for thread {thread_id}, boundary_message_id: {boundary_message_id}")
+                
+                return summary_message
+            else:
+                logger.debug(f"No summary found in DB for thread {thread_id}")
+                return None
+        except Exception as e:
+            logger.warning(f"Failed to load summary from DB for thread {thread_id}: {e}")
+            return None
+    
+    async def _filter_summarized_messages(self, messages: List[Dict[str, Any]], thread_id: str) -> List[Dict[str, Any]]:
         """
         Filter messages to exclude old messages that have been summarized.
-        Uses summarization_boundary_index to determine which messages to exclude.
+        Uses boundary_message_id from DB to determine which messages to exclude.
         Returns the stored summary + messages after the boundary.
         """
         if not messages:
             return messages
         
+        # Load summary from DB if not already cached
+        if self.current_summary is None:
+            self.current_summary = await self._load_summary_from_db(thread_id)
+        
         # If no summarization has occurred, return all messages
-        if self.summarization_boundary_index == -1 or self.current_summary is None:
+        if self.current_summary is None or self.boundary_message_id is None:
             return messages
         
-        # If boundary is beyond message count, return all messages
-        if self.summarization_boundary_index >= len(messages):
+        # Find the index of the boundary message
+        boundary_index = None
+        for i, msg in enumerate(messages):
+            if msg.get('message_id') == self.boundary_message_id:
+                boundary_index = i
+                break
+        
+        # If boundary message not found, return all messages (safety fallback)
+        if boundary_index is None:
+            logger.warning(f"Boundary message {self.boundary_message_id} not found in messages, returning all messages")
             return messages
         
-        # Return stored summary + messages after the boundary (last 3 fresh ones)
-        KEEP_FRESH_MESSAGES = 3
-        if len(messages) > self.summarization_boundary_index + KEEP_FRESH_MESSAGES:
-            # Return summary + last 3 fresh messages
-            return [self.current_summary] + messages[-KEEP_FRESH_MESSAGES:]
-        else:
-            # Return summary + all messages after boundary
-            return [self.current_summary] + messages[self.summarization_boundary_index:]
+        # Return stored summary + all messages from boundary onwards
+        # This ensures no messages are lost between the boundary and new messages
+        return [self.current_summary] + messages[boundary_index:]
     
     async def _generate_context_summary(
         self,
         messages: List[Dict[str, Any]],
-        llm_model: str
+        llm_model: str,
+        thread_id: str
     ) -> Optional[Dict[str, Any]]:
         """
         Generate a summary of old context messages using flash lite model.
@@ -356,8 +412,8 @@ class ThreadManager:
             logger.debug("Not enough messages to summarize (need at least 5)")
             return None
         
-        # Keep the last 2-3 messages fresh (not summarized)
-        KEEP_FRESH_MESSAGES = 3
+        # Keep the last 5 messages fresh (not summarized)
+        KEEP_FRESH_MESSAGES = 5
         
         if len(messages) <= KEEP_FRESH_MESSAGES:
             logger.debug(f"Only {len(messages)} messages, skipping summarization")
@@ -453,18 +509,20 @@ class ThreadManager:
             else:
                 text = str(content)
             
-            # Truncate very long messages to avoid token limits
-            if len(text) > 2000:
-                text = text[:2000] + "... [truncated]"
+            # For tool execution messages, preserve more detail
+            # Truncate very long messages but keep more for tool results
+            if len(text) > 5000:
+                text = text[:5000] + "... [truncated - see full context in original messages]"
             
             if text.strip():
                 context_parts.append(f"[{role}]: {text}")
         
         context_text = "\n\n".join(context_parts)
         
-        # Limit total input to avoid token limits (roughly 50k chars ≈ 12.5k tokens)
-        if len(context_text) > 50000:
-            context_text = context_text[:50000] + "\n\n... [truncated for summarization]"
+        # Limit total input to avoid token limits (roughly 100k chars ≈ 25k tokens)
+        # Increased limit to preserve more context for comprehensive summarization
+        if len(context_text) > 100000:
+            context_text = context_text[:100000] + "\n\n... [truncated for summarization - oldest messages may be condensed]"
         
         # Create summarization prompt with task IDs preservation
         task_ids_section = ""
@@ -477,17 +535,58 @@ CRITICAL: The following task IDs were created and MUST be preserved exactly as s
 {chr(10).join(task_ids_list)}
 """
         
-        summarization_prompt = f"""Summarize the following conversation context into a concise paragraph (4-5 sentences maximum, ~150-200 words). 
+        summarization_prompt = f"""You are tasked with creating a comprehensive, detailed summary that condenses all previous conversation context. This summary will REPLACE all the old messages, so it MUST preserve every critical piece of information in a crystal clear, well-organized manner.
 
-Preserve:
-- Main goals and objectives
-- Key decisions and outcomes  
-- Important context that might be needed later
-- Critical information from tool results
+CRITICAL REQUIREMENTS:
+1. **Preserve ALL Important Information**: Your summary must include:
+   - Every tool call that was made (tool name, purpose, key parameters)
+   - All tool results and outputs (especially for graph creation, file operations, code generation, web searches)
+   - File paths, variable names, IDs, configurations, and any specific identifiers
+   - Graph structures created (nodes, edges, relationships, properties)
+   - Web search data and findings (summarize effectively but preserve key facts, URLs, sources)
+   - Code snippets, functions, classes created (summarize but preserve structure)
+   - Task IDs, their status, and what they represent
+   - User requirements, constraints, and preferences
+   - Decisions made and reasoning behind them
+   - Current state of work (what's completed, what's in progress, what remains)
+
+2. **Organization**: Structure your summary clearly:
+   - **Overview**: Brief 2-3 sentence summary of the overall task/goal
+   - **Tool Executions**: For each important tool call, include:
+     * Tool name and what it accomplished
+     * Key inputs/parameters
+     * Important outputs/results (condense but preserve critical details)
+     * Any IDs, paths, or identifiers created
+   - **State Information**: Document what exists:
+     * Files created/modified with their paths
+     * Graph structures (nodes, edges, relationships)
+     * Variables, configurations, values
+     * Data structures, schemas, models
+   - **Web Search Findings**: For any web searches, summarize:
+     * Key facts and information discovered
+     * Important URLs and sources
+     * Relevant data points and statistics
+   - **Task Status**: List all task IDs and their current status
+   - **Remaining Work**: What still needs to be done
+
+3. **Condensation Strategy**: 
+   - Be concise but comprehensive - use as much space as you need (up to 4500 tokens)
+   - Condense repetitive information but preserve unique details
+   - For web search results: summarize effectively but keep key facts, URLs, and important data
+   - For tool results: preserve the essence and critical outputs, condense verbose output
+   - For code: preserve structure and key logic, summarize verbose comments
+   - Make every word count - be crystal clear and information-dense
+
+4. **Format**:
+   - Use clear section headers (## Section Name)
+   - Use bullet points for lists
+   - Use code blocks for code snippets, file paths, IDs
+   - Be specific with names, paths, IDs, and identifiers
+   - Preserve relationships and dependencies
+
+REMEMBER: This summary replaces all previous context. If information is not in the summary, it will be lost. Make personal effort to fit as much critical information as possible while maintaining clarity. Use as much space as needed (up to 4500 tokens) to ensure nothing important is lost.
+
 {task_ids_section}
-
-Be extremely concise - aim for a single paragraph that captures the essence of what happened. Do not include tool call details, just summarize the outcomes and context.
-{task_ids_section and 'IMPORTANT: After your summary paragraph, add a section listing all task IDs that were created (format: "Task IDs: [id1, id2, id3, ...]")' or ''}
 
 Conversation context to summarize:
 {context_text}
@@ -496,11 +595,13 @@ Conversation context to summarize:
         try:
             # Use flash lite model for fast, cheap summarization
             logger.info("Calling gemini/gemini-2.5-flash-lite for context summarization...")
+            logger.info(f"📝 Summarization prompt length: {len(summarization_prompt)} characters")
+            logger.debug(f"📝 Full summarization prompt being sent:\n{summarization_prompt}")
             summary_response = await make_llm_api_call(
                 messages=[{"role": "user", "content": summarization_prompt}],
                 model_name="gemini/gemini-2.5-flash-lite",
                 temperature=0.1,
-                max_tokens=500,  # Limit summary to ~500 tokens (paragraph length)
+                max_tokens=4500,  # Allow comprehensive summary with all important details
                 stream=False
             )
             
@@ -528,6 +629,9 @@ Conversation context to summarize:
                 logger.warning("Summary too short, keeping original messages")
                 return None
             
+            # Log the actual summary output from the summarizer
+            logger.info(f"📄 Summarizer output ({len(summary_text)} chars):\n{summary_text}")
+            
             # Append task IDs explicitly to the summary to ensure they're preserved
             task_ids_append = ""
             if extracted_task_ids:
@@ -535,10 +639,11 @@ Conversation context to summarize:
                 task_ids_append = f"\n\n[PRESERVED TASK IDs]: {json.dumps(task_id_list)}"
                 logger.info(f"Preserving {len(task_id_list)} task IDs in summary")
             
-            # Create a summary message
-            summary_message = {
+            # Create a summary message content
+            summary_content = f"[Previous conversation summary]: {summary_text}{task_ids_append}"
+            summary_message_dict = {
                 "role": "system",
-                "content": f"[Previous conversation summary]: {summary_text}{task_ids_append}"
+                "content": summary_content
             }
             
             logger.info(
@@ -546,11 +651,112 @@ Conversation context to summarize:
                 f"({len(summary_text)} chars)"
             )
             
-            return summary_message
+            # Persist summary to database (save or update)
+            try:
+                await self._persist_summary_to_db(
+                    thread_id=thread_id,
+                    summary_content=summary_message_dict,
+                    boundary_message_id=fresh_messages[0].get('message_id') if fresh_messages else None,
+                    replaced_count=len(old_messages),
+                    version=1  # Will be incremented if updating existing summary
+                )
+                logger.info(f"Summary persisted to database for thread {thread_id}")
+            except Exception as e:
+                logger.error(f"Failed to persist summary to DB for thread {thread_id}: {e}", exc_info=True)
+                # Continue anyway - summary is still generated, just not persisted
+                # This allows the agent to continue even if DB write fails
+            
+            return summary_message_dict
             
         except Exception as e:
             logger.error(f"Failed to generate context summary: {e}", exc_info=True)
             return None
+    
+    async def _persist_summary_to_db(
+        self,
+        thread_id: str,
+        summary_content: Dict[str, Any],
+        boundary_message_id: Optional[str],
+        replaced_count: int,
+        version: int = 1
+    ) -> Optional[str]:
+        """
+        Persist summary to database. If summary exists, update it; otherwise create new one.
+        Returns the message_id of the summary message.
+        """
+        try:
+            client = await self.db.client
+            
+            # Check if summary already exists
+            existing_summary_result = await client.rpc('find_thread_summary', {'thread_uuid': thread_id}).execute()
+            existing_summary_id = None
+            if existing_summary_result.data and len(existing_summary_result.data) > 0:
+                # The function returns a UUID directly, but Supabase wraps it
+                result_value = existing_summary_result.data[0]
+                if isinstance(result_value, str):
+                    existing_summary_id = result_value
+                elif isinstance(result_value, dict):
+                    # Handle different return formats
+                    existing_summary_id = result_value.get('find_thread_summary') or result_value.get('message_id')
+                else:
+                    existing_summary_id = str(result_value) if result_value else None
+            
+            # Prepare metadata
+            metadata = {
+                "summarization": True,
+                "replaced_count": replaced_count,
+                "version": version
+            }
+            if boundary_message_id:
+                metadata["boundary_message_id"] = boundary_message_id
+            
+            if existing_summary_id:
+                # Update existing summary
+                # Get current version and increment
+                current_summary = await client.table('messages').select('metadata').eq('message_id', existing_summary_id).execute()
+                if current_summary.data and current_summary.data[0].get('metadata'):
+                    current_version = current_summary.data[0]['metadata'].get('version', 1)
+                    metadata["version"] = current_version + 1
+                
+                # Update the summary message
+                update_result = await client.table('messages').update({
+                    'content': summary_content,
+                    'metadata': metadata,
+                    'updated_at': datetime.now(timezone.utc).isoformat()
+                }).eq('message_id', existing_summary_id).execute()
+                
+                if update_result.data:
+                    logger.info(f"Updated existing summary message {existing_summary_id} for thread {thread_id} (version {metadata['version']})")
+                    self.boundary_message_id = boundary_message_id
+                    # Update cache with new summary content
+                    self.current_summary = summary_content
+                    return existing_summary_id
+                else:
+                    logger.warning(f"Failed to update summary message {existing_summary_id}")
+                    return None
+            else:
+                # Create new summary message
+                summary_message = await self.add_message(
+                    thread_id=thread_id,
+                    type='system',
+                    content=summary_content,
+                    is_llm_message=True,
+                    metadata=metadata
+                )
+                
+                if summary_message and summary_message.get('message_id'):
+                    logger.info(f"Created new summary message {summary_message['message_id']} for thread {thread_id}")
+                    self.boundary_message_id = boundary_message_id
+                    # Update cache with new summary content
+                    self.current_summary = summary_content
+                    return summary_message['message_id']
+                else:
+                    logger.warning(f"Failed to create summary message for thread {thread_id}")
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"Error persisting summary to DB for thread {thread_id}: {e}", exc_info=True)
+            raise
     
     async def run_thread(
         self,
@@ -636,38 +842,41 @@ Conversation context to summarize:
                 )
                 
                 # Generate summary of old messages (includes previous summary if it exists)
-                summary_message = await self._generate_context_summary(all_messages, llm_model)
+                summary_message = await self._generate_context_summary(all_messages, llm_model, thread_id)
                 
                 if summary_message:
-                    # Replace old messages with summary, keep last 3 fresh
-                    KEEP_FRESH_MESSAGES = 3
+                    # Replace old messages with summary, keep last 5 fresh
+                    KEEP_FRESH_MESSAGES = 5
                     if len(all_messages) > KEEP_FRESH_MESSAGES:
-                        # Track the boundary: messages before this index were summarized
-                        # The boundary is the index of the first message we're keeping fresh
-                        self.summarization_boundary_index = len(all_messages) - KEEP_FRESH_MESSAGES
+                        # Get the boundary message ID (first message kept fresh)
+                        boundary_msg = all_messages[-KEEP_FRESH_MESSAGES]
+                        boundary_message_id = boundary_msg.get('message_id')
                         
-                        # Store the summary in memory for reuse when below 80k
+                        # Store the summary in cache for reuse when below 80k
+                        # Note: Summary is already persisted to DB in _generate_context_summary
                         self.current_summary = summary_message
                         
-                        # Replace all old messages with new summary, keep only last 3 fresh
+                        # Replace all old messages with new summary, keep only last 5 fresh
                         messages = [summary_message] + all_messages[-KEEP_FRESH_MESSAGES:]
                         self.summarization_triggered = True
                         logger.info(
-                            f"Context summarization complete: replaced {self.summarization_boundary_index} "
+                            f"Context summarization complete: replaced {len(all_messages) - KEEP_FRESH_MESSAGES} "
                             f"old messages with summary, keeping {KEEP_FRESH_MESSAGES} fresh messages "
-                            f"(boundary index: {self.summarization_boundary_index})"
+                            f"(boundary message_id: {boundary_message_id})"
                         )
                     else:
                         logger.warning("Not enough messages to replace, keeping all messages")
                         messages = all_messages
-                        self.summarization_boundary_index = -1
+                        self.boundary_message_id = None
+                        self.current_summary = None  # Clear cache
                 else:
                     logger.warning("Context summarization failed, continuing with all messages")
                     messages = all_messages
-                    self.summarization_boundary_index = -1
+                    self.boundary_message_id = None
+                    self.current_summary = None  # Clear cache
             else:
                 # Below 80k threshold - filter out messages that were summarized
-                messages = self._filter_summarized_messages(all_messages)
+                messages = await self._filter_summarized_messages(all_messages, thread_id)
             
             # Handle auto-continue context
             if auto_continue_state['count'] > 0 and auto_continue_state['continuous_state'].get('accumulated_content'):

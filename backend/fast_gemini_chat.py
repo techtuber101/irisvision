@@ -1045,13 +1045,14 @@ async def adaptive_chat_stream(
             
             # Create model with proper system instructions (full prompt passed as system_instruction, not as user messages)
             # Optimized: removed top_p for faster generation, kept temperature for quality
+            # Use JSON mode for reliable parsing (consistent with non-streaming endpoint)
             model = genai.GenerativeModel(
                 request.model,
                 system_instruction=resolved_instructions,
                 generation_config={
                     "temperature": ADAPTIVE_TEMPERATURE,
                     # Removed top_p for faster generation
-                    # REMOVED: response_mime_type - no JSON mode for faster generation
+                    "response_mime_type": "application/json",  # Enable JSON mode for reliable parsing
                 },
             )
             logger.debug(f"[Adaptive Stream] Using system instructions (length: {len(resolved_instructions)} chars)")

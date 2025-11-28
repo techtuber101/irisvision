@@ -69,9 +69,9 @@ import { useSimpleChatStreamStore } from '@/lib/stores/simple-chat-stream-store'
 const ADAPTIVE_PROMPT_COUNTDOWN = 30;
 const ADAPTIVE_AGENTIC_DIRECTIVE = [
   'ADAPTIVE ESCALATION DIRECTIVE:',
-  'Restart the entire task from the start.',
-  'Ignore the lightweight adaptive response above—you are now the Iris Intelligence agent assigned to execute the user\u2019s request end-to-end with full planning, tooling, and deliverables.',
-  'Treat the restated user request below as your mission and re-run everything from scratch.'
+  'Restart entire task from start.',
+  'Ignore lightweight adaptive response above—you are now Iris Intelligence agent assigned to execute the user\u2019s request end-to-end with full planning, tooling, and deliverables.',
+  'Treatrestated user request below as your mission and re-run everything from scratch.'
 ].join('\n');
 
 const sanitizeStreamChunk = (chunk: string) => {
@@ -367,22 +367,17 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   
   // Detect chat mode from thread metadata and messages (only once per thread, and only if user hasn't selected)
   useEffect(() => {
-    // Don't override if user has manually selected a mode
+    // CRITICAL: Never override if user has manually selected a mode
     if (userSelectedModeRef.current) {
       return;
     }
     
     if (threadQuery.data && initialLoadCompleted && !hasSetInitialMode) {
-      // First, check if user has a persisted preference
+      // First, check if user has a persisted preference - this is the user's explicit choice
       const persistedMode = getPersistedChatMode();
-      if (persistedMode && persistedMode !== 'adaptive') {
-        // User has explicitly chosen a mode, use it
-        setInitialChatMode(persistedMode);
-        setHasSetInitialMode(true);
-        return;
-      }
       
-      // First, check messages for adaptive mode metadata (most recent messages first)
+      // Check messages for chat mode metadata (most recent messages first)
+      // This helps restore the mode when reopening a thread
       let detectedMode: ChatMode | null = null;
       if (messages.length > 0) {
         for (let i = messages.length - 1; i >= 0; i--) {
@@ -392,8 +387,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
               const metadata = typeof message.metadata === 'string' 
                 ? JSON.parse(message.metadata) 
                 : message.metadata;
-              if (metadata.chat_mode === 'adaptive' || metadata.chat_mode === 'chat' || metadata.chat_mode === 'simple') {
-                detectedMode = metadata.chat_mode === 'simple' ? 'chat' : metadata.chat_mode;
+              // Only detect 'execute' mode from messages, not 'adaptive' or 'chat' (those can be auto-detected incorrectly)
+              if (metadata.chat_mode === 'execute') {
+                detectedMode = 'execute';
                 break;
               }
             } catch (e) {
@@ -403,28 +399,30 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
         }
       }
       
-      // If found in messages, use it (but only if user hasn't selected a different mode)
-      if (detectedMode) {
-        setInitialChatMode(detectedMode);
-        setHasSetInitialMode(true);
-        return;
+      // Priority: 1) Persisted user preference, 2) Detected mode from messages, 3) Thread metadata, 4) Default
+      let finalMode: ChatMode = persistedMode; // Default to persisted preference
+      
+      // If we detected 'execute' mode from messages, use it (user explicitly used execute mode)
+      if (detectedMode === 'execute') {
+        finalMode = 'execute';
+      } else {
+        // Check thread metadata as fallback
+        const threadMetadata = threadQuery.data.metadata;
+        if (threadMetadata && typeof threadMetadata === 'object' && threadMetadata.chat_mode) {
+          if (threadMetadata.chat_mode === 'simple') {
+            finalMode = 'chat';
+          } else if (threadMetadata.chat_mode === 'execute') {
+            finalMode = 'execute';
+          } else if (threadMetadata.chat_mode === 'adaptive') {
+            // Only use adaptive from thread metadata if no persisted preference
+            if (persistedMode === 'adaptive') {
+              finalMode = 'adaptive';
+            }
+          }
+        }
       }
       
-      // Otherwise, check thread metadata
-      const threadMetadata = threadQuery.data.metadata;
-      if (threadMetadata && typeof threadMetadata === 'object') {
-        if (threadMetadata.chat_mode === 'simple') {
-          setInitialChatMode('chat');
-        } else if (threadMetadata.chat_mode === 'adaptive') {
-          setInitialChatMode('adaptive');
-        } else {
-          // Default to persisted preference or adaptive mode
-          setInitialChatMode(persistedMode);
-        }
-      } else {
-        // Default to persisted preference or adaptive mode
-        setInitialChatMode(persistedMode);
-      }
+      setInitialChatMode(finalMode);
       setHasSetInitialMode(true);
     }
   }, [threadQuery.data, initialLoadCompleted, messages, hasSetInitialMode, getPersistedChatMode]);
@@ -733,6 +731,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
       await addUserMessageMutation.mutateAsync({
         threadId,
         message: escalationDirective,
+        metadata: { hidden: true, source: 'adaptive_escalation' },
       });
 
       // Ensure message is fully persisted before starting agent
@@ -845,8 +844,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     if (decisionState === 'agent_needed') {
       console.log('[Adaptive] Agent needed - auto-starting agent');
       
-      // Don't override user's selected mode - only set if user hasn't explicitly chosen
-      if (!userSelectedModeRef.current) {
+      // CRITICAL: Only set mode if user hasn't explicitly chosen AND we're actually in adaptive mode
+      // Don't override user's explicit mode selection (e.g., if they selected 'execute')
+      if (!userSelectedModeRef.current && initialChatMode === 'adaptive') {
         userSelectedModeRef.current = 'adaptive';
         setInitialChatMode('adaptive');
       }
@@ -892,8 +892,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     // Handle ask_user - show prompt to user
     if (decisionState === 'ask_user' && decision.ask_user) {
       console.log('[Adaptive] Asking user for confirmation:', decision.ask_user);
-      // Don't override user's selected mode - only set if user hasn't explicitly chosen
-      if (!userSelectedModeRef.current) {
+      // CRITICAL: Only set mode if user hasn't explicitly chosen AND we're actually in adaptive mode
+      // Don't override user's explicit mode selection (e.g., if they selected 'execute')
+      if (!userSelectedModeRef.current && initialChatMode === 'adaptive') {
         userSelectedModeRef.current = 'adaptive';
         setInitialChatMode('adaptive');
       }
@@ -911,8 +912,9 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
     // Handle agent_not_needed - just clear prompt
     if (decisionState === 'agent_not_needed') {
       console.log('[Adaptive] Agent not needed, clearing prompt');
-      // Don't override user's selected mode - only set if user hasn't explicitly chosen
-      if (!userSelectedModeRef.current) {
+      // CRITICAL: Only set mode if user hasn't explicitly chosen AND we're actually in adaptive mode
+      // Don't override user's explicit mode selection (e.g., if they selected 'execute')
+      if (!userSelectedModeRef.current && initialChatMode === 'adaptive') {
         userSelectedModeRef.current = 'adaptive';
         setInitialChatMode('adaptive');
       }
@@ -1365,6 +1367,62 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
             }
           }
 
+          // CRITICAL: If agent mode has been triggered before, route all follow-ups directly to agent mode
+          // Check if there's an active agent run OR if there have been any agent runs in this thread
+          const hasActiveAgent = agentRunId && agentStatus === 'running';
+          const hasAgentHistory = agentRunsQuery.data && agentRunsQuery.data.length > 0;
+          
+          if (options.chat_mode === 'adaptive' && (hasActiveAgent || hasAgentHistory)) {
+            console.log('[Adaptive] Agent mode already triggered in this thread, routing follow-up directly to agent mode');
+            
+            if (hasActiveAgent && agentRunId) {
+              // Agent is currently running - send message directly to agent
+              try {
+                await persistMessagePromise;
+                await sendAdaptiveInputMutation.mutateAsync({
+                  agentRunId,
+                  message,
+                  threadId,
+                });
+                setNewMessage('');
+                return;
+              } catch (error) {
+                console.error('[Adaptive] Failed to send to active agent, starting new agent run:', error);
+                // Fall through to start new agent run
+              }
+            }
+            
+            // Agent was running before but not now, or we need to start a new run
+            // Start agent mode with the follow-up message
+            if (!selectedAgentId) {
+              console.error('[Adaptive] No agent selected, falling back to adaptive router');
+              // Fall through to adaptive router
+            } else {
+              try {
+                // Ensure message is persisted before starting agent
+                await persistMessagePromise;
+                
+                // Start agent with the follow-up message
+                const agentResult = await startAgentMutation.mutateAsync({
+                  threadId,
+                  options: {
+                    ...options,
+                    agent_id: selectedAgentId,
+                  },
+                });
+                
+                console.log('[Adaptive] Agent started for follow-up, run ID:', agentResult.agent_run_id);
+                setUserInitiatedRun(true);
+                setAgentRunId(agentResult.agent_run_id);
+                triggerTitleGeneration();
+                return;
+              } catch (error) {
+                console.error('[Adaptive] Failed to start agent for follow-up:', error);
+                // Fall through to adaptive router as fallback
+              }
+            }
+          }
+
           const fastModePromise = runFastMode(options.chat_mode);
           persistMessagePromise.catch((error) => {
             console.error('Failed to persist user message:', error);
@@ -1510,6 +1568,14 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
       setShowAgentLimitDialog,
       queryClient,
       handleAdaptiveDecisionOutcome,
+      agentRunsQuery.data,
+      agentRunId,
+      agentStatus,
+      selectedAgentId,
+      sendAdaptiveInputMutation,
+      triggerTitleGeneration,
+      setUserInitiatedRun,
+      setNewMessage,
     ],
   );
 

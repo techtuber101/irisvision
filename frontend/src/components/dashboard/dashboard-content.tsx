@@ -58,7 +58,45 @@ export function DashboardContent() {
   const [selectedCharts, setSelectedCharts] = useState<string[]>([]);
   const [selectedOutputFormat, setSelectedOutputFormat] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [chatMode, setChatMode] = useState<'chat' | 'execute' | 'adaptive'>('adaptive');
+  
+  // CRITICAL: Load chat mode from localStorage to match ThreadComponent behavior
+  // This ensures Dashboard and ThreadComponent always show the same mode
+  const getPersistedChatMode = useCallback((): 'chat' | 'execute' | 'adaptive' => {
+    if (typeof window === 'undefined') return 'adaptive';
+    try {
+      const persisted = localStorage.getItem('iris-chat-mode-preference');
+      if (persisted === 'chat' || persisted === 'execute' || persisted === 'adaptive') {
+        return persisted as 'chat' | 'execute' | 'adaptive';
+      }
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+    return 'adaptive';
+  }, []);
+  
+  const [chatMode, setChatMode] = useState<'chat' | 'execute' | 'adaptive'>(() => {
+    // Initialize with persisted mode on first render (same as ThreadComponent)
+    return getPersistedChatMode();
+  });
+  
+  // Sync with localStorage changes and ensure mode is persisted
+  useEffect(() => {
+    const persistedMode = getPersistedChatMode();
+    if (persistedMode !== chatMode) {
+      // If localStorage changed (e.g., from another tab/component), sync it
+      setChatMode(persistedMode);
+    }
+  }, [getPersistedChatMode, chatMode]);
+  
+  // CRITICAL: Persist mode changes to localStorage (same as ThreadComponent)
+  const handleChatModeChange = useCallback((mode: 'chat' | 'execute' | 'adaptive') => {
+    setChatMode(mode);
+    try {
+      localStorage.setItem('iris-chat-mode-preference', mode);
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+  }, []);
   const [isFastModeStreaming, setIsFastModeStreaming] = useState(false);
   const [showControlMenu, setShowControlMenu] = useState(false);
   const [menuAnimate, setMenuAnimate] = useState(false);
@@ -618,7 +656,7 @@ export function DashboardContent() {
                           selectedCharts={selectedCharts}
                           selectedOutputFormat={selectedOutputFormat}
                           initialChatMode={chatMode}
-                          onChatModeChange={setChatMode}
+                          onChatModeChange={handleChatModeChange}
                         />
                       </div>
                     </div>

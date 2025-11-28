@@ -306,19 +306,25 @@ Now enhance this prompt:\n\n${value}`;
     }, [value, controlledOnChange]);
 
     // Sync chat mode with initialChatMode prop changes (only for external changes, not user-initiated)
+    // CRITICAL: This ensures the displayed mode always matches the actual mode being used
     useEffect(() => {
       // Only sync if:
       // 1. The prop actually changed from the previous value (external change)
       // 2. It's different from current chatMode
       // 3. It's not a user-initiated change (user changes propagate via onChatModeChange)
+      // 4. The change is significant (not just a re-render with same value)
       if (
         initialChatMode !== previousInitialChatModeRef.current &&
         initialChatMode !== chatMode &&
         !userInitiatedChangeRef.current
       ) {
+        console.log(`[ChatInput] Syncing mode from prop: ${chatMode} -> ${initialChatMode}`);
         setChatMode(initialChatMode);
+        previousInitialChatModeRef.current = initialChatMode;
+      } else if (initialChatMode === chatMode && initialChatMode !== previousInitialChatModeRef.current) {
+        // Update ref even if mode matches (to track prop changes)
+        previousInitialChatModeRef.current = initialChatMode;
       }
-      previousInitialChatModeRef.current = initialChatMode;
     }, [initialChatMode, chatMode]); // Include chatMode to properly detect changes
 
     const {

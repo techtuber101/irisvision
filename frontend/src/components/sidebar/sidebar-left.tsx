@@ -240,9 +240,13 @@ export function SidebarLeft({
         <SidebarGroup>
           <Link href="/">
             <SidebarMenuButton
-              className={cn('touch-manipulation', {
-                'bg-accent text-accent-foreground font-medium': pathname === '/',
-              })}
+              className={cn(
+                'touch-manipulation transition-all duration-200 border border-transparent',
+                {
+                  'bg-white/10 dark:bg-white/10 backdrop-blur-sm !border-white/20 dark:!border-white/20 text-foreground font-medium': pathname === '/',
+                  'hover:!bg-black/5 dark:hover:!bg-white/5 hover:backdrop-blur-sm hover:!border-black/10 dark:hover:!border-white/10': pathname !== '/',
+                }
+              )}
               onClick={() => {
                 posthog.capture('new_task_clicked');
                 if (isMobile) setOpenMobile(false);
@@ -264,6 +268,7 @@ export function SidebarLeft({
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton
                       tooltip="Personalities"
+                      className="transition-all duration-200 border border-transparent hover:!bg-black/5 dark:hover:!bg-white/5 hover:backdrop-blur-sm hover:!border-black/10 dark:hover:!border-white/10"
                       onClick={() => {
                         if (state === 'collapsed') {
                           setOpen(true);
@@ -287,9 +292,13 @@ export function SidebarLeft({
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem> */}
                       <SidebarMenuSubItem>
-                        <SidebarMenuSubButton className={cn('pl-3 touch-manipulation', {
-                          'bg-accent text-accent-foreground font-medium': pathname === '/agents' && ((searchParams?.get('tab') === 'my-agents') || (searchParams?.get('tab') === null)),
-                        })} asChild>
+                        <SidebarMenuSubButton className={cn(
+                          'pl-3 touch-manipulation transition-all duration-200 border border-transparent',
+                          {
+                            'bg-white/10 dark:bg-white/10 backdrop-blur-sm !border-white/20 dark:!border-white/20 text-foreground font-medium': pathname === '/agents' && ((searchParams?.get('tab') === 'my-agents') || (searchParams?.get('tab') === null)),
+                            'hover:!bg-black/5 dark:hover:!bg-white/5 hover:backdrop-blur-sm hover:!border-black/10 dark:hover:!border-white/10': pathname !== '/agents' || ((searchParams?.get('tab') !== 'my-agents') && (searchParams?.get('tab') !== null)),
+                          }
+                        )} asChild>
                           <Link href="/agents?tab=my-agents" onClick={() => isMobile && setOpenMobile(false)}>
                             <span>Added Personalities</span>
                           </Link>
@@ -301,7 +310,7 @@ export function SidebarLeft({
                             setShowNewAgentDialog(true);
                             if (isMobile) setOpenMobile(false);
                           }}
-                          className="cursor-pointer pl-3 touch-manipulation"
+                          className="cursor-pointer pl-3 touch-manipulation transition-all duration-200 border border-transparent hover:!bg-black/5 dark:hover:!bg-white/5 hover:backdrop-blur-sm hover:!border-black/10 dark:hover:!border-white/10"
                         >
                           <span>New Personality</span>
                         </SidebarMenuSubButton>

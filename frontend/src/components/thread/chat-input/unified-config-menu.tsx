@@ -304,18 +304,18 @@ const LoggedInMenu: React.FC<UnifiedConfigMenuProps> = memo(function LoggedInMen
                                                         onClick={() => handleAgentClick(agent.agent_id)}
                                                         className={cn(
                                                             "w-full flex items-center justify-between px-2.5 py-2 rounded-lg transition-all duration-200 text-left",
-                                                            "bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10",
-                                                            "hover:bg-black/8 dark:hover:bg-white/8 hover:border-black/15 dark:hover:border-white/15",
-                                                            selectedAgentId === agent.agent_id && "bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 ring-1 ring-black/10 dark:ring-white/10",
+                                                            "bg-white/5 dark:bg-white/5 border border-white/10 dark:border-white/10 backdrop-blur-sm",
+                                                            "hover:bg-white/8 dark:hover:bg-white/8 hover:border-white/15 dark:hover:border-white/15 hover:backdrop-blur-md",
+                                                            selectedAgentId === agent.agent_id && "bg-white/10 dark:bg-white/10 border-white/20 dark:border-white/20 ring-1 ring-white/10 dark:ring-white/10 backdrop-blur-md",
                                                             "min-h-[36px]"
                                                         )}
                                                     >
                                                         <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                                             {renderAgentIcon(agent)}
-                                                            <span className="truncate text-xs font-medium text-black/90 dark:text-white/90">{agent.name}</span>
+                                                            <span className="truncate text-xs font-medium text-foreground/80 dark:text-foreground/80">{agent.name}</span>
                                                         </div>
                                                         {selectedAgentId === agent.agent_id && (
-                                                            <Check className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+                                                            <Check className="h-3.5 w-3.5 text-foreground/70 dark:text-foreground/70 flex-shrink-0" />
                                                         )}
                                                     </button>
                                                 ))}
