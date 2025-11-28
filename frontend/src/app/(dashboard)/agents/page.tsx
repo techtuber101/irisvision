@@ -579,7 +579,7 @@ export default function AgentsPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="container mx-auto max-w-7xl px-4 py-8">
+      <div className="container mx-auto max-w-7xl px-4 py-6">
         <AgentsPageHeader />
       </div>
       <div className="sticky top-0 z-50">
@@ -593,8 +593,8 @@ export default function AgentsPage() {
           </div>
         </div>
       </div>
-      <div className="container mx-auto max-w-7xl px-4 py-2">
-        <div className="w-full min-h-[calc(100vh-300px)]">
+      <div className="container mx-auto max-w-7xl px-4 py-2 pb-8">
+        <div className="w-full">
           {activeTab === "my-agents" && (
             <MyAgentsTab
               agentsSearchQuery={agentsSearchQuery}

@@ -60,6 +60,7 @@ import { AgentTriggersConfiguration } from './triggers/agent-triggers-configurat
 import { AgentAvatar } from '../thread/content/agent-avatar';
 import { AgentIconEditorDialog } from './config/agent-icon-editor-dialog';
 import { AgentVersionSwitcher } from './agent-version-switcher';
+import { PersonalityIntroSection } from './personality-intro-section';
 
 interface AgentConfigurationDialogProps {
   open: boolean;
@@ -96,6 +97,7 @@ export function AgentConfigurationDialog({
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
   const [isIconEditorOpen, setIsIconEditorOpen] = useState(false);
+  const [showIntro, setShowIntro] = useState(false);
   
   // Debug state changes
   useEffect(() => {
@@ -107,7 +109,14 @@ export function AgentConfigurationDialog({
     if (open && initialTab) {
       setActiveTab(initialTab);
     }
-  }, [open, initialTab]);
+    // Show intro for new agents or if user hasn't configured anything
+    if (open && agent) {
+      const hasConfig = formData.system_prompt || 
+                       Object.keys(formData.agentpress_tools || {}).length > 0 ||
+                       (formData.configured_mcps || []).length > 0;
+      setShowIntro(!hasConfig && initialTab === 'instructions');
+    }
+  }, [open, initialTab, agent]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -380,53 +389,84 @@ export function AgentConfigurationDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-5xl h-[85vh] overflow-hidden p-0 gap-0 flex flex-col">
-          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
+        <DialogContent className="max-w-5xl h-[85vh] overflow-hidden p-0 gap-0 flex flex-col rounded-[32px] border border-white/10 dark:border-white/10 bg-[rgba(255,255,255,0.25)] dark:bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.05),inset_0_1px_0_0_rgba(0,0,0,0.06)] dark:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] relative">
+          {/* Dark mode gradient rim */}
+          <div className="absolute inset-0 rounded-[32px] dark:opacity-100 opacity-0 pointer-events-none z-0" style={{
+            background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+            WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+            WebkitMaskComposite: 'xor',
+            maskComposite: 'exclude',
+            padding: '1px',
+            borderRadius: '32px'
+          }} />
+          
+          {/* Light mode gradient rim */}
+          <div className="absolute inset-0 rounded-[32px] light:opacity-100 dark:opacity-0 pointer-events-none z-0" style={{
+            background: 'linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02) 30%, rgba(0,0,0,0.05) 85%, rgba(0,0,0,0.03))',
+            WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+            WebkitMaskComposite: 'xor',
+            maskComposite: 'exclude',
+            padding: '1px',
+            borderRadius: '32px'
+          }} />
+          
+          {/* Dark mode specular streak */}
+          <div className="absolute inset-x-0 top-0 h-24 rounded-t-[32px] dark:opacity-100 opacity-0 pointer-events-none z-0" style={{
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+            filter: 'blur(6px)',
+            mixBlendMode: 'screen',
+          }} />
+          
+          {/* Light mode specular streak */}
+          <div className="absolute inset-x-0 top-0 h-24 rounded-t-[32px] light:opacity-100 dark:opacity-0 pointer-events-none z-0" style={{
+            background: 'linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.03) 45%, rgba(0,0,0,0) 100%)',
+            filter: 'blur(6px)',
+            mixBlendMode: 'screen',
+          }} />
+          
+          {/* Fine noise */}
+          <div className="absolute inset-0 rounded-[32px] opacity-30 dark:opacity-30 light:opacity-20 pointer-events-none z-0" style={{
+            backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 0.03"/></feComponentTransfer></filter><rect width="100%" height="100%" filter="url(%23n)" /></svg>')`,
+            backgroundSize: '100px 100px',
+            mixBlendMode: 'overlay',
+          }} />
+          <DialogHeader className="relative z-10 px-6 pt-6 pb-4 flex-shrink-0 border-b border-white/10 dark:border-white/10">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div
-                  className="flex-shrink-0"
-                >
+              <div className="flex items-center gap-4">
+                <div className="flex-shrink-0">
                   {isIrisAgent ? (
                     <AgentAvatar
                       isIrisDefault={true}
                       agentName={formData.name}
-                      size={40}
-                      className="ring-1 ring-border"
+                      size={48}
+                      className="ring-2 ring-primary/20"
                     />
                   ) : (
                     <button
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        console.log('🎯 Icon clicked in config dialog - opening editor');
-                        console.log('Current formData:', { 
-                          icon_name: formData.icon_name, 
-                          icon_color: formData.icon_color, 
-                          icon_background: formData.icon_background 
-                        });
                         setIsIconEditorOpen(true);
                       }}
-                      className="cursor-pointer transition-all hover:scale-105 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-lg"
+                      className="cursor-pointer transition-all hover:scale-105 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-xl"
                       type="button"
-                      title="Click to customize agent icon"
+                      title="Click to customize personality icon"
                     >
                       <AgentAvatar
                         iconName={formData.icon_name}
                         iconColor={formData.icon_color}
                         backgroundColor={formData.icon_background}
                         agentName={formData.name}
-                        size={40}
-                        className="ring-1 ring-border hover:ring-foreground/20 transition-all"
+                        size={48}
+                        className="ring-2 ring-primary/20 hover:ring-primary/40 transition-all"
                       />
                     </button>
                   )}
                 </div>
 
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2">
                     {isEditingName ? (
-                      // Name editing mode (takes priority over everything)
                       <div className="flex items-center gap-2">
                         <Input
                           ref={nameInputRef}
@@ -440,13 +480,13 @@ export function AgentConfigurationDialog({
                               setIsEditingName(false);
                             }
                           }}
-                          className="h-8 w-64"
+                          className="h-9 w-64 bg-white/10 dark:bg-white/5 border-white/10"
                           maxLength={50}
                         />
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-8 w-8"
+                          className="h-9 w-9"
                           onClick={handleNameSave}
                         >
                           <Check className="h-4 w-4" />
@@ -454,7 +494,7 @@ export function AgentConfigurationDialog({
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-8 w-8"
+                          className="h-9 w-9"
                           onClick={() => {
                             setEditName(formData.name);
                             setIsEditingName(false);
@@ -464,26 +504,25 @@ export function AgentConfigurationDialog({
                         </Button>
                       </div>
                     ) : onAgentChange ? (
-                      // When agent switching is enabled, show a sleek inline agent selector
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <button className="flex items-center gap-2 hover:bg-muted/50 rounded-md px-2 py-1 transition-colors group">
-                              <DialogTitle className="text-xl font-semibold truncate">
-                                {isLoading ? 'Loading...' : formData.name || 'Agent'}
+                            <button className="flex items-center gap-2 hover:bg-white/5 dark:hover:bg-white/5 rounded-lg px-3 py-1.5 transition-colors group">
+                              <DialogTitle className="text-2xl font-bold truncate">
+                                {isLoading ? 'Loading...' : formData.name || 'Personality'}
                               </DialogTitle>
                               <ChevronDown className="h-4 w-4 opacity-60 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent 
-                            className="w-80 p-0" 
+                            className="w-80 p-0 rounded-xl border-white/10 dark:border-white/10 bg-[rgba(255,255,255,0.25)] dark:bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl" 
                             align="start"
                             sideOffset={4}
                           >
-                            <div className="p-3 border-b">
+                            <div className="p-3 border-b border-white/10">
                               <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                                 <Search className="h-4 w-4" />
-                                Switch Agent
+                                Switch Personality
                               </div>
                             </div>
                             <div className="max-h-60 overflow-y-auto">
@@ -518,12 +557,11 @@ export function AgentConfigurationDialog({
                             </div>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                        {/* Add edit button for name editing when agent switching is enabled */}
                         {isNameEditable && (
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-6 w-6 flex-shrink-0"
+                            className="h-8 w-8 flex-shrink-0"
                             onClick={() => {
                               setIsEditingName(true);
                               setTimeout(() => {
@@ -532,21 +570,20 @@ export function AgentConfigurationDialog({
                               }, 0);
                             }}
                           >
-                            <Edit3 className="h-3 w-3" />
+                            <Edit3 className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
                     ) : (
-                      // Static title mode (no agent switching available)
                       <div className="flex items-center gap-2">
-                        <DialogTitle className="text-xl font-semibold">
-                          {isLoading ? 'Loading...' : formData.name || 'Agent'}
+                        <DialogTitle className="text-2xl font-bold">
+                          {isLoading ? 'Loading...' : formData.name || 'Personality'}
                         </DialogTitle>
                         {isNameEditable && (
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-6 w-6"
+                            className="h-8 w-8"
                             onClick={() => {
                               setIsEditingName(true);
                               setTimeout(() => {
@@ -555,12 +592,15 @@ export function AgentConfigurationDialog({
                               }, 0);
                             }}
                           >
-                            <Edit3 className="h-3 w-3" />
+                            <Edit3 className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
                     )}
                   </div>
+                  <p className="text-sm text-muted-foreground">
+                    Customize how this personality behaves and what it can do
+                  </p>
                 </div>
               </div>
 
@@ -591,13 +631,16 @@ export function AgentConfigurationDialog({
             </div>
           </DialogHeader>
           {isLoading ? (
-            <div className="flex-1 flex items-center justify-center">
+            <div className="relative z-10 flex-1 flex items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="flex-1 flex flex-col min-h-0">
-              <div className='flex items-center justify-center w-full'>
-                <TabsList className="mt-4 w-[95%] flex-shrink-0">
+            <Tabs value={activeTab} onValueChange={(value) => {
+              setActiveTab(value as typeof activeTab);
+              setShowIntro(false);
+            }} className="relative z-10 flex-1 flex flex-col min-h-0">
+              <div className='flex items-center justify-center w-full px-6 pt-4'>
+                <TabsList className="w-full max-w-4xl flex-shrink-0 bg-white/5 dark:bg-white/5 backdrop-blur-sm border border-white/10 dark:border-white/10 rounded-xl p-1">
                   {tabItems.map((tab) => {
                     const Icon = tab.icon;
                     return (
@@ -606,63 +649,68 @@ export function AgentConfigurationDialog({
                         value={tab.id}
                         disabled={tab.disabled}
                         className={cn(
+                          "flex-1 data-[state=active]:bg-white/10 dark:data-[state=active]:bg-white/10 data-[state=active]:text-foreground",
                           tab.disabled && "opacity-50 cursor-not-allowed"
                         )}
                       >
-                        <Icon className="h-4 w-4" />
+                        <Icon className="h-4 w-4 mr-2" />
                         {tab.label}
                       </TabsTrigger>
                     );
                   })}
                 </TabsList>
               </div>
-              <div className="flex-1 overflow-auto">
-                {/* <TabsContent value="general" className="p-6 mt-0 flex flex-col h-full">
-                  <div className="flex flex-col flex-1 gap-6">
-                    <div className="flex-shrink-0">
-                      <Label className="text-base font-semibold mb-3 block">Model</Label>
-                      <AgentModelSelector
-                        value={formData.model}
-                        onChange={handleModelChange}
-                        disabled={isViewingOldVersion}
-                        variant="default"
-                      />
-                    </div>
-
+              <div className="flex-1 overflow-auto px-6">
+                {showIntro && activeTab === 'instructions' ? (
+                  <div className="py-6">
+                    <PersonalityIntroSection 
+                      onGetStarted={() => setShowIntro(false)}
+                    />
                   </div>
-                </TabsContent> */}
-
-                <TabsContent value="instructions" className="p-6 mt-0 flex flex-col h-full">
-                  <div className="flex flex-col flex-1 min-h-0">
+                ) : (
+                  <>
+                    <TabsContent value="instructions" className="py-6 mt-0 flex flex-col h-full">
+                  <div className="flex flex-col flex-1 min-h-0 space-y-4">
                     {isIrisAgent && (
-                      <Alert className="mb-4 bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900">
+                      <Alert className="bg-blue-50/50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900 rounded-xl">
                         <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         <AlertDescription className="text-sm text-blue-800 dark:text-blue-300">
-                          You can't edit the main iris Super Worker, but you can create a new AI Worker that you can modify as you wish.
+                          You can't edit the main iris Super Worker, but you can create a new personality that you can modify as you wish.
                         </AlertDescription>
                       </Alert>
                     )}
-                    <Label className="text-base font-semibold mb-3 block flex-shrink-0">System Prompt</Label>
+                    <div className="space-y-2">
+                      <Label className="text-lg font-semibold block">Instructions</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Define how this personality thinks, responds, and behaves. Be specific about its role, tone, and approach.
+                      </p>
+                    </div>
                     <ExpandableMarkdownEditor
                       value={formData.system_prompt}
                       onSave={handleSystemPromptChange}
                       disabled={!isSystemPromptEditable}
-                      placeholder="Define how your agent should behave..."
-                      className="flex-1 h-[90%]"
+                      placeholder="Example: You are a helpful coding assistant. You explain code clearly, provide examples, and help debug issues. Always format code properly and explain your reasoning..."
+                      className="flex-1 min-h-[400px]"
                     />
                   </div>
                 </TabsContent>
 
-                <TabsContent value="tools" className="p-6 mt-0 flex flex-col h-full">
-                  <div className="flex flex-col flex-1 min-h-0 h-full">
+                <TabsContent value="tools" className="py-6 mt-0 flex flex-col h-full">
+                  <div className="flex flex-col flex-1 min-h-0 space-y-4">
                     {isIrisAgent && (
-                      <Alert className="mb-4 bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900">
+                      <Alert className="bg-blue-50/50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900 rounded-xl">
                         <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         <AlertDescription className="text-sm text-blue-800 dark:text-blue-300">
-                          You can't edit the main iris Super Worker, but you can create a new AI Worker that you can modify as you wish.
+                          You can't edit the main iris Super Worker, but you can create a new personality that you can modify as you wish.
                         </AlertDescription>
                       </Alert>
                     )}
+                    <div className="space-y-2">
+                      <Label className="text-lg font-semibold block">Tools & Capabilities</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Enable specific capabilities for this personality. Tools allow it to perform actions like web search, code execution, file operations, and more.
+                      </p>
+                    </div>
                     <GranularToolConfiguration
                       tools={formData.agentpress_tools}
                       onToolsChange={handleToolsChange}
@@ -672,8 +720,14 @@ export function AgentConfigurationDialog({
                     />
                   </div>
                 </TabsContent>
-                <TabsContent value="integrations" className="p-6 mt-0 flex flex-col h-full">
-                  <div className="flex flex-col flex-1 min-h-0 h-full">
+                <TabsContent value="integrations" className="py-6 mt-0 flex flex-col h-full">
+                  <div className="flex flex-col flex-1 min-h-0 space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-lg font-semibold block">Integrations</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Connect external services and APIs to extend this personality's capabilities. Integrations allow it to interact with third-party tools and services.
+                      </p>
+                    </div>
                     <AgentMCPConfiguration
                       configuredMCPs={formData.configured_mcps}
                       customMCPs={formData.custom_mcps}
@@ -691,22 +745,36 @@ export function AgentConfigurationDialog({
                   </div>
                 </TabsContent>
 
-                <TabsContent value="knowledge" className="p-6 mt-0 flex flex-col h-full">
-                  <div className="flex flex-col flex-1 min-h-0 h-full">
-                    <AgentKnowledgeBaseManager agentId={agentId} agentName={formData.name || 'Agent'} />
+                <TabsContent value="knowledge" className="py-6 mt-0 flex flex-col h-full">
+                  <div className="flex flex-col flex-1 min-h-0 space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-lg font-semibold block">Knowledge Base</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Upload documents and files to give this personality specialized knowledge. It can reference this information when answering questions.
+                      </p>
+                    </div>
+                    <AgentKnowledgeBaseManager agentId={agentId} agentName={formData.name || 'Personality'} />
                   </div>
                 </TabsContent>
 
-                <TabsContent value="triggers" className="p-6 mt-0 flex flex-col h-full">
-                  <div className="flex flex-col flex-1 min-h-0 h-full">
+                <TabsContent value="triggers" className="py-6 mt-0 flex flex-col h-full">
+                  <div className="flex flex-col flex-1 min-h-0 space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-lg font-semibold block">Triggers</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Set up automated triggers that activate this personality based on specific conditions or events.
+                      </p>
+                    </div>
                     <AgentTriggersConfiguration agentId={agentId} />
                   </div>
                 </TabsContent>
+                  </>
+                )}
               </div>
             </Tabs>
           )}
 
-          <DialogFooter className="px-6 py-4 border-t bg-background flex-shrink-0">
+          <DialogFooter className="relative z-10 px-6 py-4 border-t border-white/10 dark:border-white/10 bg-white/10 dark:bg-white/5 backdrop-blur-sm flex-shrink-0">
             <Button
               variant="outline"
               onClick={() => handleClose(false)}

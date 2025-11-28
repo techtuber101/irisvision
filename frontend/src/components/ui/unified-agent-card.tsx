@@ -342,14 +342,47 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
   const renderDashboardCard = () => (
     <div
       className={cn(
-        'group relative bg-muted/30 rounded-3xl overflow-hidden transition-all duration-300 border cursor-pointer flex flex-col w-full border-border/50',
-        'hover:border-primary/20',
+        'group relative rounded-[32px] overflow-hidden transition-all duration-300 border cursor-pointer flex flex-col w-full border-white/10 dark:border-white/10 bg-[rgba(255,255,255,0.25)] dark:bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.05),inset_0_1px_0_0_rgba(0,0,0,0.06)] dark:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] hover:scale-[1.02]',
         className
       )}
       onClick={() => onClick?.(data)}
     >
+      {/* Dark mode gradient rim */}
+      <div className="absolute inset-0 rounded-[32px] dark:opacity-100 opacity-0 pointer-events-none" style={{
+        background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+        WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+        WebkitMaskComposite: 'xor',
+        maskComposite: 'exclude',
+        padding: '1px',
+        borderRadius: '32px'
+      }} />
+      
+      {/* Light mode gradient rim */}
+      <div className="absolute inset-0 rounded-[32px] light:opacity-100 dark:opacity-0 pointer-events-none" style={{
+        background: 'linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02) 30%, rgba(0,0,0,0.05) 85%, rgba(0,0,0,0.03))',
+        WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+        WebkitMaskComposite: 'xor',
+        maskComposite: 'exclude',
+        padding: '1px',
+        borderRadius: '32px'
+      }} />
+      
+      {/* Dark mode specular streak */}
+      <div className="absolute inset-x-0 top-0 h-16 rounded-t-[32px] dark:opacity-100 opacity-0 pointer-events-none" style={{
+        background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+        filter: 'blur(4px)',
+        mixBlendMode: 'screen',
+      }} />
+      
+      {/* Light mode specular streak */}
+      <div className="absolute inset-x-0 top-0 h-16 rounded-t-[32px] light:opacity-100 dark:opacity-0 pointer-events-none" style={{
+        background: 'linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.03) 45%, rgba(0,0,0,0) 100%)',
+        filter: 'blur(4px)',
+        mixBlendMode: 'screen',
+      }} />
+      
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-      <div className="h-full relative flex flex-col overflow-hidden w-full p-4">
+      <div className="h-full relative z-10 flex flex-col overflow-hidden w-full p-4">
         <div className="flex items-center gap-3">
           <div className="flex-shrink-0">
             <CardAvatar data={data} size={40} variant={variant} />
@@ -371,10 +404,10 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
     >
       <Card 
         className={cn(
-          'cursor-pointer transition-all duration-200 relative overflow-hidden',
+          'cursor-pointer transition-all duration-200 relative overflow-hidden rounded-[32px] border border-white/10 dark:border-white/10 bg-[rgba(255,255,255,0.25)] dark:bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.05),inset_0_1px_0_0_rgba(0,0,0,0.06)] dark:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)]',
           isSelected 
-            ? 'border-2 border-foreground bg-background' 
-            : 'border border-border hover:border-muted-foreground/30',
+            ? 'ring-2 ring-primary/50 scale-[1.02]' 
+            : 'hover:scale-[1.01]',
           className
         )}
         onClick={() => onToggle?.(data.id)}
@@ -428,7 +461,7 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
   
   const renderStandardCard = () => {
     const cardClassName = cn(
-      'group relative bg-card rounded-2xl overflow-hidden transition-all duration-300 border cursor-pointer flex flex-col border-border/50 hover:border-primary/20',
+      'group relative rounded-[32px] overflow-hidden transition-all duration-300 border cursor-pointer flex flex-col border-white/10 dark:border-white/10 bg-[rgba(255,255,255,0.25)] dark:bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.05),inset_0_1px_0_0_rgba(0,0,0,0.06)] dark:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] hover:scale-[1.02]',
       className
     );
     
@@ -564,8 +597,49 @@ export const UnifiedAgentCard: React.FC<UnifiedAgentCardProps> = ({
     
     return (
       <div className={cardClassName} onClick={() => onClick?.(data)}>
+        {/* Dark mode gradient rim */}
+        <div className="absolute inset-0 rounded-[32px] dark:opacity-100 opacity-0 pointer-events-none" style={{
+          background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+          WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+          WebkitMaskComposite: 'xor',
+          maskComposite: 'exclude',
+          padding: '1px',
+          borderRadius: '32px'
+        }} />
+        
+        {/* Light mode gradient rim */}
+        <div className="absolute inset-0 rounded-[32px] light:opacity-100 dark:opacity-0 pointer-events-none" style={{
+          background: 'linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02) 30%, rgba(0,0,0,0.05) 85%, rgba(0,0,0,0.03))',
+          WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+          WebkitMaskComposite: 'xor',
+          maskComposite: 'exclude',
+          padding: '1px',
+          borderRadius: '32px'
+        }} />
+        
+        {/* Dark mode specular streak */}
+        <div className="absolute inset-x-0 top-0 h-24 rounded-t-[32px] dark:opacity-100 opacity-0 pointer-events-none" style={{
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+          filter: 'blur(6px)',
+          mixBlendMode: 'screen',
+        }} />
+        
+        {/* Light mode specular streak */}
+        <div className="absolute inset-x-0 top-0 h-24 rounded-t-[32px] light:opacity-100 dark:opacity-0 pointer-events-none" style={{
+          background: 'linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.03) 45%, rgba(0,0,0,0) 100%)',
+          filter: 'blur(6px)',
+          mixBlendMode: 'screen',
+        }} />
+        
+        {/* Fine noise */}
+        <div className="absolute inset-0 rounded-[32px] opacity-30 dark:opacity-30 light:opacity-20 pointer-events-none" style={{
+          backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 0.03"/></feComponentTransfer></filter><rect width="100%" height="100%" filter="url(%23n)" /></svg>')`,
+          backgroundSize: '100px 100px',
+          mixBlendMode: 'overlay',
+        }} />
+        
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-        <div className="relative p-6 flex flex-col flex-1">
+        <div className="relative z-10 p-6 flex flex-col flex-1">
           <div className="flex items-start justify-between mb-4">
             <CardAvatar data={data} variant={variant} />
             <div className="flex items-center gap-2">
