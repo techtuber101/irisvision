@@ -241,10 +241,10 @@ export function SidebarLeft({
           <Link href="/">
             <SidebarMenuButton
               className={cn(
-                'touch-manipulation transition-all duration-200 border border-transparent',
+                'touch-manipulation transition-all duration-200 border border-transparent relative overflow-hidden group',
                 {
-                  'bg-white/10 dark:bg-white/10 backdrop-blur-sm !border-white/20 dark:!border-white/20 text-foreground font-medium': pathname === '/',
-                  'hover:!bg-black/5 dark:hover:!bg-white/5 hover:backdrop-blur-sm hover:!border-black/10 dark:hover:!border-white/10': pathname !== '/',
+                  'bg-white/10 dark:bg-white/10 backdrop-blur-sm text-foreground font-medium': pathname === '/',
+                  'hover:!bg-white/10 dark:hover:!bg-white/5 hover:backdrop-blur-sm light:hover:!bg-[rgba(255,255,255,0.15)]': pathname !== '/',
                 }
               )}
               onClick={() => {
@@ -252,8 +252,14 @@ export function SidebarLeft({
                 if (isMobile) setOpenMobile(false);
               }}
             >
-              <Plus className="h-4 w-4 mr-1" />
-              <span className="flex items-center justify-between w-full">
+              {/* Light mode glassy gradient overlay on hover */}
+              {pathname !== '/' && (
+                <div className="absolute inset-0 opacity-0 light:group-hover:opacity-100 dark:opacity-0 pointer-events-none transition-opacity duration-200 rounded-lg" style={{
+                  background: 'linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.01) 30%, rgba(0,0,0,0.03) 85%, rgba(0,0,0,0.02))',
+                }} />
+              )}
+              <Plus className="h-4 w-4 mr-1 relative z-10" />
+              <span className="flex items-center justify-between w-full relative z-10">
                 New Mission
               </span>
             </SidebarMenuButton>
@@ -268,16 +274,20 @@ export function SidebarLeft({
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton
                       tooltip="Personalities"
-                      className="transition-all duration-200 border border-transparent hover:!bg-black/5 dark:hover:!bg-white/5 hover:backdrop-blur-sm hover:!border-black/10 dark:hover:!border-white/10"
+                      className="transition-all duration-200 border border-transparent hover:!bg-white/10 dark:hover:!bg-white/5 hover:backdrop-blur-sm light:hover:!bg-[rgba(255,255,255,0.15)] relative overflow-hidden group"
                       onClick={() => {
                         if (state === 'collapsed') {
                           setOpen(true);
                         }
                       }}
                     >
-                      <Sparkles className="h-4 w-4 mr-1" />
-                      <span>Personalities</span>
-                      <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      {/* Light mode glassy gradient overlay on hover */}
+                      <div className="absolute inset-0 opacity-0 light:group-hover:opacity-100 dark:opacity-0 pointer-events-none transition-opacity duration-200 rounded-lg" style={{
+                        background: 'linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.01) 30%, rgba(0,0,0,0.03) 85%, rgba(0,0,0,0.02))',
+                      }} />
+                      <Sparkles className="h-4 w-4 mr-1 relative z-10" />
+                      <span className="relative z-10">Personalities</span>
+                      <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 relative z-10" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
@@ -293,14 +303,20 @@ export function SidebarLeft({
                       </SidebarMenuSubItem> */}
                       <SidebarMenuSubItem>
                         <SidebarMenuSubButton className={cn(
-                          'pl-3 touch-manipulation transition-all duration-200 border border-transparent',
+                          'pl-3 touch-manipulation transition-all duration-200 border border-transparent relative overflow-hidden group',
                           {
-                            'bg-white/10 dark:bg-white/10 backdrop-blur-sm !border-white/20 dark:!border-white/20 text-foreground font-medium': pathname === '/agents' && ((searchParams?.get('tab') === 'my-agents') || (searchParams?.get('tab') === null)),
-                            'hover:!bg-black/5 dark:hover:!bg-white/5 hover:backdrop-blur-sm hover:!border-black/10 dark:hover:!border-white/10': pathname !== '/agents' || ((searchParams?.get('tab') !== 'my-agents') && (searchParams?.get('tab') !== null)),
+                            'bg-white/10 dark:bg-white/10 backdrop-blur-sm text-foreground font-medium': pathname === '/agents' && ((searchParams?.get('tab') === 'my-agents') || (searchParams?.get('tab') === null)),
+                            'hover:!bg-white/10 dark:hover:!bg-white/5 hover:backdrop-blur-sm light:hover:!bg-[rgba(255,255,255,0.15)]': pathname !== '/agents' || ((searchParams?.get('tab') !== 'my-agents') && (searchParams?.get('tab') !== null)),
                           }
                         )} asChild>
                           <Link href="/agents?tab=my-agents" onClick={() => isMobile && setOpenMobile(false)}>
-                            <span>Added Personalities</span>
+                            {/* Light mode glassy gradient overlay on hover */}
+                            {(pathname !== '/agents' || ((searchParams?.get('tab') !== 'my-agents') && (searchParams?.get('tab') !== null))) && (
+                              <div className="absolute inset-0 opacity-0 light:group-hover:opacity-100 dark:opacity-0 pointer-events-none transition-opacity duration-200 rounded-lg" style={{
+                                background: 'linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.01) 30%, rgba(0,0,0,0.03) 85%, rgba(0,0,0,0.02))',
+                              }} />
+                            )}
+                            <span className="relative z-10">Added Personalities</span>
                           </Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
@@ -310,9 +326,13 @@ export function SidebarLeft({
                             setShowNewAgentDialog(true);
                             if (isMobile) setOpenMobile(false);
                           }}
-                          className="cursor-pointer pl-3 touch-manipulation transition-all duration-200 border border-transparent hover:!bg-black/5 dark:hover:!bg-white/5 hover:backdrop-blur-sm hover:!border-black/10 dark:hover:!border-white/10"
+                          className="cursor-pointer pl-3 touch-manipulation transition-all duration-200 border border-transparent hover:!bg-white/10 dark:hover:!bg-white/5 hover:backdrop-blur-sm light:hover:!bg-[rgba(255,255,255,0.15)] relative overflow-hidden group"
                         >
-                          <span>New Personality</span>
+                          {/* Light mode glassy gradient overlay on hover */}
+                          <div className="absolute inset-0 opacity-0 light:group-hover:opacity-100 dark:opacity-0 pointer-events-none transition-opacity duration-200 rounded-lg" style={{
+                            background: 'linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.01) 30%, rgba(0,0,0,0.03) 85%, rgba(0,0,0,0.02))',
+                          }} />
+                          <span className="relative z-10">New Personality</span>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>

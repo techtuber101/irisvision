@@ -188,19 +188,54 @@ export function ShareModal({ isOpen, onClose, threadId, projectId }: ShareModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Share Chat
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-md border border-white/10 dark:border-white/10 bg-[rgba(10,14,22,0.55)] dark:bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] light:border-gray-200 light:bg-white light:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.1)] overflow-hidden max-h-[90vh] overflow-y-auto p-0">
+        <div className="relative p-6 light:bg-gradient-to-br light:from-white light:via-white light:to-gray-50/50">
+          {/* Dark mode gradient rim */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 rounded-2xl dark:opacity-100 opacity-0"
+            style={{
+              background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
+              WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+              WebkitMaskComposite: 'xor' as any,
+              maskComposite: 'exclude',
+              padding: 1,
+              borderRadius: 16,
+            }}
+          />
+          
+          {/* Dark mode specular streak */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-16 dark:opacity-100 opacity-0"
+            style={{
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+              filter: 'blur(4px)',
+              mixBlendMode: 'screen',
+            }}
+          />
 
-        <div className="space-y-6">
+          {/* Fine noise - dark mode only */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 rounded-2xl opacity-[0.015] dark:opacity-[0.015] light:opacity-0"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+            }}
+          />
+
+          <DialogHeader className="relative z-10">
+            <DialogTitle className="flex items-center gap-2">
+              Share Chat
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6 relative z-10">
           {isChecking ? (
             <ShareModalSkeleton />
           ) : shareLink ? (
             <>
-              <Alert>
+              <Alert className="bg-white/5 dark:bg-white/5 border border-black/10 dark:border-white/10 backdrop-blur-sm light:bg-white/10 light:border-black/15">
                 <Globe className="h-4 w-4" />
                 <AlertDescription>
                   This chat is publicly accessible. Anyone with the link can view this conversation.
@@ -247,11 +282,6 @@ export function ShareModal({ isOpen, onClose, threadId, projectId }: ShareModalP
             </>
           ) : (
             <div className="text-center space-y-4">
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Create a shareable link that allows others to view this conversation publicly.
-                </p>
-              </div>
               <Button onClick={createShareLink} disabled={isLoading} className="w-full">
                 {isLoading ? (
                   <>
@@ -265,8 +295,14 @@ export function ShareModal({ isOpen, onClose, threadId, projectId }: ShareModalP
                   </>
                 )}
               </Button>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Generate a public link to share this conversation with others. Anyone with the link will be able to view the full conversation.
+                </p>
+              </div>
             </div>
           )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

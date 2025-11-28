@@ -437,14 +437,20 @@ const ThreadItem: React.FC<{
     <SidebarMenuItem key={`thread-${thread.threadId}`} className="group/row relative">
       <SidebarMenuButton
         asChild
-        className={`relative transition-all duration-200 ${isActive
+        className={`relative transition-all duration-200 overflow-hidden group ${isActive
           ? 'bg-white/10 dark:bg-white/5 backdrop-blur-sm !border-transparent text-foreground font-medium hover:!bg-white/12 dark:hover:!bg-white/6 hover:backdrop-blur-sm'
           : isSelected
-            ? 'bg-white/8 dark:bg-white/8 backdrop-blur-sm !border-white/15 dark:!border-white/15'
-            : 'border border-transparent hover:!bg-black/5 dark:hover:!bg-white/5 hover:backdrop-blur-sm hover:!border-black/10 dark:hover:!border-white/10'
+            ? 'bg-white/8 dark:bg-white/8 backdrop-blur-sm !border-transparent'
+            : 'border border-transparent hover:!bg-white/10 dark:hover:!bg-white/5 hover:backdrop-blur-sm light:hover:!bg-[rgba(255,255,255,0.15)]'
           }`}
       >
-            <div className="flex items-center w-full">
+            <div className="flex items-center w-full relative z-10">
+              {/* Light mode glassy gradient overlay on hover */}
+              {!isActive && !isSelected && (
+                <div className="absolute inset-0 opacity-0 light:group-hover/row:opacity-100 dark:opacity-0 pointer-events-none transition-opacity duration-200 rounded-lg -z-10" style={{
+                  background: 'linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.01) 30%, rgba(0,0,0,0.03) 85%, rgba(0,0,0,0.02))',
+                }} />
+              )}
           <Link
             href={thread.url}
             onClick={(e) =>
@@ -484,8 +490,8 @@ const ThreadItem: React.FC<{
             onClick={(e) => toggleThreadSelection(thread.threadId, e)}
           >
             <div
-              className={`h-4 w-4 border rounded cursor-pointer transition-all duration-150 flex items-center justify-center ${isSelected
-                ? 'opacity-100 bg-primary/15 border-primary hover:bg-primary/20'
+              className={`h-4 w-4 border rounded cursor-pointer transition-all duration-150 flex items-center justify-center relative ${isSelected
+                ? 'opacity-100 bg-primary border-primary hover:bg-primary/90'
                 : 'opacity-0 group-hover/checkbox:opacity-100 border-muted-foreground/30 bg-background hover:bg-muted/50'
                 }`}
             >
@@ -496,9 +502,9 @@ const ThreadItem: React.FC<{
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0, opacity: 0 }}
                     transition={{ duration: 0.2, type: "spring", stiffness: 300 }}
-                    className="absolute -top-2 -right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center shadow-md z-10"
+                    className="absolute inset-0 flex items-center justify-center"
                   >
-                    <Check className="w-3 h-3 text-primary-foreground" strokeWidth={3} />
+                    <Check className="w-3 h-3 text-primary-foreground" strokeWidth={2.5} />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -520,14 +526,14 @@ const ThreadItem: React.FC<{
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-72 rounded-2xl border border-white/10 bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] overflow-hidden p-4 light:bg-[rgba(255,255,255,0.4)] light:backdrop-blur-2xl"
+              className="w-72 rounded-2xl border border-white/10 dark:border-white/10 bg-[rgba(10,14,22,0.55)] dark:bg-[rgba(10,14,22,0.55)] backdrop-blur-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.06)] overflow-hidden p-4 light:border-white/20 light:bg-[rgba(255,255,255,0.25)] light:backdrop-blur-2xl light:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.05),inset_0_1px_0_0_rgba(0,0,0,0.04)] relative"
               side={isMobile ? 'bottom' : 'right'}
               align={isMobile ? 'end' : 'start'}
             >
-              {/* Gradient rim */}
+              {/* Dark mode gradient rim */}
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 rounded-2xl"
+                className="pointer-events-none absolute inset-0 rounded-2xl dark:opacity-100 opacity-0"
                 style={{
                   background: 'linear-gradient(180deg, rgba(173,216,255,0.18), rgba(255,255,255,0.04) 30%, rgba(150,160,255,0.14) 85%, rgba(255,255,255,0.06))',
                   WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
@@ -538,12 +544,37 @@ const ThreadItem: React.FC<{
                 }}
               />
               
-              {/* Specular streak */}
+              {/* Light mode gradient rim */}
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-x-0 top-0 h-16"
+                className="pointer-events-none absolute inset-0 rounded-2xl light:opacity-100 dark:opacity-0"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02) 30%, rgba(0,0,0,0.05) 85%, rgba(0,0,0,0.03))',
+                  WebkitMask: 'linear-gradient(#000,#000) content-box, linear-gradient(#000,#000)',
+                  WebkitMaskComposite: 'xor' as any,
+                  maskComposite: 'exclude',
+                  padding: 1,
+                  borderRadius: 16,
+                }}
+              />
+              
+              {/* Dark mode specular streak */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 top-0 h-16 dark:opacity-100 opacity-0"
                 style={{
                   background: 'linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)',
+                  filter: 'blur(4px)',
+                  mixBlendMode: 'screen',
+                }}
+              />
+
+              {/* Light mode specular streak */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 top-0 h-16 light:opacity-100 dark:opacity-0"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.03) 45%, rgba(0,0,0,0) 100%)',
                   filter: 'blur(4px)',
                   mixBlendMode: 'screen',
                 }}
@@ -552,7 +583,7 @@ const ThreadItem: React.FC<{
               {/* Fine noise */}
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 rounded-2xl opacity-[0.015]"
+                className="pointer-events-none absolute inset-0 rounded-2xl opacity-[0.015] dark:opacity-[0.015] light:opacity-[0.03]"
                 style={{
                   backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
                 }}
@@ -615,7 +646,7 @@ const ThreadItem: React.FC<{
                       setShowShareModal(true);
                       setIsMenuOpen(false);
                     }}
-                    className="h-10 rounded-xl bg-white/5 dark:bg-white/5 border border-white/10 dark:border-white/10 backdrop-blur-sm hover:bg-white/8 dark:hover:bg-white/8 hover:border-white/15 dark:hover:border-white/15 transition-all duration-200 flex items-center justify-center gap-2 text-xs font-medium text-foreground/80"
+                    className="h-10 rounded-xl bg-white/5 dark:bg-white/5 border border-black/10 dark:border-white/10 backdrop-blur-sm hover:bg-white/8 dark:hover:bg-white/8 hover:border-black/15 dark:hover:border-white/15 light:hover:border-black/20 transition-all duration-200 flex items-center justify-center gap-2 text-xs font-medium text-foreground/80"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                     <span>Share</span>
@@ -629,7 +660,7 @@ const ThreadItem: React.FC<{
                       handleDeleteThread(thread.threadId, thread.projectName);
                       setIsMenuOpen(false);
                     }}
-                    className="h-10 rounded-xl bg-white/5 dark:bg-white/5 border border-white/10 dark:border-white/10 backdrop-blur-sm hover:bg-red-500/20 hover:border-red-500/30 transition-all duration-200 flex items-center justify-center gap-2 text-xs font-medium text-red-400"
+                    className="h-10 rounded-xl bg-white/5 dark:bg-white/5 border border-black/10 dark:border-white/10 backdrop-blur-sm hover:bg-red-500/20 hover:border-red-500/30 dark:hover:border-red-500/30 light:hover:border-red-500/40 transition-all duration-200 flex items-center justify-center gap-2 text-xs font-medium text-red-400"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                     <span>Delete</span>
@@ -644,7 +675,7 @@ const ThreadItem: React.FC<{
                       e.stopPropagation();
                       setIsMenuOpen(false);
                     }}
-                    className="h-10 rounded-xl bg-white/5 dark:bg-white/5 border border-white/10 dark:border-white/10 backdrop-blur-sm hover:bg-white/8 dark:hover:bg-white/8 hover:border-white/15 dark:hover:border-white/15 transition-all duration-200 flex items-center justify-center gap-2 text-xs font-medium text-foreground/80"
+                    className="h-10 rounded-xl bg-white/5 dark:bg-white/5 border border-black/10 dark:border-white/10 backdrop-blur-sm hover:bg-white/8 dark:hover:bg-white/8 hover:border-black/15 dark:hover:border-white/15 light:hover:border-black/20 transition-all duration-200 flex items-center justify-center gap-2 text-xs font-medium text-foreground/80"
                   >
                     <ArrowUpRight className="h-3.5 w-3.5" />
                     <span>New Tab</span>
@@ -657,7 +688,7 @@ const ThreadItem: React.FC<{
                       e.stopPropagation();
                       setIsRenaming(true);
                     }}
-                    className="h-10 rounded-xl bg-white/5 dark:bg-white/5 border border-white/10 dark:border-white/10 backdrop-blur-sm hover:bg-white/8 dark:hover:bg-white/8 hover:border-white/15 dark:hover:border-white/15 transition-all duration-200 flex items-center justify-center gap-2 text-xs font-medium text-foreground/80"
+                    className="h-10 rounded-xl bg-white/5 dark:bg-white/5 border border-black/10 dark:border-white/10 backdrop-blur-sm hover:bg-white/8 dark:hover:bg-white/8 hover:border-black/15 dark:hover:border-white/15 light:hover:border-black/20 transition-all duration-200 flex items-center justify-center gap-2 text-xs font-medium text-foreground/80"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                     <span>Rename</span>
