@@ -44,6 +44,7 @@ import { cn } from '@/lib/utils';
 import { usePathname, useSearchParams } from 'next/navigation';
 import posthog from 'posthog-js';
 import { useDocumentModalStore } from '@/lib/stores/use-document-modal-store';
+import { SidebarSearchTrigger } from '@/components/search/sidebar-search-trigger';
 
 function FloatingMobileMenuButton() {
   const { setOpenMobile, openMobile } = useSidebar();
@@ -341,6 +342,7 @@ export function SidebarLeft({
               </Collapsible>
             </SidebarMenu>
           )}
+          <SidebarSearchTrigger />
         </SidebarGroup>
         <NavAgents />
       </SidebarContent>

@@ -19,6 +19,7 @@ import { useAgents } from '@/hooks/react-query/agents/use-agents';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { MaintenanceAlert } from '../maintenance-alert';
 import { OnboardingProvider } from '@/components/onboarding/onboarding-provider';
+import { GlobalSearchModal } from '@/components/search/global-search-modal';
 
 interface DashboardLayoutContentProps {
   children: React.ReactNode;
@@ -141,7 +142,10 @@ export default function DashboardLayoutContent({
 
             {/* Status overlay for deletion operations */}
             <StatusOverlay />
-            
+
+            {/* Global search overlay */}
+            <GlobalSearchModal />
+
             {/* Floating mobile menu button */}
             <FloatingMobileMenuButton />
           </SidebarProvider>
