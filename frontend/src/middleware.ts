@@ -43,7 +43,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Special handling for homepage: allow both logged-in and non-logged-in users
-  // Logged-in users will see dashboard content, non-logged-in will see homepage
+  // Logged-in users will see dashboard content, non-logged-in will see homepage==
   if (pathname === '/') {
     // Allow all users to access homepage - the page component will handle what to show
     return NextResponse.next();
