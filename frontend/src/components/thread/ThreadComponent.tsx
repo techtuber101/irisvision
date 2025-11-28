@@ -720,11 +720,8 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
   const startAgentFromAdaptiveDecision = useCallback(async (originalMessage: string, submitOptions?: { model_name?: string; hidden?: boolean }) => {
     console.log('[Adaptive] Starting agent from adaptive decision with message and options:', { originalMessage, submitOptions });
     
-    if (!selectedAgentId) {
-      console.error('[Adaptive] No agent selected, cannot start agent');
-      toast.error('Please select an agent first');
-      return;
-    }
+    // Note: If no agent is selected, backend will use default agent automatically
+    console.log('[Adaptive] Starting agent', selectedAgentId ? `with agent ${selectedAgentId}` : 'using default agent');
     
     try {
       const escalationDirective = `${ADAPTIVE_AGENTIC_DIRECTIVE}\n\nUSER REQUEST TO EXECUTE FROM SCRATCH:\n${originalMessage}`;
@@ -740,11 +737,12 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
       
       // Use /thread/{threadId}/agent/start which will process the latest message in the thread
       // The message should already be in the thread from the adaptive mode call
+      // If agent_id is undefined, backend will use default agent
       const agentResult = await startAgentMutation.mutateAsync({
         threadId,
         options: {
           ...submitOptions,
-          agent_id: selectedAgentId,
+          ...(selectedAgentId && { agent_id: selectedAgentId }),
         },
       });
       
@@ -1394,32 +1392,29 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
             
             // Agent was running before but not now, or we need to start a new run
             // Start agent mode with the follow-up message
-            if (!selectedAgentId) {
-              console.error('[Adaptive] No agent selected, falling back to adaptive router');
-              // Fall through to adaptive router
-            } else {
-              try {
-                // Ensure message is persisted before starting agent
-                await persistMessagePromise;
-                
-                // Start agent with the follow-up message
-                const agentResult = await startAgentMutation.mutateAsync({
-                  threadId,
-                  options: {
-                    ...options,
-                    agent_id: selectedAgentId,
-                  },
-                });
-                
-                console.log('[Adaptive] Agent started for follow-up, run ID:', agentResult.agent_run_id);
-                setUserInitiatedRun(true);
-                setAgentRunId(agentResult.agent_run_id);
-                triggerTitleGeneration();
-                return;
-              } catch (error) {
-                console.error('[Adaptive] Failed to start agent for follow-up:', error);
-                // Fall through to adaptive router as fallback
-              }
+            // If no agent is selected, backend will use default agent automatically
+            try {
+              // Ensure message is persisted before starting agent
+              await persistMessagePromise;
+              
+              // Start agent with the follow-up message
+              // If agent_id is undefined, backend will use default agent
+              const agentResult = await startAgentMutation.mutateAsync({
+                threadId,
+                options: {
+                  ...options,
+                  ...(selectedAgentId && { agent_id: selectedAgentId }),
+                },
+              });
+              
+              console.log('[Adaptive] Agent started for follow-up, run ID:', agentResult.agent_run_id, selectedAgentId ? `with agent ${selectedAgentId}` : 'using default agent');
+              setUserInitiatedRun(true);
+              setAgentRunId(agentResult.agent_run_id);
+              triggerTitleGeneration();
+              return;
+            } catch (error) {
+              console.error('[Adaptive] Failed to start agent for follow-up:', error);
+              // Fall through to adaptive router as fallback
             }
           }
 
@@ -1453,7 +1448,7 @@ export function ThreadComponent({ projectId, threadId, compact = false, configur
           threadId,
           options: {
             ...options,
-            agent_id: selectedAgentId,
+            ...(selectedAgentId && { agent_id: selectedAgentId }),
           },
         });
 
