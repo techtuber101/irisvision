@@ -238,12 +238,12 @@ export function SidebarLeft({
       </SidebarHeader>
       <SidebarContent className="[&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] relative z-10">
         <SidebarGroup>
-          <Link href="/">
+          <Link href="/" className="group/new-mission">
             <SidebarMenuButton
               className={cn(
-                'touch-manipulation transition-all duration-200 border border-transparent relative overflow-hidden group',
+                'touch-manipulation transition-all duration-200 border border-transparent relative overflow-hidden',
                 {
-                  'bg-white/10 dark:bg-white/10 backdrop-blur-sm text-foreground font-medium': pathname === '/',
+                  'bg-white/10 dark:bg-white/10 backdrop-blur-sm text-foreground font-medium hover:!bg-white/10 dark:hover:!bg-white/10 hover:!text-foreground': pathname === '/',
                   'hover:!bg-white/10 dark:hover:!bg-white/5 hover:backdrop-blur-sm light:hover:!bg-[rgba(255,255,255,0.15)]': pathname !== '/',
                 }
               )}
@@ -254,7 +254,7 @@ export function SidebarLeft({
             >
               {/* Light mode glassy gradient overlay on hover */}
               {pathname !== '/' && (
-                <div className="absolute inset-0 opacity-0 light:group-hover:opacity-100 dark:opacity-0 pointer-events-none transition-opacity duration-200 rounded-lg" style={{
+                <div className="absolute inset-0 opacity-0 light:group-hover/new-mission:opacity-100 dark:opacity-0 pointer-events-none transition-opacity duration-200 rounded-lg" style={{
                   background: 'linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.01) 30%, rgba(0,0,0,0.03) 85%, rgba(0,0,0,0.02))',
                 }} />
               )}
@@ -268,13 +268,13 @@ export function SidebarLeft({
             <SidebarMenu>
               <Collapsible
                 defaultOpen={false}
-                className="group/collapsible"
+                className="group/collapsible group/personalities"
               >
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton
                       tooltip="Personalities"
-                      className="transition-all duration-200 border border-transparent hover:!bg-white/10 dark:hover:!bg-white/5 hover:backdrop-blur-sm light:hover:!bg-[rgba(255,255,255,0.15)] relative overflow-hidden group"
+                      className="transition-all duration-200 border border-transparent hover:!bg-white/10 dark:hover:!bg-white/5 hover:backdrop-blur-sm light:hover:!bg-[rgba(255,255,255,0.15)] relative overflow-hidden"
                       onClick={() => {
                         if (state === 'collapsed') {
                           setOpen(true);
@@ -282,7 +282,7 @@ export function SidebarLeft({
                       }}
                     >
                       {/* Light mode glassy gradient overlay on hover */}
-                      <div className="absolute inset-0 opacity-0 light:group-hover:opacity-100 dark:opacity-0 pointer-events-none transition-opacity duration-200 rounded-lg" style={{
+                      <div className="absolute inset-0 opacity-0 light:group-hover/personalities:opacity-100 dark:opacity-0 pointer-events-none transition-opacity duration-200 rounded-lg" style={{
                         background: 'linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.01) 30%, rgba(0,0,0,0.03) 85%, rgba(0,0,0,0.02))',
                       }} />
                       <Sparkles className="h-4 w-4 mr-1 relative z-10" />

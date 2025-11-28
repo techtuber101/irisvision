@@ -1,6 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { cn } from '@/lib/utils';
 import { MermaidRenderer } from './mermaid-renderer';
 import { isMermaidCode } from '@/lib/mermaid-utils';
@@ -20,7 +23,8 @@ export const Markdown: React.FC<MarkdownProps> = React.memo(({
   return (
     <div className={cn('prose prose-sm dark:prose-invert max-w-none', className)}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
         components={{
           // Custom styling for markdown elements
           h1: ({ children }) => <h1 className="text-lg font-semibold mb-2">{children}</h1>,
