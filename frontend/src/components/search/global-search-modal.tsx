@@ -214,7 +214,7 @@ export function GlobalSearchModal() {
           href: thread.url,
           metadata: formatDateLabel(thread.updatedAt),
           icon: <ThreadIcon iconName={thread.iconName} className="h-4 w-4" size={16} />,
-          score: 10 - index,
+          score: Math.max(1, 10 - index),
         }));
     });
 
@@ -232,7 +232,7 @@ export function GlobalSearchModal() {
         href: '/knowledge-base',
         metadata: formatDateLabel(file.created_at),
         icon: <FileText className="h-4 w-4 text-emerald-500" />,
-        score: 8 - index,
+        score: Math.max(1, 8 - index),
       }));
 
     return [...messageItems, ...chatItems, ...fileItems]
