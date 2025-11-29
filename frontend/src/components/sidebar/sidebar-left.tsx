@@ -244,7 +244,7 @@ export function SidebarLeft({
               className={cn(
                 'touch-manipulation transition-all duration-200 border border-transparent relative overflow-hidden',
                 {
-                  'bg-white/10 dark:bg-white/10 backdrop-blur-sm text-foreground font-medium hover:!bg-white/10 dark:hover:!bg-white/10 hover:!text-foreground': pathname === '/',
+                  'bg-white/10 dark:bg-white/10 backdrop-blur-sm text-foreground font-medium': pathname === '/',
                   'hover:!bg-white/10 dark:hover:!bg-white/5 hover:backdrop-blur-sm light:hover:!bg-[rgba(255,255,255,0.15)]': pathname !== '/',
                 }
               )}
@@ -342,7 +342,9 @@ export function SidebarLeft({
               </Collapsible>
             </SidebarMenu>
           )}
-          <SidebarSearchTrigger />
+          <SidebarMenu className="gap-0.5">
+            <SidebarSearchTrigger />
+          </SidebarMenu>
         </SidebarGroup>
         <NavAgents />
       </SidebarContent>
